@@ -1,0 +1,20 @@
+plugins: []
+
+rules: {}
+
+types:    [design, decision, overview, reference, glossary]
+statuses: [draft, review, accepted, deprecated]
+
+propagation:
+  threshold: likely     # Pass 2 score at or above which to flag
+  gate: 0.5             # Pass 1 score below which the edge is pruned
+  budget: 200           # max judge calls per run; overridable with --budget
+  concurrency: 8        # judge calls in flight at once
+
+judges:
+  propagation: jev-1.13.0
+
+gates: {}
+
+defaults:
+  gates: []             # for documents with no gates field
