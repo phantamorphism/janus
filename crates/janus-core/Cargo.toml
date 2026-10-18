@@ -1,0 +1,9 @@
+[package]
+name = "janus-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Dual-upstream (Anthropic + OpenAI) LLM proxy core: credential pool, HMAC auth, request forwarding."
+
+[dependencies]

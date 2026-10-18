@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package janus.v1;
+
+// JanusPlugin is implemented by a HOST app (e.g. Shadow), not by janus-daemon.
+// janus-daemon is the gRPC CLIENT of this service, and only calls it when a
+// plugin endpoint is configured. With no plugin configured, janus-daemon is
+// a pure pass-through proxy and makes zero calls defined in this file.
+service JanusPlugin {
+  // Synchronous routing decision, consulted before janus-daemon forwards a
+  // request upstream. Blocking by design — every proxied request waits on
+  // this when the plugin is enabled. Default posture on failure (unreachable
+  // plugin, error response) is FAIL CLOSED: reject the request rather than
+  // silently falling back to a default credential. Deliberately mirrors
+  // Shadow's existing AC-03 account-routing invariant ("hard error, no
+  // fallback") — billing the wrong account/credential silently is worse
+  // than a failed request.
+  rpc ResolveRoute(ResolveRouteRequest) returns (ResolveRouteResponse);
+
+  // Fire-and-forget event stream. janus-daemon never blocks on this and
+  // never inspects the response beyond acknowledging delivery — it's a
+  // "something happened, tell whoever's listening" channel. One generic
+  // envelope type instead of one RPC per event, so new event kinds (e.g. a
+  // future checkpoint/compaction signal) don't require a proto change.
+  rpc Notify(stream NotifyEvent) returns (NotifyAck);
+}
+
+message ResolveRouteRequest {
+  string conversation_id = 1;
+  // "anthropic" | "openai" | "openrouter" — which upstream this request is
+  // destined for.
+  string upstream = 2;
+}
+
+message ResolveRouteResponse {
+  oneof outcome {
+    // Use this specific credential reference (opaque to janus-daemon; the
+    // plugin and the credential pool agree on what it means).
+    string credential_ref = 1;
+    // Explicitly defer to janus-daemon's own default credential chain.
+    bool use_default = 2;
+    // Hard-fail the request with this reason (fail-closed path).
+    string deny_reason = 3;
+  }
+}
+
+message NotifyEvent {
+  // Freeform, extensible — e.g. "credential_invalid", "account_error",
+  // "context_checkpoint_detected". New kinds are additive; janus-daemon
+  // does not validate this against a fixed enum.
+  string event_type = 1;
+  string conversation_id = 2;
+  // Event-specific data as a JSON-encoded string, kept loose on purpose —
+  // see event_type for why.
+  string payload_json = 3;
+}
+
+message NotifyAck {}

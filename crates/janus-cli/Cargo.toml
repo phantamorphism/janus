@@ -1,0 +1,13 @@
+[package]
+name = "janus-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Admin CLI for janus-daemon: manage credentials, inspect pool health, tail request logs."
+
+[[bin]]
+name = "janus"
+path = "src/main.rs"
+
+[dependencies]

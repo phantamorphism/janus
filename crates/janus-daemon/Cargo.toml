@@ -1,0 +1,14 @@
+[package]
+name = "janus-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The long-running Janus process: runs the proxy, hosts the gRPC plugin server (ResolveRoute, Notify)."
+
+[[bin]]
+name = "janus-daemon"
+path = "src/main.rs"
+
+[dependencies]
+janus-core = { path = "../janus-core" }
