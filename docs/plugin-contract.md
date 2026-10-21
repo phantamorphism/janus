@@ -119,12 +119,12 @@ makes based on the latency it can afford and the isolation it wants:
 
 - **Bundled (in-process).** The plugin is loaded into `janus-daemon`'s own
   process and implements the same interface without a socket in between. Fastest
-  — no serialization, no context switch, no network — and the right choice when
-  the policy logic is trusted and the per-request budget is tight. It is also
-  the weakest isolation: the plugin shares an address space with the one process
-  that holds real credential material. "Bundled" means loaded and conforming to
-  the same interface, not compiled in as a fork of Janus; the mechanism by which
-  that is achieved is not yet decided — see
+  — no socket, no context switch, no network round trip — and the right choice
+  when the policy logic is trusted and the per-request budget is tight. It is
+  also the weakest isolation: the plugin shares an address space with the
+  process that holds real credential material. "Bundled" means loaded and
+  conforming to the same interface, not compiled in as a fork of Janus; the
+  mechanism by which that is achieved is not yet decided — see
   <ref target="docs/status#open-questions">open questions</ref>.
 - **Local socket.** The plugin is a separate process on the same host, reached
   over gRPC on a unix domain socket. Real process isolation and no network
@@ -138,12 +138,14 @@ makes based on the latency it can afford and the isolation it wants:
   that channel is authenticated is not yet decided — see
   <ref target="docs/status#open-questions">open questions</ref>.
 
-Two consequences of holding the interface constant across all three. First, a
-plugin author does not choose the model: the same implementation can be bundled
-in one deployment and run remotely in another. Second, the fail-closed posture
-above is not a remote-only concern — a bundled plugin that panics or a local
-socket that is not listening are handled the same way as an unreachable network
-service.
+Two consequences of holding the interface constant across all three. First, the
+model is meant to be a deployment choice rather than a plugin author's: the
+intent is that one implementation can be bundled in one deployment and run
+remotely in another, though how completely that holds depends on the unresolved
+bundled ABI — see <ref target="docs/status#open-questions">open questions</ref>.
+Second, the fail-closed posture above is not a remote-only concern — a bundled
+plugin that panics or a local socket that is not listening are handled the same
+way as an unreachable network service.
 
 gRPC is the contract shape precisely because of the first model's existence
 alongside the third. The interface has to be cheap enough to sit on the

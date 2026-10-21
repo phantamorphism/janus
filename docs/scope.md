@@ -12,7 +12,7 @@ separate application with a Rust backend, has a gateway module bundled inside
 its server binary that proxies Anthropic, OpenAI and OpenRouter traffic with
 credential pooling, HMAC auth and request logging. That working code is the
 starting point for Janus's forwarding path, which is why those three are the
-first upstreams Janus supports.
+first upstreams Janus will support.
 
 Janus depends on no type from that application and is not scoped to its use
 cases. This document records which of that code carries over cleanly, and which

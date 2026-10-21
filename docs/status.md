@@ -91,6 +91,15 @@ section is updated.
   Janus implements first, and reads oddly for a general-purpose proxy. Left as
   it is for now rather than renamed on speculation; worth revisiting once there
   is a non-LLM upstream to test it against.
+- **The admin surface itself.**
+  <ref target="docs/architecture#janus-daemon">janus-daemon</ref> is described
+  as exposing an operator-facing admin surface, separate from the data plane and
+  consumed by both <ref target="docs/architecture#janus-cli">janus-cli</ref> and
+  <ref target="docs/architecture#ui">the UI</ref>. What protocol it speaks,
+  where it listens, and how an operator authenticates to it are all undecided.
+  Since it is the surface that manages credentials, "not reachable by the
+  callers the data plane serves" is a requirement with no mechanism behind it
+  yet.
 - **Full `janus` CLI command surface.**
   <ref target="docs/architecture#janus-cli">janus-cli</ref> is described as an
   admin client for credential management, pool health, and log tailing, but the
