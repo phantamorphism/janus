@@ -1,11 +1,8 @@
 plugins: []
 
-rules:
-  # No TYPESAFE_API_KEY provisioned for this project yet, so the propagation
-  # judge (jev) can't actually run. Off for now rather than left at warn,
-  # which would hit exit 4 (judge unreachable) the first time an edit creates
-  # a propagation edge. Revisit once there's a key.
-  propagation/may-need-update: off
+rules: {}
+  # propagation/may-need-update uses the default (warn). TYPESAFE_API_KEY is
+  # provisioned and the jev judge is confirmed reachable.
 
 types:    [design, decision, overview, reference, glossary]
 statuses: [draft, review, accepted, deprecated]
