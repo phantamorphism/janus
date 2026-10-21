@@ -1,11 +1,14 @@
 //! janus-core: the proxy brain.
 //!
-//! Default behavior is a pure pass-through dual-upstream (Anthropic +
-//! OpenAI) proxy with no external dependencies — credential pool and HMAC
-//! auth live here. Optional behavior (account routing, event notifications)
-//! is reached only through the gRPC plugin contract defined in `proto/`,
-//! never by depending on a specific host app's types.
+//! Holds everything that is true of the proxy regardless of how it is
+//! deployed: caller-identity verification, the credential pool, the
+//! substitution of a real upstream credential for the caller's identity, and
+//! the forwarding path. Callers never see credential material; it does not
+//! leave this crate in the direction of a caller.
 //!
-//! Lifted and generalized from Shadow's `shadow-server/src/gateway/` +
-//! `shadow-core/src/gateway/token.rs`. Not yet implemented — this crate is
-//! currently a scaffold.
+//! Default behavior is a pass-through credential-substituting proxy with no
+//! external dependencies. Policy (which credential a caller gets, whether the
+//! call is allowed at all) is reached only through the gRPC plugin contract in
+//! `proto/`, never by depending on a specific host app's types.
+//!
+//! Not yet implemented — this crate is currently a scaffold.
