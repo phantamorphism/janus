@@ -7,7 +7,7 @@ tags: [janus, status]
 
 # Status
 
-As of 2026-10-18, both the `janus` code repository and this documentation corpus
+As of 2026-10-21, both the `janus` code repository and this documentation corpus
 are brand new. This document is a plain statement of what's actually built, and
 a list of what's still genuinely undecided — not a place to invent answers to
 make the picture look more finished than it is.
