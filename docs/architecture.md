@@ -35,9 +35,14 @@ The library crate holding everything that is true of the proxy regardless of how
 it is deployed. It is linked by `janus-daemon` and by tooling; it owns no
 listener and no process lifecycle of its own. Its responsibilities:
 
-- **Caller identity verification.** Minting and verifying the HMAC-signed tokens
-  that represent a caller identity, so the daemon can establish who is asking
-  before anything else happens.
+- **Caller identity verification.** The token primitives — HMAC minting and
+  verification, carried over from the existing gateway code (see
+  <ref target="docs/scope#extractable">what carries over</ref>) — that let the
+  daemon establish who is asking before anything else happens. The crate owns
+  those primitives; the lifecycle around them (who asks for an identity to be
+  minted, how one reaches a sandbox, how long it lives, how it is revoked) is
+  not yet decided — see <ref target="docs/status#open-questions">open
+  questions</ref>.
 - **The credential pool.** Storage and lookup of real upstream credentials,
   detection of what kind each one is, and refreshing the ones that expire. This
   is the only component with read access to credential material; nothing above
@@ -113,8 +118,8 @@ points where a decision actually gets made; everything else is mechanical.
 
 1. **A caller issues a request.** The agent calls the upstream's own API, with
    the base URL pointed at `janus-daemon`'s data plane and its own caller
-   identity in place of upstream auth. From the caller's side this is an
-   ordinary upstream call.
+   identity presented instead of a real upstream credential. From the caller's
+   side this is an ordinary upstream call.
 2. **Janus verifies the identity.** *(Decision: Janus alone.)* The presented
    identity is verified locally. If it does not verify, the request is rejected
    immediately — no plugin is consulted, no credential is touched, nothing is
@@ -160,13 +165,15 @@ All three substitute the credential; they differ only in what happens to the
 response.
 
 - **Pass through.** The default and the baseline. The response is relayed
-  unmodified. This is the lowest-latency path and the only one available with no
-  plugin configured.
+  unmodified and nothing about the call leaves the daemon beyond its own request
+  log. This is the lowest-latency path and the only one available with no plugin
+  configured.
 - **Pass through and observe.** The response is still relayed unmodified, but
-  the call is recorded and/or emitted as an event. Observation is strictly off
-  the critical path: it must not alter what the caller receives, and it must not
-  be able to stall or fail the response. This is the path that makes usage
-  attribution and auditing possible without changing behavior.
+  the call is reported outward as an event, on top of the request log the daemon
+  keeps either way. Observation is strictly off the critical path: it must not
+  alter what the caller receives, and it must not be able to stall or fail the
+  response. This is the path that makes usage attribution and auditing possible
+  without changing behavior.
 - **Pass through and augment.** The response is transformed before it reaches
   the caller, transparently — the caller still sees a well-formed response of
   the kind the upstream produces, not a Janus-specific envelope. This is the

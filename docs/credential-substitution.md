@@ -58,10 +58,12 @@ secret that authorizes the call*. Janus separates them.
 
 ## The substitution {#substitution}
 
-A request arrives carrying the caller's identity in the position where upstream
-auth would normally go. Janus verifies that identity, decides which real
-credential applies, strips the caller's identity material out of the request,
-injects the real credential's auth headers, and forwards the result upstream.
+A request arrives carrying the caller's identity instead of an upstream
+credential — where exactly that identity sits on the wire is not yet decided,
+see <ref target="docs/status#open-questions">open questions</ref>. Janus
+verifies the identity, decides which real credential applies, strips the
+caller's identity material out of the request, applies the real credential's
+auth in whatever form that upstream expects, and forwards the result upstream.
 The response comes back along the same path.
 
 Two properties of that exchange are load-bearing:
@@ -98,7 +100,10 @@ Three kinds of check belong there:
   routed to different accounts.
 - **Metering.** Has this identity exhausted its credit, quota, or rate budget?
   Because the check happens before the call is forwarded, an over-budget caller
-  is stopped before it costs anything upstream, not reconciled after the fact.
+  can be stopped before it costs anything upstream rather than reconciled after
+  the fact. Where the counting that answers the question actually lives — in the
+  plugin, or in Janus itself — is not yet decided; see
+  <ref target="docs/status#open-questions">open questions</ref>.
 
 All three collapse into the same contract call. The plugin is handed the caller
 identity and the intended upstream, and answers with either a credential to use

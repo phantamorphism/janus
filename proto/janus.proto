@@ -43,14 +43,15 @@ message ResolveRouteRequest {
   // WHICH CALLER IS ASKING. The identity janus-daemon has already verified for
   // this request, and the primary input to the decision: the plugin's job is
   // to say which real credential this specific identity may have substituted
-  // in, or to deny it. Opaque to the plugin beyond being a stable, verified
-  // identifier for one caller.
+  // in, or to deny it. Treat it as a stable identifier to key policy off, not
+  // as a structure to parse — the identity's internal format is not decided.
   //
   // How a caller obtains and presents this identity in the first place is not
   // yet decided (see docs/status open questions); this field only carries the
-  // verified result of that step. Empty means unidentified — a plugin that
-  // enforces per-caller policy should treat that as a denial rather than
-  // falling back to a default.
+  // verified result of that step. janus-daemon does not call ResolveRoute
+  // without a verified identity, so this is not expected to be empty; a plugin
+  // that nonetheless sees it empty should deny rather than fall back to a
+  // default.
   string caller_identity = 3;
 }
 

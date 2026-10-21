@@ -27,9 +27,9 @@ both directions at once: one face toward the caller, one toward the upstream.
 
 ## First upstreams
 
-Anthropic, OpenAI and OpenRouter — the LLM APIs — are the first upstreams
-implemented, because that is where the need is concrete and there is existing
-proxy code to build on. They are the first implementation of the model, not the
+Anthropic, OpenAI and OpenRouter — the LLM APIs — are the first upstreams Janus
+targets, because that is where the need is concrete and there is existing proxy
+code to build on. They are the first implementation of the model, not the
 definition of it: holding a credential on a caller's behalf, substituting it
 per-request, and gating the call on policy applies to any authenticated HTTP
 service an agent is pointed at.
@@ -89,8 +89,8 @@ Two extension points, shaped differently because they behave differently:
   Fails **closed**: if a configured plugin is unreachable or errors, the request
   is rejected rather than silently falling back to a default credential.
 - **`Notify`** — a fire-and-forget event stream using one generic envelope
-  (`{event_type, payload}`) rather than one RPC per event kind, so new event
-  types don't require a proto change.
+  (`{event_type, conversation_id, payload_json}`) rather than one RPC per event
+  kind, so new event types don't require a proto change.
 
 With no plugin configured, Janus makes zero calls defined in `janus.proto` and
 behaves as a plain credential-substituting pass-through proxy.
