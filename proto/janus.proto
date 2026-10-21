@@ -2,52 +2,78 @@ syntax = "proto3";
 
 package janus.v1;
 
-// JanusPlugin is implemented by a HOST app (e.g. Shadow), not by janus-daemon.
-// janus-daemon is the gRPC CLIENT of this service, and only calls it when a
-// plugin endpoint is configured. With no plugin configured, janus-daemon is
-// a pure pass-through proxy and makes zero calls defined in this file.
+// JanusPlugin is the policy side of Janus: it is implemented by a plugin, not
+// by janus-daemon. janus-daemon is the gRPC CLIENT of this service, and only
+// calls it when a plugin endpoint is configured. With no plugin configured,
+// janus-daemon is a pure credential-substituting pass-through proxy and makes
+// zero calls defined in this file.
+//
+// The same interface is used regardless of where the plugin runs — loaded
+// in-process, behind a local unix socket, or across the network. See
+// docs/plugin-contract for the execution models and their trade-offs.
 service JanusPlugin {
-  // Synchronous routing decision, consulted before janus-daemon forwards a
-  // request upstream. Blocking by design — every proxied request waits on
-  // this when the plugin is enabled. Default posture on failure (unreachable
-  // plugin, error response) is FAIL CLOSED: reject the request rather than
-  // silently falling back to a default credential. Deliberately mirrors
-  // Shadow's existing AC-03 account-routing invariant ("hard error, no
-  // fallback") — billing the wrong account/credential silently is worse
-  // than a failed request.
+  // Synchronous credential-resolution and policy decision, consulted before
+  // janus-daemon forwards a request upstream. Given a verified caller
+  // identity and the upstream it is trying to reach, the plugin answers with
+  // the credential to substitute in, a deferral to janus-daemon's own default
+  // chain, or a denial.
+  //
+  // Blocking by design — every proxied request waits on this when the plugin
+  // is enabled. Default posture on failure (unreachable plugin, error
+  // response) is FAIL CLOSED: reject the request rather than silently falling
+  // back to a default credential. Billing or acting as the wrong account
+  // silently is worse than a failed request the caller can see and retry.
   rpc ResolveRoute(ResolveRouteRequest) returns (ResolveRouteResponse);
 
   // Fire-and-forget event stream. janus-daemon never blocks on this and
   // never inspects the response beyond acknowledging delivery — it's a
   // "something happened, tell whoever's listening" channel. One generic
-  // envelope type instead of one RPC per event, so new event kinds (e.g. a
-  // future checkpoint/compaction signal) don't require a proto change.
+  // envelope type instead of one RPC per event, so new event kinds don't
+  // require a proto change.
   rpc Notify(stream NotifyEvent) returns (NotifyAck);
 }
 
 message ResolveRouteRequest {
+  // Optional correlation hint from the caller, carried through so a plugin can
+  // group related requests. Opaque to janus-daemon, and may be empty.
   string conversation_id = 1;
   // "anthropic" | "openai" | "openrouter" — which upstream this request is
-  // destined for.
+  // destined for. Additive: new upstreams are new values, not a proto change.
   string upstream = 2;
+  // WHICH CALLER IS ASKING. The identity janus-daemon has already verified for
+  // this request, and the primary input to the decision: the plugin's job is
+  // to say which real credential this specific identity may have substituted
+  // in, or to deny it. Opaque to the plugin beyond being a stable, verified
+  // identifier for one caller.
+  //
+  // How a caller obtains and presents this identity in the first place is not
+  // yet decided (see docs/status open questions); this field only carries the
+  // verified result of that step. Empty means unidentified — a plugin that
+  // enforces per-caller policy should treat that as a denial rather than
+  // falling back to a default.
+  string caller_identity = 3;
 }
 
 message ResolveRouteResponse {
   oneof outcome {
-    // Use this specific credential reference (opaque to janus-daemon; the
-    // plugin and the credential pool agree on what it means).
+    // Substitute this credential (opaque to janus-daemon; the plugin and the
+    // credential pool agree on what the reference means).
     string credential_ref = 1;
     // Explicitly defer to janus-daemon's own default credential chain.
     bool use_default = 2;
-    // Hard-fail the request with this reason (fail-closed path).
+    // Hard-fail the request with this reason (fail-closed path). This is the
+    // single policy-denial channel: a failed authentication check, an
+    // unauthorized caller/upstream pair, and an exhausted credit or rate
+    // budget all come back this way. janus-daemon does not distinguish
+    // between them — all are policy saying no.
     string deny_reason = 3;
   }
 }
 
 message NotifyEvent {
-  // Freeform, extensible — e.g. "credential_invalid", "account_error",
-  // "context_checkpoint_detected". New kinds are additive; janus-daemon
-  // does not validate this against a fixed enum.
+  // Freeform, extensible — e.g. "credential_invalid", "account_error".
+  // New kinds are additive; janus-daemon does not validate this against a
+  // fixed enum.
   string event_type = 1;
   string conversation_id = 2;
   // Event-specific data as a JSON-encoded string, kept loose on purpose —
