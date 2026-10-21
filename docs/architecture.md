@@ -13,7 +13,7 @@ request takes through them. For what the system is *for* — callers, identities
 and why the substitution exists at all — see
 <ref target="docs/credential-substitution">credential substitution and policy
 enforcement</ref>. See <ref target="docs/status#build-status">status</ref> for
-how much of this is actually implemented today (as of 2026-10-18: scaffolding
+how much of this is actually implemented today (as of 2026-10-21: scaffolding
 only).
 
 ## Crate split {#crates}
