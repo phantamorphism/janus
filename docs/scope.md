@@ -25,9 +25,15 @@ These pieces are generic enough to lift and generalize into
 <ref target="docs/architecture#janus-core">janus-core</ref>, with no
 host-internal dependencies:
 
-- **HMAC token minting and verification** — already isolated in its own crate
-  there, with no entanglement with a database or app-wide types. This becomes
-  Janus's caller-identity verification.
+- **HMAC token verification** — already isolated in its own crate there, with no
+  entanglement with a database or app-wide types. This becomes the `hmac`
+  verification method of Janus's identity extractor, including its
+  namespace-separation discipline, which is what keeps a token minted for one
+  purpose from being replayable against another. See
+  <ref target="docs/caller-identity#methods">verification methods</ref>. The
+  *minting* half does not carry over: Janus verifies identities, it does not
+  issue them (see <ref target="docs/caller-identity#not-minting">Janus extracts;
+  it does not mint</ref>), so the host keeps its own minting code.
 - **The credential pool / store** — pure filesystem, directory-per-slot. It
   auto-detects `.credentials.json` for Anthropic, `auth.json` for OpenAI/Codex,
   and plain API keys for OpenRouter. No database dependency.
@@ -74,10 +80,16 @@ implementation.
 
 That gateway runs embedded in its host's process, and the host calls it
 in-process for more than proxying: minting tokens from other parts of its own
-code, a credential-peek UI, and a request-log viewer. Janus is a separate
-process, so every one of those becomes a call against
-<ref target="docs/architecture#janus-daemon">the daemon's admin surface</ref> —
-and that surface does not exist yet. Credential inspection and log viewing are
-already in its intended scope; identity minting depends on the unresolved
-identity question in <ref target="docs/status#open-questions">open
-questions</ref>. Recorded here so the migration cost isn't discovered late.
+code, a credential-peek UI, and a request-log viewer.
+
+Token minting turns out not to be a migration cost at all. Janus does not mint
+identities, so the host keeps that code exactly where it is and configures a
+matching `hmac` extractor binding with the same secret and namespace — Janus
+verifies what the host already issues. Nothing moves.
+
+The other two do move. Janus is a separate process, so credential inspection and
+log viewing become calls against
+<ref target="docs/architecture#admin-surface">the daemon's admin surface</ref> —
+both already in its intended scope, but the endpoints don't exist yet (see
+<ref target="docs/status#open-questions">open questions</ref>). Recorded here so
+the migration cost isn't discovered late.

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "The long-running Janus process: runs the proxy, hosts the gRPC plugin server (ResolveRoute, Notify)."
+description = "The long-running Janus process: proxy data plane, operator admin surface, and client of the plugin contract (ResolveRoute, Notify)."
 
 [[bin]]
 name = "janus-daemon"

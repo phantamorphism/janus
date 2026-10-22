@@ -39,13 +39,15 @@ secret that authorizes the call*. Janus separates them.
 - **Caller.** The agent, in its sandbox. It holds its own identity and nothing
   else. It is configured to reach the upstream through Janus rather than
   directly, which in practice means a different base URL.
-- **Caller identity.** An identity minted for that specific caller, presented on
-  every request it makes through Janus. It is not an upstream credential and has
-  no value at the upstream. How a caller obtains and presents it is not yet
-  decided — see <ref target="docs/status#open-questions">open questions</ref>.
-- **janus-daemon.** The proxy process. It verifies the caller identity,
-  determines which real credential the call should be made with, performs the
-  substitution, and forwards. See
+- **Caller identity.** An identity belonging to that specific caller, presented
+  on every request it makes through Janus. It is not an upstream credential and
+  has no value at the upstream. Janus does not mint it — whatever creates the
+  sandbox is the only thing positioned to hand an identity to it, so Janus's
+  responsibility begins at *extracting and verifying* what the caller presents.
+  See <ref target="docs/caller-identity">caller identity extraction</ref>.
+- **janus-daemon.** The proxy process. It extracts and verifies the caller
+  identity, determines which real credential the call should be made with,
+  performs the substitution, and forwards. See
   <ref target="docs/architecture#janus-daemon">janus-daemon</ref>.
 - **Credential pool.** Where the real upstream credentials live, on the Janus
   side of the boundary. Callers have no read path to it.
@@ -59,12 +61,16 @@ secret that authorizes the call*. Janus separates them.
 ## The substitution {#substitution}
 
 A request arrives carrying the caller's identity instead of an upstream
-credential — where exactly that identity sits on the wire is not yet decided,
-see <ref target="docs/status#open-questions">open questions</ref>. Janus
-verifies the identity, decides which real credential applies, strips the
-caller's identity material out of the request, applies the real credential's
-auth in whatever form that upstream expects, and forwards the result upstream.
-The response comes back along the same path.
+credential. Where on the wire that identity sits is configuration, not a fixed
+convention — a binding per request type says which header or parameter to read
+it from and how to verify it, because different upstreams' SDKs present a
+credential in different places and Janus has to accept what the caller already
+sends (see <ref target="docs/caller-identity#binding">binding an extractor to a
+request type</ref>). Janus verifies the identity, decides which real credential
+applies, builds an outbound request that does not carry the caller's identity
+material, applies the real credential's auth in whatever form that upstream
+expects, and forwards the result upstream. The response comes back along the
+same path, relayed unmodified.
 
 Two properties of that exchange are load-bearing:
 
@@ -95,23 +101,30 @@ they are asking for.
 Three kinds of check belong there:
 
 - **Authentication.** Is this caller identity real, current, and not revoked?
+  Janus answers this one itself, before any plugin is consulted — see
+  <ref target="docs/caller-identity">caller identity extraction</ref>. A plugin
+  is never handed an unverified identity, and never has to authenticate a caller
+  on policy's behalf.
 - **Authorization.** May this identity reach this upstream at all, and with
   which credential? Two agents hitting the same upstream can legitimately be
   routed to different accounts.
 - **Metering.** Has this identity exhausted its credit, quota, or rate budget?
   Because the check happens before the call is forwarded, an over-budget caller
   can be stopped before it costs anything upstream rather than reconciled after
-  the fact. Where the counting that answers the question actually lives — in the
-  plugin, or in Janus itself — is not yet decided; see
-  <ref target="docs/status#open-questions">open questions</ref>.
+  the fact. The *policy* — what a limit is and what exceeding it means — is the
+  plugin's; the counting is a mechanical problem every such plugin shares, so
+  Janus ships primitives for it rather than each plugin reinventing them. See
+  <ref target="docs/plugin-contract#metering-primitives">metering
+  primitives</ref>.
 
-All three collapse into the same contract call. The plugin is handed the caller
-identity and the intended upstream, and answers with either a credential to use
-or a reason the request is refused — see
+Authorization and metering collapse into the same contract call. The plugin is
+handed the verified caller identity and the intended upstream, and answers with
+either a credential to use or a reason the request is refused — see
 <ref target="docs/plugin-contract#resolve-route">ResolveRoute</ref>. Janus does
-not care whether a particular denial was an authentication failure or an
+not care whether a particular denial was an unauthorized upstream or an
 exhausted credit balance; both are policy saying no, and both reach the caller
-as a refused request rather than a silently-degraded one.
+as a refused request rather than a silently-degraded one. A failed
+authentication never gets that far: it is a rejection at the door.
 
 The symmetric point: with no plugin configured there is no policy, and Janus is
 a pass-through credential-substituting proxy and nothing more. Policy is
@@ -133,10 +146,15 @@ and enumerable:
 - how auth is carried on the wire for that upstream (header name and scheme, or
   a signing procedure),
 - the base URL and any path rewriting,
+- which inbound headers are forwarded to it — the allowlist the outbound request
+  is constructed from, which is also what keeps a caller's identity material
+  from leaking upstream (see <ref target="docs/caller-identity#scrub">the
+  presented material never goes upstream</ref>),
 - how a credential of that kind is refreshed when it expires,
 - what in a response is worth observing, for upstreams where observation is
-  wanted.
+  wanted — this is what populates the `usage` field a metering plugin reads off
+  <ref target="docs/plugin-contract#guaranteed-events">`call_completed`</ref>.
 
-Everything else — identity verification, the credential pool, the policy call,
-the forwarding path — is shared. Adding an upstream should mean supplying that
-narrow list, not extending the model.
+Everything else — identity extraction and verification, the credential pool, the
+policy call, the forwarding path — is shared. Adding an upstream should mean
+supplying that narrow list, not extending the model.
