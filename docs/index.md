@@ -14,12 +14,16 @@ real credentials for those services.
 The motivating caller is an agent running in a sandbox. Such an agent needs to
 call APIs that are gated by API keys, OAuth tokens, or signed headers — but the
 sandbox is exactly the place those secrets should not live. Janus resolves that
-tension: an agent is issued its own identity, presents that identity to Janus,
-and makes ordinary requests against the upstream's own API shape. Janus
-substitutes the real credential on the way out. The agent can authenticate and
-call; it can never read the token it authenticated with. See
+tension: an agent holds its own identity, presents that identity to Janus, and
+makes ordinary requests against the upstream's own API shape. Janus substitutes
+the real credential on the way out. The agent can authenticate and call; it can
+never read the token it authenticated with. See
 <ref target="docs/credential-substitution">credential substitution and policy
-enforcement</ref> for the full model.
+enforcement</ref> for the full model, and
+<ref target="docs/caller-identity">caller identity extraction</ref> for how
+Janus establishes which caller is asking — it verifies the identity a
+deployment's own provisioner issued, rather than becoming an identity provider
+itself.
 
 Because every one of those calls crosses Janus, Janus is also the natural place
 to enforce policy on them — is this identity allowed to use this credential at
@@ -59,24 +63,27 @@ around that general point; the LLM upstreams are the first proof of it.
 3. **Standalone by default.** A daemon and CLI that work with no external
    dependencies out of the box: a pass-through proxy that needs no configuration
    beyond upstream credentials to get traffic flowing.
-4. **Extensible via a gRPC plugin contract, not forks.** Policy and
-   observability behavior is reached only through a defined gRPC contract. Janus
-   is the gRPC *client*; the plugin is the *server*, and can run in-process, on
-   a local socket, or across the network. See
-   <ref target="docs/plugin-contract">the plugin contract</ref> for the design
-   and reasoning.
+4. **Extensible via a plugin contract, not forks.** Policy and observability
+   behavior is reached only through one defined contract. Janus is always the
+   *client* of it; the plugin implements the server side, and can be compiled
+   into a custom build of the daemon, or reached over gRPC on a local socket or
+   across the network. See <ref target="docs/plugin-contract">the plugin
+   contract</ref> for the design and reasoning.
 
 ## Where to go next {#links}
 
 - <ref target="docs/credential-substitution">Credential substitution and policy
   enforcement</ref> — the core model: actors, identities, what gets substituted,
   and where policy is decided.
+- <ref target="docs/caller-identity">Caller identity extraction</ref> — why
+  Janus verifies rather than mints, the extractor interface and its verification
+  methods, and how one is bound per request type.
 - <ref target="docs/architecture">Architecture</ref> — the crate, daemon, CLI,
-  and UI split, what each piece is responsible for, and the end-to-end request
-  lifecycle.
+  and UI split, what each piece is responsible for, how the admin surface is
+  kept away from callers, and the end-to-end request lifecycle.
 - <ref target="docs/plugin-contract">Plugin contract</ref> — the `ResolveRoute`
-  and `Notify` design, why the two RPCs are shaped differently, and the three
-  plugin execution models.
+  and `Notify` design, why the two are shaped differently, the three plugin
+  execution models, and the metering primitives a policy plugin can link.
 - <ref target="docs/scope">Scope and non-goals</ref> — which existing proxy code
   carries over into Janus, and what is deliberately left out.
 - <ref target="docs/status">Status</ref> — current build status and open

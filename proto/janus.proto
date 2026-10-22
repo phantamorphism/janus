@@ -8,9 +8,12 @@ package janus.v1;
 // janus-daemon is a pure credential-substituting pass-through proxy and makes
 // zero calls defined in this file.
 //
-// The same interface is used regardless of where the plugin runs — loaded
-// in-process, behind a local unix socket, or across the network. See
-// docs/plugin-contract for the execution models and their trade-offs.
+// This file is the contract's wire form, used by the two out-of-process
+// execution models (local unix socket, network). A plugin compiled into a
+// custom build of janus-daemon implements the equivalent Rust trait instead,
+// with no serialization — the two are kept in one-to-one correspondence by
+// hand. See docs/plugin-contract for the execution models and their
+// trade-offs.
 service JanusPlugin {
   // Synchronous credential-resolution and policy decision, consulted before
   // janus-daemon forwards a request upstream. Given a verified caller
@@ -34,9 +37,14 @@ service JanusPlugin {
 }
 
 message ResolveRouteRequest {
-  // Optional correlation hint from the caller, carried through so a plugin can
-  // group related requests. Opaque to janus-daemon, and may be empty.
-  string conversation_id = 1;
+  // Janus-assigned identifier for THIS proxied request. Unique, always
+  // populated, and never supplied by the caller. Its purpose is to let a
+  // plugin tie later NotifyEvents back to the decision it made here — which
+  // is what makes post-call accounting possible at all: a plugin that charged
+  // a budget at ResolveRoute time learns the real cost, or learns the call
+  // never happened, in a NotifyEvent carrying this same request_id. See
+  // docs/plugin-contract metering primitives.
+  string request_id = 1;
   // "anthropic" | "openai" | "openrouter" — which upstream this request is
   // destined for. Additive: new upstreams are new values, not a proto change.
   string upstream = 2;
@@ -44,15 +52,32 @@ message ResolveRouteRequest {
   // this request, and the primary input to the decision: the plugin's job is
   // to say which real credential this specific identity may have substituted
   // in, or to deny it. Treat it as a stable identifier to key policy off, not
-  // as a structure to parse — the identity's internal format is not decided.
+  // as a structure to parse — see identity_claims below for the supported way
+  // to read more than the bare id.
   //
-  // How a caller obtains and presents this identity in the first place is not
-  // yet decided (see docs/status open questions); this field only carries the
-  // verified result of that step. janus-daemon does not call ResolveRoute
-  // without a verified identity, so this is not expected to be empty; a plugin
-  // that nonetheless sees it empty should deny rather than fall back to a
-  // default.
+  // Produced by janus-daemon's identity-extraction stage (see
+  // docs/caller-identity), which verifies the material a caller presented
+  // before any plugin is consulted. Janus does not mint caller identities; it
+  // extracts and verifies whatever the deployment's own provisioner issued.
+  // janus-daemon does not call ResolveRoute without a verified identity, so
+  // this is not expected to be empty; a plugin that nonetheless sees it empty
+  // should deny rather than fall back to a default.
   string caller_identity = 3;
+  // Optional grouping hint, carried through so a plugin can relate several
+  // requests to each other and so log lines can be stitched together. Unlike
+  // request_id this is NOT unique per request, and unlike caller_identity it
+  // is NOT necessarily trustworthy: depending on the binding it may have been
+  // lifted from a verified claim or copied from an unverified caller-supplied
+  // header. NEVER key a policy decision off it — a caller that chooses its own
+  // correlation value can choose another caller's. May be empty.
+  string correlation_id = 4;
+  // The remaining VERIFIED claims the identity-extraction stage produced
+  // alongside caller_identity, if the configured method produced any (e.g. an
+  // agent-type or tenant marker carried in a signed token). Trustworthy to the
+  // same degree as caller_identity. Exists so policy that needs more than the
+  // bare id does not have to parse caller_identity as a structure. Empty when
+  // the configured extraction method yields only an identity.
+  map<string, string> identity_claims = 5;
 }
 
 message ResolveRouteResponse {
@@ -72,14 +97,24 @@ message ResolveRouteResponse {
 }
 
 message NotifyEvent {
-  // Freeform, extensible — e.g. "credential_invalid", "account_error".
-  // New kinds are additive; janus-daemon does not validate this against a
-  // fixed enum.
+  // Freeform, extensible — new kinds are additive and janus-daemon does not
+  // validate this against a fixed enum. Four kinds are emitted by janus-daemon
+  // itself and are therefore the ones a plugin can rely on existing:
+  // "call_completed", "call_abandoned", "credential_invalid",
+  // "account_error". See docs/plugin-contract for their payloads and for why
+  // the first two are what post-call accounting is built on.
   string event_type = 1;
-  string conversation_id = 2;
+  // The ResolveRouteRequest.request_id this event belongs to, when the event
+  // concerns one specific proxied request — which is how a plugin matches a
+  // completion or an abandonment to the decision it made. Empty for events
+  // that aren't about a single request.
+  string request_id = 2;
+  // Same grouping hint, same trust caveat, as
+  // ResolveRouteRequest.correlation_id. May be empty.
+  string correlation_id = 3;
   // Event-specific data as a JSON-encoded string, kept loose on purpose —
   // see event_type for why.
-  string payload_json = 3;
+  string payload_json = 4;
 }
 
 message NotifyAck {}

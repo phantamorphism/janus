@@ -4,6 +4,6 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Dual-upstream (Anthropic + OpenAI) LLM proxy core: credential pool, HMAC auth, request forwarding."
+description = "Janus proxy core: caller-identity extraction, credential pool, credential substitution, forwarding, metering primitives."
 
 [dependencies]
