@@ -342,7 +342,10 @@ pub struct Meter<S: UsageStore> { /* store + configured quotas */ }
 
 impl<S: UsageStore> Meter<S> {
     /// Check and increment in one step, so two concurrent requests from one
-    /// identity cannot both pass a limit with one unit left.
+    /// identity cannot both pass a limit with one unit left. An `Exceeded`
+    /// result leaves the counter where it was: a denied request consumed
+    /// nothing upstream, so charging for it would inflate a `Fixed` window
+    /// and permanently wedge a `Total` one.
     pub async fn charge(&self, identity: &str, meter: &str, amount: u64)
         -> Result<Charge, UsageError>;
 
