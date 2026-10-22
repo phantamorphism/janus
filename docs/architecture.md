@@ -208,7 +208,9 @@ decision actually gets made; everything else is mechanical.
    not verify, the request is rejected immediately — no plugin is consulted, no
    credential is touched, the body is never buffered, nothing is forwarded. This
    happens before policy because policy needs a trustworthy identity to reason
-   about. See <ref target="docs/caller-identity">caller identity
+   about. A route an operator explicitly declared identity-less is the one
+   exception, and it skips step 3 as well rather than reaching it with nothing
+   to key off. See <ref target="docs/caller-identity">caller identity
    extraction</ref>.
 3. **Janus resolves which credential to use.** *(Decision: the plugin, or the
    default chain.)* If a plugin is configured, `janus-daemon` calls

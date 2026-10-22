@@ -28,8 +28,8 @@ itself.
 Because every one of those calls crosses Janus, Janus is also the natural place
 to enforce policy on them — is this identity allowed to use this credential at
 all, has it run out of credit, has it exceeded a rate limit. Those decisions are
-made by plugins over a gRPC contract rather than being hardcoded, so operators
-supply their own policy without forking Janus. See
+made by plugins over one defined contract rather than being hardcoded, so
+operators supply their own policy without forking Janus. See
 <ref target="docs/plugin-contract">the plugin contract</ref>.
 
 Janus is named for the Roman god of doors and thresholds, traditionally depicted

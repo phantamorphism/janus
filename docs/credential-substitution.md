@@ -51,9 +51,12 @@ secret that authorizes the call*. Janus separates them.
   <ref target="docs/architecture#janus-daemon">janus-daemon</ref>.
 - **Credential pool.** Where the real upstream credentials live, on the Janus
   side of the boundary. Callers have no read path to it.
-- **Policy plugin.** An optional gRPC service that makes the per-request
-  decision: which credential this identity gets, or that the call is denied. See
-  <ref target="docs/plugin-contract">the plugin contract</ref>.
+- **Policy plugin.** An optional implementation of the Janus plugin contract
+  that makes the per-request decision: which credential this identity gets, or
+  that the call is denied. It can be compiled into a custom build of the daemon
+  or reached over gRPC on a local socket or across the network; Janus is always
+  the caller of it either way. See <ref target="docs/plugin-contract">the plugin
+  contract</ref>.
 - **Upstream.** The authenticated service being called. It sees a normal,
   correctly-authenticated request and has no knowledge that a proxy or a
   distinct caller identity is involved.

@@ -88,6 +88,13 @@ section is updated.
   currently needs it. See
   <ref target="docs/plugin-contract#metering-primitives">metering
   primitives</ref>.
+- **Policy on an identity-less route.** A route bound `method = "none"` yields
+  no verified identity, so no plugin is consulted and the default credential
+  chain decides — see <ref target="docs/caller-identity#binding">binding an
+  extractor to a request type</ref>. Whether an operator should be able to
+  attach policy to such a route anyway (a per-route allow/deny that needs no
+  identity) is not decided. Nothing currently needs it, and the conservative
+  reading is that a path an operator declared open is open.
 - **The opaque-identity registry.** One of the four extraction methods looks
   identities up in a daemon-owned registry, and that registry's storage and
   admin operations are not designed — see

@@ -163,6 +163,22 @@ If no binding resolves, the request is rejected. There is no implicit
 `method = "none"`, which is a deliberate, greppable statement in config rather
 than a consequence of an omission.
 
+`none` is not a fifth verification method — it is the absence of one, and it has
+a consequence worth stating outright rather than leaving to be inferred. A route
+bound to it produces no verified identity, and
+<ref target="docs/plugin-contract#resolve-route">`ResolveRoute`</ref> is
+specified never to be called without one. So on such a route the plugin is not
+consulted at all and the daemon's default credential chain decides, exactly as
+in the no-plugin case. It is **not** called with an empty `caller_identity` — a
+plugin is told to deny that, which would make `method = "none"` unusable in any
+deployment that has a plugin.
+
+That makes `none` a genuinely open route: anything that can reach the data plane
+can spend a real upstream credential on that path. It is appropriate for cheap
+unauthenticated metadata endpoints and nothing else. Whether an operator should
+additionally be able to attach policy to an identity-less route is not decided —
+see <ref target="docs/status#open-questions">open questions</ref>.
+
 ```toml
 # Daemon default: one identity scheme for every upstream that doesn't
 # override it.
