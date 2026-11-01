@@ -43,9 +43,12 @@ them. The reasoning behind the scope is recorded in
   `build`, `started_at`, the bound listeners, each configured upstream with its
   identity binding method, the request log's size and retention, and a `plugin`
   object: `mode` (`none` | `linked` | `unix` | `tls` | `plaintext`), `endpoint`,
-  `health` (`ok` | `unreachable` | `tls_error` | `no_client_auth` |
-  `rejected_client_cert` | `timeout`), `last_error`, `last_ok_at`, and when TLS
-  is in use `client_cert_expires_at` and `server_cert_expires_at`. This is what
+  `health` (`unknown` before any call has been attempted, then `ok` |
+  `unreachable` | `timeout` | `tls_error` | `no_client_auth` |
+  `rejected_client_cert` | `error` — the failure classes of
+  <ref target="docs/plugin-contract#plugin-config">configuring the plugin</ref>
+  without their `plugin_` prefix), `last_error`, `last_ok_at`, and when TLS is
+  in use `client_cert_expires_at` and `server_cert_expires_at`. This is what
   `janus status` prints and what the UI overview renders.
 
 ### Credentials {#credentials-endpoint}
@@ -113,18 +116,22 @@ record shape.
 - `GET /v1/requests/{request_id}` — one record.
 - `GET /v1/requests/stream?identity=&upstream=&outcome=` — a live tail as
   `text/event-stream`: one `request` event per completed record matching the
-  filter, plus a periodic `ping`. SSE rather than a WebSocket because a browser,
-  `curl`, and the CLI all consume it with nothing extra.
+  filter, plus a periodic `ping`. SSE rather than a WebSocket because `curl`,
+  the CLI and a browser `fetch` all consume it with nothing extra. The stream
+  takes the admin token in the `Authorization` header like every other endpoint,
+  never in the query string, so the UI reads it with `fetch` and a streaming
+  body rather than with `EventSource`, which cannot set headers.
 
 ### Plugin {#plugin-endpoint}
 
 - `GET /v1/plugin` — the `plugin` object from `/v1/status`, alone.
 - `POST /v1/plugin/check` — actively verify the channel: perform a full
-  handshake with the configured material, then — on the TLS transport — a second
-  handshake with a throwaway self-signed client certificate that the plugin must
-  *reject*. Returns both results. This is how an operator confirms the plugin is
-  actually requiring daemon authentication, which the daemon can otherwise only
-  observe passively — see
+  handshake with the configured material, then — on the TLS transport — two
+  handshakes the plugin must *reject*, one with a throwaway self-signed client
+  certificate and one with none. Returns each result; on the socket transport,
+  the path-permission walk and a connection attempt. This is how an operator
+  confirms the plugin is actually requiring daemon authentication, which the
+  daemon can otherwise only observe passively — see
   <ref target="docs/plugin-contract#channel-security">securing the
   channel</ref>.
 
@@ -178,13 +185,14 @@ janus credential list [--upstream <name>]
 janus credential show <ref>
 janus credential default --upstream <name>
 janus credential add --upstream <name> [--ref <ref>] [--label <text>]
-                     (--api-key <key> | --from-file <path>)
-janus credential rotate <ref> (--api-key <key> | --from-file <path>)
+                     (--api-key-stdin | --from-file <path>)
+janus credential rotate <ref> (--api-key-stdin | --from-file <path>)
 janus credential enable|disable|refresh|rm <ref>
 
 janus identity create --identity <string> [--claim k=v]... [--label <text>]
                       [--expires-in <duration>]        # prints the token once
 janus identity list [--identity <string>] [--include-revoked]
+                    [--include-expired]
 janus identity show|revoke|rm <id>
 
 janus log query [--identity ...] [--upstream ...] [--outcome ...]
@@ -194,21 +202,25 @@ janus log show <request_id>
 
 janus plugin status
 janus plugin check
-janus plugin tls init --plugin-host <name> [--out <dir>]
+janus plugin tls init --plugin-host <name> [--out <dir>] [--days N]
 ```
 
 `--from-file` reads credential material from a file on the operator's host — the
 vendor CLI's own credential file, typically — and sends its contents in
-`material`. `janus plugin tls init` is the bootstrap for the TLS plugin
-transport and is described with it in
+`material`. `--api-key-stdin` reads a bare API key from standard input. There is
+deliberately no flag that takes a key as an argument, because an argument lands
+in shell history and in every other local user's view of the process list.
+`janus plugin tls init` is the bootstrap for the TLS plugin transport and is
+described with it in
 <ref target="docs/plugin-contract#channel-security">securing the channel</ref>.
 
 Connection: `--admin <address>` or `JANUS_ADMIN`, where the address is
 `unix://<path>` or `http(s)://host:port`; the default is the daemon's admin
 socket, `<data_dir>/admin.sock`, resolving `data_dir` the same way the daemon
-does. For a TCP address the admin token comes from `--token`,
+does. For a TCP address the admin token comes from `--token-file <path>`,
 `JANUS_ADMIN_TOKEN`, or — when the CLI runs on the daemon's host —
-`<data_dir>/admin-token`.
+`<data_dir>/admin-token`; for the same process-list reason as credential
+material, it is never taken as an argument.
 
 Config validation is the daemon's job, not the CLI's, because only the daemon
 links the extractors and upstream implementations that a config has to be
@@ -242,11 +254,13 @@ creation, not an operator's.
 
 Authentication: the UI listener requires the admin token on every API call,
 loopback included. A browser is a hostile environment — any page a user visits
-can issue requests to a loopback port — and requiring an `Authorization` header
-is what makes those cross-origin requests fail preflight. The UI prompts for the
-token once and keeps it in session storage; the daemon logs the UI URL and the
-token file's path at startup. A non-loopback UI bind carries the same TLS
-requirement as a non-loopback admin bind.
+can issue requests to a loopback port, and through DNS rebinding can even do so
+same-origin — so the only thing that makes such a request fail is a secret the
+page does not have. The token travels in an `Authorization` header, which also
+means a cross-origin request is preflighted, and the daemon answers no CORS
+preflight. The UI prompts for the token once and keeps it in session storage;
+the daemon logs the UI URL and the token file's path at startup. A non-loopback
+UI bind carries the same TLS requirement as a non-loopback admin bind.
 
 ## Storage {#storage}
 
@@ -256,7 +270,8 @@ The daemon owns one SQLite database, `<data_dir>/janus.db`, with two tables:
   the token; the token itself is never stored), `identity`, `claims` (JSON),
   `label`, `created_at`, `expires_at`, `revoked_at`, `last_seen_at`. Loaded into
   an in-memory index at startup and written through on every mutation, so an
-  `opaque` lookup on the hot path is a hash-map probe and never a disk read.
+  `opaque` lookup on the hot path is a hash-map probe and never a disk read;
+  `last_seen_at` is flushed periodically rather than written per lookup.
 - `requests` — the request log, as described above, indexed on `(received_at)`,
   `(caller_identity, received_at)` and `(request_id)`.
 

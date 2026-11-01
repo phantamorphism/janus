@@ -162,10 +162,13 @@ extractor to a request type</ref>.
 verified identity by construction. A per-route rule set inside Janus would be a
 second policy engine — hardcoded rules, which goal 4 rules out — and nothing
 asks for it: the only stated use of `none` is cheap unauthenticated metadata
-endpoints. What *was* under-specified is observability, and that is now stated:
-such calls appear in the request log with an empty identity, the credential-
-centric `Notify` events still fire, and the two settlement events do not,
-because there was no decision to settle.
+endpoints. The cost is stated rather than hidden: an open route is the one place
+goal 2 — every call a policy enforcement point — does not hold, and it does not
+hold only because the operator wrote `method = "none"` for that path. What *was*
+under-specified is observability, and that is now stated: such calls appear in
+the request log with an empty identity, the credential- centric `Notify` events
+still fire, and the two settlement events do not, because there was no decision
+to settle.
 
 ## The opaque-identity registry {#opaque-registry}
 
@@ -192,22 +195,31 @@ credential store if the database leaks.
 credentials, identities, requests, plugin — with `janus` as a thin client of it
 and the UI as a deliberate subset. The surface never returns credential
 material. The request log is metadata-only, stored in SQLite with a single
-retention setting, queryable and tailable over SSE. Non-loopback admin and UI
-binds require TLS unless plaintext is explicitly allowed. The UI omits the two
+retention setting, queryable and tailable over SSE. Every TCP admin and UI
+listener requires the admin token, loopback included, and a non-loopback one
+requires TLS unless plaintext is explicitly allowed. The UI omits the two
 operations that accept credential material and identity creation. Design:
 <ref target="docs/admin-surface">admin surface, CLI and UI</ref>.
 
 **Clear-cut.** The shape follows from decisions already made (HTTP+JSON, a
 separate listener, the socket as default) and from the users: an operator needs
 to see pool health and traffic and to act on both; a host embedding Janus needs
-the peek and the log; the opaque method needs its registry operations. The two
-scope lines that were judgement calls are recorded with their reasons in the
-design: the UI leaves material entry to the CLI because material comes from a
-file on the operator's host and a browser form would be a second path for the
-most sensitive input with nothing asking for it; the request log does not
-capture bodies because Janus does not inspect responses beyond the `usage`
-observation, and body capture is a privacy-sensitive feature that would need its
-own design if a user asks.
+the peek and the log; the opaque method needs its registry operations. Three
+scope lines within it were judgement calls rather than consequences. They were
+taken on the reasoning below without the multi-proposal review the contested
+questions had, because each leaves the smaller surface and can be widened later
+without changing anything already built:
+
+- The UI leaves material entry to the CLI, because material comes from a file on
+  the operator's host and a browser form would be a second path for the most
+  sensitive input with nothing asking for it. It leaves identity creation to the
+  provisioner, a program acting at sandbox creation rather than an operator.
+- The request log does not capture bodies, because Janus does not inspect
+  responses beyond the `usage` observation, and body capture is a
+  privacy-sensitive feature that would need its own design if a user asks.
+- The request log cannot be disabled, only shortened, because attribution of a
+  call to the identity that made it is the purpose of the proxy; a switch to
+  turn it off is a flag a user can ask for.
 
 ## Embedded callers of the prior gateway {#embedded-callers}
 
