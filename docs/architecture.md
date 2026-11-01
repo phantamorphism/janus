@@ -256,8 +256,9 @@ decision actually gets made; everything else is mechanical.
    <ref target="docs/plugin-contract#notify">Notify</ref>, which is
    fire-and-forget and off the critical path. Exactly one of `call_completed` or
    `call_abandoned` is emitted for every request that reached step 3, so a
-   plugin that charged a budget on the way in always learns how the call
-   actually ended. The caller's response does not wait on any of it.
+   plugin that charged a budget on the way in is always told how the call
+   actually ended, subject to Notify's best-effort delivery. The caller's
+   response does not wait on any of it.
 
 Steps 2 through 5 are entirely invisible to the caller when they succeed. That
 is the point: the caller's view of a successful call is identical to calling the
