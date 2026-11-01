@@ -255,7 +255,7 @@ decision actually gets made; everything else is mechanical.
    — how the call ended, a credential the upstream rejected — go out over
    <ref target="docs/plugin-contract#notify">Notify</ref>, which is
    fire-and-forget and off the critical path. Exactly one of `call_completed` or
-   `call_abandoned` is emitted for every request that reached step 3, so a
+   `call_abandoned` is emitted for every request step 3 sent to a plugin, so a
    plugin that charged a budget on the way in is always told how the call
    actually ended, subject to Notify's best-effort delivery. The caller's
    response does not wait on any of it.
