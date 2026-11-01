@@ -162,8 +162,8 @@ itself, because they describe what happened *after* `ResolveRoute` answered:
 
 Both of the first two carry the `request_id` of the `ResolveRoute` they follow.
 Exactly one of them is emitted for every request `ResolveRoute` was sent for, so
-a plugin that charges a budget on the way in always gets a matching settlement
-event on the way out.
+a plugin that charges a budget on the way in is always sent a matching
+settlement event on the way out.
 
 `caller_identity` is repeated on the two settlement events so that a plugin can
 settle a charge without holding a `request_id → identity` map in memory — a
