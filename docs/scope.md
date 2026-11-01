@@ -89,7 +89,18 @@ verifies what the host already issues. Nothing moves.
 
 The other two do move. Janus is a separate process, so credential inspection and
 log viewing become calls against
-<ref target="docs/architecture#admin-surface">the daemon's admin surface</ref> —
-both already in its intended scope, but the endpoints don't exist yet (see
-<ref target="docs/status#open-questions">open questions</ref>). Recorded here so
-the migration cost isn't discovered late.
+<ref target="docs/architecture#admin-surface">the daemon's admin surface</ref>:
+the credential peek is `GET /v1/credentials/default?upstream=` and the list is
+`GET /v1/credentials` (metadata only — the host never saw material before and
+does not now); the log viewer is `GET /v1/requests` with its filters, and
+`GET /v1/requests/stream` for a live tail. See
+<ref target="docs/admin-surface#endpoints">endpoints</ref>. A host on the same
+machine reaches them over the admin socket with no token; a host elsewhere uses
+the TLS admin listener with the admin token. Two differences from the embedded
+gateway are real migration costs and are stated here rather than discovered: the
+request log is metadata-only, so a viewer that showed request and response
+bodies loses them; and the host's per-conversation tap on upstream response
+bytes, which its own agent runtime consumes, is response inspection and stays on
+the host's side of Janus — see
+<ref target="docs/architecture#no-response-transforms">out of scope: response
+transformation</ref>.

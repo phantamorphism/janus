@@ -7,10 +7,10 @@ tags: [janus, status]
 
 # Status
 
-As of 2026-10-21, both the `janus` code repository and this documentation corpus
-are brand new. This document is a plain statement of what's actually built, and
-a list of what's still genuinely undecided — not a place to invent answers to
-make the picture look more finished than it is.
+As of 2026-11-01, the design in this corpus is complete and the `janus` code
+repository is still scaffolding. This document is a plain statement of what's
+actually built, and of anything still genuinely undecided — not a place to
+invent answers to make the picture look more finished than it is.
 
 ## Current build status {#build-status}
 
@@ -60,59 +60,47 @@ answered now, and the answers live in the design docs rather than here:
   a unix socket as the default admin address.
   <ref target="docs/architecture#admin-surface">The admin surface is a separate
   listener</ref>.
+- **Plugin endpoint discovery.** A `[plugin]` block in the daemon's config file
+  and nothing else; the endpoint URI scheme selects the transport.
+  <ref target="docs/plugin-contract#plugin-config">Configuring the plugin</ref>;
+  reasoning in <ref target="docs/decisions#plugin-discovery">decisions</ref>.
+- **Daemon-to-plugin channel security.** Filesystem permissions on the unix
+  socket; mandatory mutual TLS against an operator-named anchor on the network,
+  with the daemon refusing a plugin that does not request a client certificate;
+  plaintext only by explicit opt-in. No shared-secret mode.
+  <ref target="docs/plugin-contract#channel-security">Securing the
+  channel</ref>; options and verdicts in
+  <ref target="docs/decisions#plugin-channel-auth">decisions</ref>.
+- **The metering store.** The `UsageStore` trait is one atomic, idempotent,
+  ledgered operation; `janus-core` ships a volatile in-memory store and a
+  durable embedded SQLite store, plus a conformance suite. No replicated store
+  until a plugin runs replicas.
+  <ref target="docs/plugin-contract#usage-stores">The store</ref>; options and
+  verdicts in <ref target="docs/decisions#metering-store">decisions</ref>.
+- **Policy on an identity-less route.** None. A `method = "none"` route is open;
+  what it logs and emits is stated.
+  <ref target="docs/caller-identity#binding">Binding an extractor to a request
+  type</ref>.
+- **The opaque-identity registry.** A daemon-owned SQLite table of hashed,
+  daemon-generated tokens with claims, expiry and revocation, managed through
+  the admin surface. <ref target="docs/caller-identity#registry">The
+  opaque-identity registry</ref>.
+- **The `janus` CLI, admin endpoints and UI scope.** One `/v1` HTTP+JSON API —
+  status, credentials, identities, requests, plugin — with the CLI as a thin
+  client and the UI as a deliberate subset; a metadata-only request log with
+  retention; TLS required off loopback. <ref target="docs/admin-surface">Admin
+  surface, CLI and UI</ref>.
+- **Embedded callers of the prior gateway.** Served by the admin endpoints; the
+  host's response-bytes tap stays with the host.
+  <ref target="docs/scope#inprocess-gap">Scope: embedded callers</ref>.
 
 ## Open questions {#open-questions}
 
-These are genuinely undecided. Treat any answer you might infer from context
-elsewhere as speculation until one of these is actually resolved and this
-section is updated.
-
-- **Plugin endpoint discovery.** How does `janus-daemon` learn where a
-  configured plugin is? Environment variable, config file, CLI flag, some
-  combination — and how is the out-of-process transport selected alongside it?
-  Not decided. The linked model is not affected: it is selected by which binary
-  you built (see <ref target="docs/plugin-contract#custom-build">what a custom
-  build looks like</ref>). See
-  <ref target="docs/plugin-contract#no-plugin-pass-through">the pass-through
-  requirement</ref> this has to coexist with.
-- **Daemon-to-plugin auth.** Is the gRPC channel between `janus-daemon` and an
-  out-of-process plugin secured with mTLS, a shared secret, or is it assumed to
-  be localhost-only with no auth? Not decided, and the answer differs between
-  the local-socket and network models. (The linked model has no channel to
-  secure.)
-- **A shared backend for the metering primitives.** `janus-core` ships an
-  in-memory `UsageStore`, which is correct for one plugin process and loses its
-  counts on restart. A durable or distributed backend — for a plugin with
-  replicas, or counts that have to survive a restart — is not designed. The
-  trait exists so adding one is additive rather than a redesign, and nothing
-  currently needs it. See
-  <ref target="docs/plugin-contract#metering-primitives">metering
-  primitives</ref>.
-- **Policy on an identity-less route.** A route bound `method = "none"` yields
-  no verified identity, so no plugin is consulted and the default credential
-  chain decides — see <ref target="docs/caller-identity#binding">binding an
-  extractor to a request type</ref>. Whether an operator should be able to
-  attach policy to such a route anyway (a per-route allow/deny that needs no
-  identity) is not decided. Nothing currently needs it, and the conservative
-  reading is that a path an operator declared open is open.
-- **The opaque-identity registry.** One of the four extraction methods looks
-  identities up in a daemon-owned registry, and that registry's storage and
-  admin operations are not designed — see
-  <ref target="docs/caller-identity#open-registry">open: the opaque-identity
-  registry</ref>. It is a piece of the admin command surface below, and the
-  other three extraction methods don't depend on it.
-- **Full `janus` CLI and admin endpoint surface.**
-  <ref target="docs/architecture#janus-cli">janus-cli</ref> is described as an
-  admin client for credential management, pool health, and log tailing, and
-  <ref target="docs/architecture#admin-surface">where it connects and how it
-  authenticates</ref> is now decided — but the actual command set and the
-  endpoints behind it don't exist yet.
-- **UI feature scope.** <ref target="docs/architecture#ui">The UI</ref> is a
-  placeholder page today. What it should actually show or let an operator do is
-  undecided. Where it is served from is decided.
-- **Embedded callers of the prior gateway.** See
-  <ref target="docs/scope#inprocess-gap">scope: known gap</ref> — the gateway
-  Janus builds on is called in-process by its host for token minting, credential
-  inspection, and log viewing. Minting is no longer a Janus problem (the host
-  keeps it), but the daemon admin surface the other two have to move to does not
-  exist yet. Recorded here so it isn't forgotten.
+Nothing is open. Three things are deliberately not built and have a named
+trigger rather than an open decision — a replicated `UsageStore` (the first
+plugin that runs replicas), credential entry and rotation in the UI (a user who
+needs it), and request/response body capture in the request log (a user who
+needs it, and a design of its own) — and each is recorded where it was decided,
+in <ref target="docs/decisions">decision records</ref>. When something new
+becomes genuinely undecided, it goes here, and an answer inferred from elsewhere
+in the corpus is speculation until it does.

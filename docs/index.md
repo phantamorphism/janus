@@ -84,7 +84,13 @@ around that general point; the LLM upstreams are the first proof of it.
 - <ref target="docs/plugin-contract">Plugin contract</ref> — the `ResolveRoute`
   and `Notify` design, why the two are shaped differently, the three plugin
   execution models, and the metering primitives a policy plugin can link.
+- <ref target="docs/admin-surface">Admin surface, CLI and UI</ref> — the
+  operator's control channel: endpoints, the `janus` command set, what the UI
+  shows, the request log, and the daemon's own storage.
 - <ref target="docs/scope">Scope and non-goals</ref> — which existing proxy code
   carries over into Janus, and what is deliberately left out.
-- <ref target="docs/status">Status</ref> — current build status and open
-  questions, honestly unresolved rather than guessed at.
+- <ref target="docs/decisions">Decision records</ref> — how the formerly open
+  design questions were resolved, with the options considered where there were
+  several.
+- <ref target="docs/status">Status</ref> — current build status and whatever is
+  still open.

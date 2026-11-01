@@ -88,10 +88,12 @@ It exposes three distinct surfaces:
   lifecycle</ref>.
 - **The admin surface.** The control channel used by
   <ref target="docs/architecture#janus-cli">janus-cli</ref> and
-  <ref target="docs/architecture#ui">the UI</ref> for credential management,
-  pool health, and log inspection — see
+  <ref target="docs/architecture#ui">the UI</ref> for credential management, the
+  opaque-identity registry, pool and plugin health, and log inspection — see
   <ref target="docs/architecture#admin-surface">the admin surface</ref> below
-  for how it is kept out of a caller's reach.
+  for how it is kept out of a caller's reach, and
+  <ref target="docs/admin-surface">admin surface, CLI and UI</ref> for what it
+  exposes.
 - **The plugin client.** `janus-daemon` is the client of the contract in
   <ref target="docs/plugin-contract">the plugin contract</ref>; the plugin
   implements the server side. The daemon calls out to policy, never the other
@@ -104,20 +106,23 @@ With no plugin endpoint configured, `janus-daemon` makes zero calls defined in
 `proto/janus.proto` and behaves as a plain credential-substituting pass-through
 proxy. This is an explicit design requirement (see
 <ref target="docs/index#goals">standalone by default</ref>), not an accident of
-the current stub state. How a plugin endpoint gets discovered and authenticated
-is not yet decided — see <ref target="docs/status#open-questions">open
-questions</ref>.
+the current stub state. A plugin is configured in the daemon's config file and
+the channel to it is secured per transport — see
+<ref target="docs/plugin-contract#plugin-config">configuring the plugin</ref>
+and <ref target="docs/plugin-contract#channel-security">securing the
+channel</ref>.
 
 ### janus-cli {#janus-cli}
 
 The admin client binary, named `janus`. It speaks to the daemon's admin surface
 and contains no proxy logic of its own — it cannot resolve a credential or
-forward a request, only ask the daemon to. Intended scope: credential
-management, pool health inspection, and request-log tailing. By default it
-connects over the admin unix socket, which means an operator with filesystem
-access to the daemon's data directory needs no token and no configuration. The
-full command surface is not yet decided — see
-<ref target="docs/status#open-questions">open questions</ref>.
+forward a request, only ask the daemon to. Its scope is the admin surface's:
+credential management, the opaque-identity registry, request-log queries and
+tailing, plugin channel health, and daemon status. By default it connects over
+the admin unix socket, which means an operator with filesystem access to the
+daemon's data directory needs no token and no configuration. The command set and
+the endpoints behind it are in <ref target="docs/admin-surface#cli">the janus
+CLI</ref>.
 
 ### ui {#ui}
 
@@ -130,9 +135,9 @@ Architecturally it is a peer of the CLI, not a component of any application that
 happens to be calling Janus: it has its own port, its own lifecycle, and it
 holds no privileged path to credentials beyond what the admin surface exposes.
 Anything an operator can do in the UI is something the admin surface can do, and
-therefore something the CLI can do too. Feature scope beyond the current
-placeholder page is not yet decided — see
-<ref target="docs/status#open-questions">open questions</ref>.
+therefore something the CLI can do too; the converse does not hold, and the
+operations the UI deliberately leaves to the CLI are listed with their reasons
+in <ref target="docs/admin-surface#ui">the UI</ref>.
 
 ## The admin surface is a separate listener {#admin-surface}
 
@@ -160,17 +165,26 @@ So they don't share a listener:
   bearer token, compared in constant time. It is deliberately *not* the same
   primitive as a caller identity: identities are minted, scoped and expiring,
   and an operator credential is none of those. Separate secret, separate check
-  path, no possibility of one verifying as the other.
+  path, no possibility of one verifying as the other. A bearer token is only as
+  secret as the channel it travels on, so a non-loopback admin bind also
+  requires TLS (`admin.tls = { cert, key }`) unless
+  `admin.allow_plaintext = true` says, explicitly, that something outside Janus
+  is encrypting the hop.
 - **The UI listener** (`ui.bind`, loopback by default) serves the UI's static
   assets, and — because a browser cannot speak a unix socket — the same admin
   API alongside them. It is a third listener, distinct from the data plane; the
   admin socket stays available either way. Not enabling the UI means that
-  listener does not exist.
+  listener does not exist. The admin API on this listener requires the admin
+  token even on loopback, because a browser will send whatever a web page tells
+  it to and the required header is what makes a cross-origin request fail; the
+  same non-loopback TLS rule applies. See
+  <ref target="docs/admin-surface#ui">the UI</ref>.
 
 The admin surface speaks HTTP and JSON on whichever listener it is reached over.
 A browser has to be able to talk to it, and the CLI is trivial either way. gRPC
 is reserved for the <ref target="docs/plugin-contract">plugin contract</ref>,
-where a per-request hot path justifies it.
+where a per-request hot path justifies it. The endpoints themselves are in
+<ref target="docs/admin-surface#endpoints">admin surface: endpoints</ref>.
 
 ### Why separate listeners rather than separate paths {#listener-rationale}
 
