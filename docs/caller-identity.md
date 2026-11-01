@@ -340,7 +340,10 @@ register a guessable token; what the provisioner supplies is everything that
 Lookup is a hash-map probe: the table lives in `<data_dir>/janus.db`, is loaded
 into memory at startup, and every mutation is written through. Verification
 therefore costs no I/O on the hot path, and a revocation is visible to the very
-next request. The operations — create, list, show, revoke, delete — are the
-identities endpoints of the admin surface and the `janus identity` commands; see
+next request. `last_seen_at` is the one field a lookup changes; it is updated in
+memory and flushed to the table periodically, so it is approximate by up to one
+flush interval rather than a write on every request. The operations — create,
+list, show, revoke, delete — are the identities endpoints of the admin surface
+and the `janus identity` commands; see
 <ref target="docs/admin-surface#identities-endpoint">identities</ref>. The other
 three methods need no store and do not touch this one.

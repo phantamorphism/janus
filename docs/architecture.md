@@ -13,7 +13,7 @@ request takes through them. For what the system is *for* — callers, identities
 and why the substitution exists at all — see
 <ref target="docs/credential-substitution">credential substitution and policy
 enforcement</ref>. See <ref target="docs/status#build-status">status</ref> for
-how much of this is actually implemented today (as of 2026-10-21: scaffolding
+how much of this is actually implemented today (as of 2026-11-01: scaffolding
 only).
 
 ## Crate split {#crates}
@@ -158,10 +158,11 @@ So they don't share a listener:
 - **An admin TCP listener** (`admin.bind`) is opt-in, for the cases the socket
   cannot serve: a CLI or UI in a different container, or on a different host.
   When set it must be a loopback address unless `admin.allow_non_loopback` is
-  explicitly set, and a non-loopback admin bind additionally requires an admin
-  token to be configured — the daemon refuses to start rather than quietly
-  exposing credential management. The token is an opaque random value generated
-  into `<data_dir>/admin-token` (mode `0600`) on first start and presented as a
+  explicitly set. Every request on it requires the admin token, loopback
+  included: unlike the socket, a loopback port is open to every local user and,
+  through a browser, to any web page, so loopback is not an authentication
+  boundary. The token is an opaque random value generated into
+  `<data_dir>/admin-token` (mode `0600`) on first start and presented as a
   bearer token, compared in constant time. It is deliberately *not* the same
   primitive as a caller identity: identities are minted, scoped and expiring,
   and an operator credential is none of those. Separate secret, separate check
@@ -169,15 +170,16 @@ So they don't share a listener:
   secret as the channel it travels on, so a non-loopback admin bind also
   requires TLS (`admin.tls = { cert, key }`) unless
   `admin.allow_plaintext = true` says, explicitly, that something outside Janus
-  is encrypting the hop.
+  is encrypting the hop; the daemon refuses to start rather than quietly
+  exposing credential management in the clear.
 - **The UI listener** (`ui.bind`, loopback by default) serves the UI's static
   assets, and — because a browser cannot speak a unix socket — the same admin
   API alongside them. It is a third listener, distinct from the data plane; the
   admin socket stays available either way. Not enabling the UI means that
   listener does not exist. The admin API on this listener requires the admin
-  token even on loopback, because a browser will send whatever a web page tells
-  it to and the required header is what makes a cross-origin request fail; the
-  same non-loopback TLS rule applies. See
+  token on every call, for the same reason as the admin TCP listener: a browser
+  sends whatever a web page tells it to, and only a secret the page lacks makes
+  that request fail. The same non-loopback TLS rule applies. See
   <ref target="docs/admin-surface#ui">the UI</ref>.
 
 The admin surface speaks HTTP and JSON on whichever listener it is reached over.

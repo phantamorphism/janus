@@ -150,20 +150,30 @@ itself, because they describe what happened *after* `ResolveRoute` answered:
   <ref target="docs/architecture#request-lifecycle">the lifecycle</ref> it died
   at) and `reason`. This is the event that makes a reservation refundable; see
   <ref target="docs/plugin-contract#metering-primitives">metering
-  primitives</ref>.
-
-`caller_identity` is repeated on the two settlement events so that a plugin can
-settle a charge without holding a `request_id → identity` map in memory — a
-plugin that restarted between `ResolveRoute` and `call_completed` can still
-account for the call, which is what makes a durable budget actually durable.
+  primitives</ref>. It is also emitted, with `stage` naming the resolve step,
+  when `ResolveRoute` was sent but failed — timed out, errored, or the plugin
+  became unreachable mid-call — because the plugin may have charged before the
+  daemon gave up on its answer, and a refund of a charge that was never made is
+  a no-op.
 - **`credential_invalid`** — the upstream rejected the credential Janus
   substituted in.
 - **`account_error`** — the upstream reported a problem with the account behind
   the credential rather than with the request.
 
 Both of the first two carry the `request_id` of the `ResolveRoute` they follow.
-Exactly one of them is emitted per resolved request, so a plugin that charges a
-budget on the way in always gets a matching settlement event on the way out.
+Exactly one of them is emitted for every request `ResolveRoute` was sent for, so
+a plugin that charges a budget on the way in always gets a matching settlement
+event on the way out.
+
+`caller_identity` is repeated on the two settlement events so that a plugin can
+settle a charge without holding a `request_id → identity` map in memory — a
+plugin that restarted between `ResolveRoute` and `call_completed` can still
+account for the call when the event reaches it after the restart. Delivery is
+best-effort (see <ref target="docs/plugin-contract#plugin-client">the daemon
+codes against one client interface</ref>): an event lost while the plugin was
+unreachable leaves its phase-1 charge in place (never refunded) and its phase-2
+cost unrecorded, which is the residual inaccuracy of a budget whose settlement
+rides an asynchronous channel.
 
 ## Execution and transport models {#transports}
 
@@ -378,18 +388,18 @@ The rules:
   deadline because nothing waits on it.
 
 Configuration is validated at startup — scheme, that every named file exists and
-parses, that the client key matches the client certificate and is not expired,
-that the key file is mode `0600`, `ca_file`/`pinned_cert` exclusivity, and the
-socket-path hygiene described below — and a daemon that fails any of it does not
-start. Reachability is deliberately *not* checked at startup, because a plugin
-is allowed to come up after the daemon does; the consequence of an unreachable
-plugin is per-request and fail-closed. Each such failure is classified as
-`plugin_unreachable`, `plugin_timeout`, `plugin_tls_error`,
-`plugin_no_client_auth`, `plugin_rejected_client_cert` or `plugin_error` (an RPC
-error from a plugin that was reached), and the class appears both on the
-request-log record (`outcome = plugin_failed`) and as the plugin's `health` on
-the admin surface — see <ref target="docs/admin-surface#status-endpoint">
-status</ref>.
+parses, that the client key matches the client certificate and the certificate
+is not expired, that the key file is mode `0600`, `ca_file`/`pinned_cert`
+exclusivity, and the socket-path hygiene described below — and a daemon that
+fails any of it does not start. Reachability is deliberately *not* checked at
+startup, because a plugin is allowed to come up after the daemon does; the
+consequence of an unreachable plugin is per-request and fail-closed. Each such
+failure is classified as `plugin_unreachable`, `plugin_timeout`,
+`plugin_tls_error`, `plugin_no_client_auth`, `plugin_rejected_client_cert` or
+`plugin_error` (an RPC error from a plugin that was reached), and the class
+appears both on the request-log record (`outcome = plugin_failed`) and as the
+plugin's `health` on the admin surface — see
+<ref target="docs/admin-surface#status-endpoint"> status</ref>.
 
 ## Securing the channel {#channel-security}
 
@@ -414,15 +424,21 @@ top, because on a correctly permissioned socket it would authenticate nothing
 the kernel has not already.
 
 The plugin binds its socket mode `0660` inside a directory owned by the plugin's
-user with mode `0750`, and the daemon's user is in that directory's group. At
-startup the daemon walks every directory on the socket's path and refuses to
-start if any of them is writable by a user other than its owner — the same
-posture as `sshd`'s `StrictModes`, for the same reason: an attacker who can
-rename a parent directory can substitute a socket of their own. A plugin that
-wants to verify the daemon's side can read the connecting peer's uid from the
-socket (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS); `janus-core` ships a
-`tonic` interceptor that does this for Rust plugins, and the check is a few
-lines in any other language's gRPC stack.
+user with mode `0750`, and the daemon's user is in that directory's group. The
+daemon walks every directory on the socket's path and rejects the path if any of
+them is writable by group or others, or is owned by anyone other than root, the
+daemon's user, or the owner of the socket's own directory — the same posture as
+`sshd`'s `StrictModes`, for the same reason: an attacker who owns or can write
+to a parent directory can substitute a socket of their own. It does this at
+startup over the part of the path that exists, refusing to start on a failure,
+and again over the full path before every connection and reconnection, because
+the plugin may create its directory after the daemon starts and a path that was
+sound at startup can be changed later; a failure then fails the request closed
+as `plugin_unreachable`, with the offending directory in `last_error`. A plugin
+that wants to verify the daemon's side can read the connecting peer's uid from
+the socket (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS); `janus-core`
+ships a `tonic` interceptor that does this for Rust plugins, and the check is a
+few lines in any other language's gRPC stack.
 
 ### Network {#channel-network}
 
@@ -482,12 +498,17 @@ because it is Janus's own, unlike a caller identity.
 
 `janus plugin check` (`POST /v1/plugin/check` on the admin surface) tests the
 channel actively rather than waiting for traffic to. On the network transport it
-performs a full handshake with the configured material, then a second with a
-throwaway self-signed client certificate that the plugin must *reject*; a plugin
-that accepts the second has client verification misconfigured, and the check
-says so. On the socket transport it reports the path-permission walk and a
-connection attempt. It is the operator's answer to "is this actually secured, or
-does it just work?"
+performs a full handshake with the configured material, then two that the plugin
+must *reject*: one presenting a throwaway self-signed client certificate, and
+one presenting none. A plugin that accepts the first has client verification
+misconfigured; a plugin that accepts the second requests a certificate without
+requiring one, which the passive check during traffic cannot tell apart from
+correct configuration. The check says which. Under TLS 1.3 a server's rejection
+of a client certificate arrives after the client's side of the handshake has
+finished, so each probe reads from the connection to observe it, and none of
+them issues a `ResolveRoute`. On the socket transport it reports the
+path-permission walk and a connection attempt. It is the operator's answer to
+"is this actually secured, or does it just work?"
 
 ## Metering primitives {#metering-primitives}
 
@@ -509,10 +530,13 @@ pub struct Meter<S: UsageStore> { /* store + configured quotas */ }
 impl<S: UsageStore> Meter<S> {
     /// Refuses a `Window::Total` quota on a store whose `durability()` is
     /// `Volatile`: a budget specified as "never resets" cannot live in memory
-    /// that does. `allow_volatile_total()` is the explicit opt-in for tests
-    /// and for plugins that accept the reset.
+    /// that does.
     pub fn new(store: S, quotas: Vec<(String, Quota)>) -> Result<Self, UsageError>;
-    pub fn allow_volatile_total(self) -> Self;
+
+    /// As `new`, but accepts a `Total` quota on a volatile store: the explicit
+    /// opt-in for tests and for plugins that accept the reset.
+    pub fn new_allowing_volatile_total(store: S, quotas: Vec<(String, Quota)>)
+        -> Self;
 
     /// Phase 1. Check and increment in one step against every quota
     /// configured on `meter`, so two concurrent requests from one identity
@@ -636,9 +660,14 @@ pub enum Durability { Volatile, Durable }
 `Meter` is a thin layer over this: `charge` is one `apply` with a `Reserve` op
 and a limit on every bound; `record` is one `apply` with a `Settle` op and no
 limits; `refund` is `release`; `check` is `get` per quota. A ledger entry that
-is never settled or released — the plugin crashed between phases — is dropped by
-`compact` after a TTL (default one hour), so the ledger is bounded by in-flight
-work, not by history.
+is never settled or released — the plugin crashed between phases, or the
+settlement event was lost — is dropped by `compact` after a TTL, as is every
+`Settle`-phase entry once its redelivery window has passed, so the ledger is
+bounded by the traffic of one TTL, not by history. The TTL is the store's
+configuration (default one hour) and has to exceed the longest call a plugin
+meters plus any delay in delivering its settlement event: past it, a late
+`refund` returns `false` and the charge stands, and a redelivered `record` is
+counted again.
 
 `janus-core` ships two stores and a test suite:
 
@@ -652,10 +681,12 @@ work, not by history.
   <ref target="docs/index#goals">standalone by default</ref>. All writes go
   through one writer thread; each `apply` is a single `BEGIN IMMEDIATE`
   transaction; the file is in WAL mode with `synchronous=FULL`. The store takes
-  an exclusive lock on the file at open and refuses to open a file another
-  process holds — two plugin replicas sharing one SQLite file is not a supported
-  deployment of this store, and failing at open is better than corrupting counts
-  under lock contention.
+  an exclusive advisory lock on the file at open and refuses to open a file
+  another process holds. Two plugin replicas sharing one SQLite file is not a
+  supported deployment of this store: it serializes every `apply` across
+  processes through SQLite's file lock, and on a network filesystem — the only
+  way replicas on different hosts could share it — that lock is not reliable.
+  Failing at open is better than counts that are silently wrong.
 - **A conformance suite**, behind the `testing` feature, that any `UsageStore`
   implementation runs against itself: atomicity of `apply` under concurrent
   callers, idempotency on a repeated `op`, all-or-nothing across bounds,
@@ -689,8 +720,9 @@ runs in two phases, which is what the `request_id` on both messages is for:
    `record`s them under the event's `request_id` — unconditionally, because the
    cost has already been incurred and a limit crossed here must be visible to
    the next `check` — then `settle`s the phase-1 charge.
-3. **On `call_abandoned`:** the plugin `refund`s the phase-1 charge, because
-   `ResolveRoute` said yes and the call never reached the upstream.
+3. **On `call_abandoned`:** the plugin `refund`s the phase-1 charge, because the
+   call never reached the upstream — whether `ResolveRoute` said yes or the
+   daemon gave up waiting for its answer.
 
 The consequence, stated plainly rather than designed away: a cost-based budget
 is enforced on the *next* request, not the one that exceeded it. An identity can

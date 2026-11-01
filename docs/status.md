@@ -88,8 +88,8 @@ answered now, and the answers live in the design docs rather than here:
 - **The `janus` CLI, admin endpoints and UI scope.** One `/v1` HTTP+JSON API —
   status, credentials, identities, requests, plugin — with the CLI as a thin
   client and the UI as a deliberate subset; a metadata-only request log with
-  retention; TLS required off loopback. <ref target="docs/admin-surface">Admin
-  surface, CLI and UI</ref>.
+  retention; the admin token on every TCP listener and TLS off loopback.
+  <ref target="docs/admin-surface">Admin surface, CLI and UI</ref>.
 - **Embedded callers of the prior gateway.** Served by the admin endpoints; the
   host's response-bytes tap stays with the host.
   <ref target="docs/scope#inprocess-gap">Scope: embedded callers</ref>.
