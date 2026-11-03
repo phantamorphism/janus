@@ -173,7 +173,8 @@ best-effort (see <ref target="docs/plugin-contract#plugin-client">the daemon
 codes against one client interface</ref>): an event lost while the plugin was
 unreachable leaves its phase-1 charge in place (never refunded) and its phase-2
 cost unrecorded, which is the residual inaccuracy of a budget whose settlement
-rides an asynchronous channel.
+rides an asynchronous channel. This is an accepted limitation, tracked as [issue
+#1](https://github.com/phantamorphism/janus/issues/1).
 
 ## Execution and transport models {#transports}
 
