@@ -173,3 +173,7 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 .schematic/
+
+# unlazy verification workspace
+.unlazy/
+.unlazy-hook-state.json
