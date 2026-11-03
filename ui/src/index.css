@@ -1,1 +1,196 @@
 @import "tailwindcss";
+
+/*
+  Janus console.
+  Cool fog paper, deep indigo ink, and one accent: oxidized brass, the
+  colour of the coin Janus is struck on. Status colours are muted so the
+  only loud thing on a screen is something that is actually wrong.
+  Headings are set in an old-style serif (the god of doorways is Roman);
+  identifiers are monospaced because they are data an operator copies.
+*/
+
+@theme {
+  --color-paper: #eceff3;
+  --color-surface: #ffffff;
+  --color-sunken: #f5f7f9;
+  --color-ink: #1d2a44;
+  --color-ink-soft: #3a4660;
+  --color-muted: #5f6b7f;
+  --color-line: #d2d8e0;
+  --color-line-strong: #aab3c0;
+  --color-brass: #8a6d24;
+  --color-brass-soft: #f3ecd9;
+
+  --color-ok: #2c6e55;
+  --color-ok-soft: #e3f0ea;
+  --color-warn: #8f5b0a;
+  --color-warn-soft: #f6ecda;
+  --color-bad: #a3271f;
+  --color-bad-soft: #f7e3e1;
+  --color-idle: #5f6b7f;
+  --color-idle-soft: #e9ecf0;
+
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #141a26;
+    --color-surface: #1b2232;
+    --color-sunken: #171d2b;
+    --color-ink: #e4e8ef;
+    --color-ink-soft: #c3cad6;
+    --color-muted: #96a0b2;
+    --color-line: #2d3648;
+    --color-line-strong: #485369;
+    --color-brass: #d2b261;
+    --color-brass-soft: #2e2a1d;
+    --color-ok: #79c4a3;
+    --color-ok-soft: #1c2f2a;
+    --color-warn: #e0b064;
+    --color-warn-soft: #33291a;
+    --color-bad: #f08b80;
+    --color-bad-soft: #3a2024;
+    --color-idle: #96a0b2;
+    --color-idle-soft: #252d3d;
+  }
+}
+
+html {
+  color-scheme: light dark;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--color-brass-soft);
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .btn:hover:not(:disabled) {
+    border-color: var(--color-ink-soft);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    border-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-ink-soft);
+  }
+  .btn-danger {
+    color: var(--color-bad);
+    border-color: color-mix(in srgb, var(--color-bad) 45%, transparent);
+  }
+  .btn-danger:hover:not(:disabled) {
+    border-color: var(--color-bad);
+    background: var(--color-bad-soft);
+  }
+  .btn-quiet {
+    border-color: transparent;
+    background: transparent;
+  }
+  .btn-quiet:hover:not(:disabled) {
+    border-color: var(--color-line);
+  }
+
+  .field {
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border-radius: 6px;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.875rem;
+    min-width: 0;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .data-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-muted);
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--color-line-strong);
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    vertical-align: top;
+  }
+  .data-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .arrive {
+    animation: arrive 900ms ease-out;
+  }
+  @keyframes arrive {
+    from {
+      background-color: var(--color-brass-soft);
+    }
+  }
+  .drawer-panel {
+    animation: drawer-in 160ms ease-out;
+  }
+  @keyframes drawer-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+  }
+}
