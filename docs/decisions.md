@@ -194,12 +194,12 @@ credential store if the database leaks.
 **Decision.** One HTTP+JSON API under `/v1` on the admin listener — status,
 credentials, identities, requests, plugin — with `janus` as a thin client of it
 and the UI as a deliberate subset. The surface never returns credential
-material. The request log is metadata-only, stored in SQLite with a single
-retention setting, queryable and tailable over SSE. Every TCP admin and UI
-listener requires the admin token, loopback included, and a non-loopback one
-requires TLS unless plaintext is explicitly allowed. The UI omits the two
-operations that accept credential material and identity creation. Design:
-<ref target="docs/admin-surface">admin surface, CLI and UI</ref>.
+material. The request log is metadata-only, stored in SQLite with an on/off
+setting and a retention setting, queryable and tailable over SSE. Every TCP
+admin and UI listener requires the admin token, loopback included, and a
+non-loopback one requires TLS unless plaintext is explicitly allowed. The UI
+omits the two operations that accept credential material and identity creation.
+Design: <ref target="docs/admin-surface">admin surface, CLI and UI</ref>.
 
 **Clear-cut.** The shape follows from decisions already made (HTTP+JSON, a
 separate listener, the socket as default) and from the users: an operator needs
