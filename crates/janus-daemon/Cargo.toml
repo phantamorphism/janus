@@ -6,9 +6,58 @@ license.workspace = true
 repository.workspace = true
 description = "The long-running Janus process: proxy data plane, operator admin surface, and client of the plugin contract (ResolveRoute, Notify)."
 
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "janus-daemon"
 path = "src/main.rs"
 
 [dependencies]
-janus-core = { path = "../janus-core" }
+janus-core.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
+http.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+bytes.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+axum.workspace = true
+url.workspace = true
+percent-encoding.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+rustls-pki-types.workspace = true
+x509-parser.workspace = true
+rcgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+humantime.workspace = true
+humantime-serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+sha2.workspace = true
+hex.workspace = true
+base64.workspace = true
+subtle.workspace = true
+rand.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+libc.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+reqwest.workspace = true

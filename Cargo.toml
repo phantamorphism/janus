@@ -11,3 +11,79 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/phantamorphism/janus"
+
+# One version of every third-party crate for the whole workspace, so no leaf has
+# to pick a version. The member manifests declare, up front, every dependency
+# their downstream modules are planned to use: those modules are built by work
+# that does not edit manifests, so a dependency listed in a member crate may
+# not have a user in that crate yet.
+[workspace.dependencies]
+janus-core = { path = "crates/janus-core" }
+janus-daemon = { path = "crates/janus-daemon" }
+
+# Async runtime and plumbing.
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["net", "sync"] }
+tokio-util = { version = "0.7", features = ["io", "codec"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# gRPC (plugin contract) and protobuf codegen.
+tonic = "0.14"
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+prost = "0.14"
+
+# HTTP: data plane, admin surface, upstream forwarding, CLI client.
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+bytes = "1"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+axum = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "json", "stream"] }
+url = { version = "2", features = ["serde"] }
+percent-encoding = "2"
+
+# TLS: admin/UI listeners, plugin mutual TLS, `janus plugin tls init`.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+rustls-pki-types = { version = "1", features = ["std"] }
+x509-parser = "0.18"
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
+
+# Serialization and config.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+humantime = "2"
+humantime-serde = "1"
+
+# Errors and logging.
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Identity verification, tokens, hashing.
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+subtle = "2"
+rand = "0.9"
+jsonwebtoken = { version = "10", default-features = false, features = ["use_pem", "rust_crypto"] }
+
+# Storage (daemon's janus.db, SqliteUsageStore).
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+# Misc.
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+libc = "0.2"
+clap = { version = "4", features = ["derive", "env"] }
+
+# Test-only.
+tempfile = "3"
