@@ -144,8 +144,17 @@ pub trait UpstreamImpl: Send + Sync {
     /// The outbound URL: `base_url` (the config's `[[upstream]] base_url`)
     /// joined with `rest`, the inbound path-and-query with the upstream's
     /// `path_prefix` already stripped, plus any rewriting this upstream
-    /// needs.
-    fn outbound_url(&self, base_url: &Url, rest: &str) -> Result<Url, UpstreamError>;
+    /// needs. `kind` is the kind of the credential the request will carry,
+    /// because an upstream may route by it: OpenAI sends Codex OAuth tokens
+    /// to `chatgpt.com/backend-api/codex` and API keys to `api.openai.com`.
+    /// [`apply_auth`](Self::apply_auth) only applies material; it never
+    /// rewrites the URI.
+    fn outbound_url(
+        &self,
+        base_url: &Url,
+        rest: &str,
+        kind: CredentialKind,
+    ) -> Result<Url, UpstreamError>;
 
     /// Apply `material` to the constructed outbound request in the form this
     /// upstream expects: a header and scheme, or a signing procedure over

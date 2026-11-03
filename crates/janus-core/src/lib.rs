@@ -24,9 +24,13 @@
 //!   plugin contract in Rust and wire form, metering signatures, credential
 //!   metadata, upstream names and data-directory layout.
 //! - [`identity`], [`pool`], [`metering`], [`proxy`] — the implementations.
+//! - [`peer`] (unix only) — the tonic peer-uid interceptor a Rust plugin can
+//!   install on its unix socket (`docs/plugin-contract#channel-unix`).
 
 pub mod contract;
 pub mod identity;
 pub mod metering;
+#[cfg(unix)]
+pub mod peer;
 pub mod pool;
 pub mod proxy;

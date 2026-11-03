@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 
 function judge(text) {
   const errs = [];
-  if (!/(^|\n)VERDICT:\s*PASS\b/.test(text) && !/(^|\n)VERDICT:\s*FAIL\b/.test(text)) errs.push('no "VERDICT: PASS" line');
+  if (!(/(^|\n)VERDICT:\s*PASS\b/.test(text) && !/(^|\n)VERDICT:\s*FAIL\b/.test(text))) errs.push('no "VERDICT: PASS" line');
   if (!/\bREVIEWER:\s*\S+/.test(text)) errs.push('no REVIEWER line');
   const open = [...text.matchAll(/^- \[ \] \[(high|medium)\].*$/gim)].map((m) => m[0]);
   for (const o of open) errs.push(`open finding: ${o.slice(0, 120)}`);

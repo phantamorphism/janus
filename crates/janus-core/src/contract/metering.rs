@@ -55,6 +55,11 @@ pub struct MeterKey {
     pub identity: String,
     /// The plugin's own dimension name (`"requests"`, `"input_tokens"`, ...).
     pub meter: String,
+    /// The quota's period in whole seconds (`Window::Fixed { period }`);
+    /// `0` for `Total`. Part of the key because two quotas on one meter
+    /// (say hourly and daily) can share a `window_start` — every daily
+    /// boundary is also an hourly one — and must still count separately.
+    pub period_secs: u64,
     /// Unix seconds at which the window this count belongs to began,
     /// derived from the quota's [`Window`] (for `Fixed`, a multiple of the
     /// period); `0` for `Total`.
@@ -121,6 +126,11 @@ pub enum UsageError {
     /// `Meter::new` refuses a `Window::Total` quota on a `Volatile` store.
     #[error("meter {meter:?} has a Total quota, which a volatile store cannot hold; use a durable store or Meter::new_allowing_volatile_total")]
     VolatileTotal { meter: String },
+    /// `Meter::new` refuses a quota it cannot enforce as written (for
+    /// example a `Fixed` period that is not a positive whole number of
+    /// seconds); `reason` says which rule it broke.
+    #[error("meter {meter:?} has an invalid quota: {reason}")]
+    InvalidQuota { meter: String, reason: String },
     /// An operation named a meter with no configured quotas.
     #[error("no quotas configured for meter {0:?}")]
     UnknownMeter(String),
@@ -260,6 +270,7 @@ mod tests {
         let key = MeterKey {
             identity: "session-42".into(),
             meter: "requests".into(),
+            period_secs: 3600,
             window_start: 1_700_000_000,
         };
         let op = OpId {
@@ -311,5 +322,34 @@ mod tests {
             limit: 10
         }
         .is_allowed());
+    }
+
+    #[test]
+    fn keys_differing_only_in_period_are_distinct_counters() {
+        let hourly = MeterKey {
+            identity: "session-42".into(),
+            meter: "requests".into(),
+            period_secs: 3600,
+            window_start: 1_699_920_000,
+        };
+        let daily = MeterKey {
+            period_secs: 86_400,
+            ..hourly.clone()
+        };
+        assert_ne!(hourly, daily);
+        let set: std::collections::BTreeSet<_> = [hourly, daily].into_iter().collect();
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn invalid_quota_names_meter_and_reason() {
+        let err = UsageError::InvalidQuota {
+            meter: "requests".into(),
+            reason: "period must be a positive whole number of seconds".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "meter \"requests\" has an invalid quota: period must be a positive whole number of seconds"
+        );
     }
 }
