@@ -13,7 +13,7 @@ request takes through them. For what the system is *for* — callers, identities
 and why the substitution exists at all — see
 <ref target="docs/credential-substitution">credential substitution and policy
 enforcement</ref>. See <ref target="docs/status#build-status">status</ref> for
-which parts are built; all are except the `janus` CLI.
+which parts are built.
 
 ## Crate split {#crates}
 
@@ -321,6 +321,5 @@ now instead of guessing at them.
 `janus-core`, `janus-daemon` and the UI implement what this document describes:
 the daemon proxies the three LLM upstreams through the full request lifecycle,
 with the plugin client, credential pool, request log and admin surface behind
-it. The `janus` CLI is the exception — its binary is a stub, and the admin API
-is reached with `curl` or the UI until it exists. The detail is in
+it. The `janus` CLI drives the same admin API. The detail is in
 <ref target="docs/status#build-status">status</ref>.

@@ -45,8 +45,8 @@ host-internal dependencies:
   <ref target="docs/credential-substitution#general-purpose">not specific to LLM
   providers</ref>.
 
-None of this has been ported yet — see
-<ref target="docs/status#build-status">the current build status</ref>.
+All of it has been ported — see <ref target="docs/status#build-status">the
+current build status</ref>.
 
 ## Deliberately left out {#left-behind}
 
