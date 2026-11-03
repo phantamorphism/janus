@@ -1,11 +1,11 @@
 //! janus-daemon as a library.
 //!
 //! Per `docs/plugin-contract#custom-build`, the stock binary (`src/main.rs`)
-//! is to be a few lines over a `janus_daemon::run(config, Embedded)` entry
-//! point, and a custom build another binary calling the same entry point
-//! with its own [`Embedded`] implementations. That entry point is not part
-//! of this crate yet (see the `run` module); [`DaemonConfig`] and
-//! [`Embedded`], its two arguments, are.
+//! is a few lines over [`run`]`(config, Embedded)`, and a custom build is
+//! another binary calling the same entry point with its own [`Embedded`]
+//! implementations. [`Daemon`] is the same lifecycle with the shutdown
+//! trigger in the caller's hands; [`check_config`] is
+//! `janus-daemon check-config`.
 //!
 //! Layout:
 //!
@@ -16,7 +16,7 @@
 //!   log.
 //! - [`dataplane`] — the proxy listener and request pipeline.
 //! - [`admin`] — the `/v1` admin API on the unix socket, TCP and UI listeners.
-//! - `run` — daemon lifecycle, where the entry point will live.
+//! - `run` — daemon lifecycle: startup validation, serving, shutdown.
 
 pub mod admin;
 pub mod contract;
@@ -27,3 +27,4 @@ pub mod store;
 mod run;
 
 pub use contract::{ConfigError, DaemonConfig, Embedded};
+pub use run::{check_config, run, CheckReport, CheckedUpstream, Daemon, RunError};
