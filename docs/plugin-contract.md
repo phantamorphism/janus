@@ -531,13 +531,14 @@ pub struct Meter<S: UsageStore> { /* store + configured quotas */ }
 impl<S: UsageStore> Meter<S> {
     /// Refuses a `Window::Total` quota on a store whose `durability()` is
     /// `Volatile`: a budget specified as "never resets" cannot live in memory
-    /// that does.
+    /// that does. A quota whose period is not a positive whole number of
+    /// seconds is `UsageError::InvalidQuota`.
     pub fn new(store: S, quotas: Vec<(String, Quota)>) -> Result<Self, UsageError>;
 
     /// As `new`, but accepts a `Total` quota on a volatile store: the explicit
     /// opt-in for tests and for plugins that accept the reset.
     pub fn new_allowing_volatile_total(store: S, quotas: Vec<(String, Quota)>)
-        -> Self;
+        -> Result<Self, UsageError>;
 
     /// Phase 1. Check and increment in one step against every quota
     /// configured on `meter`, so two concurrent requests from one identity
@@ -633,6 +634,7 @@ pub trait UsageStore: Send + Sync {
 pub struct MeterKey {
     pub identity: String,    // caller_identity
     pub meter: String,       // the plugin's own dimension name
+    pub period_secs: u64,    // the Window's length in seconds; 0 for Total
     pub window_start: i64,   // derived from the Quota's Window; 0 for Total
 }
 
@@ -682,12 +684,13 @@ counted again.
   <ref target="docs/index#goals">standalone by default</ref>. All writes go
   through one writer thread; each `apply` is a single `BEGIN IMMEDIATE`
   transaction; the file is in WAL mode with `synchronous=FULL`. The store takes
-  an exclusive advisory lock on the file at open and refuses to open a file
-  another process holds. Two plugin replicas sharing one SQLite file is not a
-  supported deployment of this store: it serializes every `apply` across
-  processes through SQLite's file lock, and on a network filesystem — the only
-  way replicas on different hosts could share it — that lock is not reliable.
-  Failing at open is better than counts that are silently wrong.
+  an exclusive advisory lock at open, on a `<path>-lock` file beside the
+  database, and refuses to open a store another process holds. Two plugin
+  replicas sharing one SQLite file is not a supported deployment of this store:
+  it serializes every `apply` across processes through SQLite's file lock, and
+  on a network filesystem — the only way replicas on different hosts could share
+  it — that lock is not reliable. Failing at open is better than counts that are
+  silently wrong.
 - **A conformance suite**, behind the `testing` feature, that any `UsageStore`
   implementation runs against itself: atomicity of `apply` under concurrent
   callers, idempotency on a repeated `op`, all-or-nothing across bounds,
