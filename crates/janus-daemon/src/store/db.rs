@@ -6,7 +6,8 @@
 //! is newer than this build knows is refused rather than guessed at.
 
 use std::fs::OpenOptions;
-use std::os::unix::fs::OpenOptionsExt;
+use std::fs::Permissions;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::time::Duration;
 
@@ -68,22 +69,44 @@ pub(super) fn schema_version() -> i64 {
     MIGRATIONS.len() as i64
 }
 
-/// Open (creating if absent, mode `0600`) the database at `path` in WAL
-/// mode and bring its schema up to date.
+/// Open (creating if absent) the database at `path` in WAL mode, with mode
+/// `0600`, and bring its schema up to date.
 pub(super) fn open(path: &Path) -> Result<Connection, StoreError> {
+    let io = |path: &Path| {
+        let path = path.to_path_buf();
+        move |source| StoreError::Io { path, source }
+    };
     // Create the file ourselves so it never exists with a umask-derived
     // mode; SQLite gives the -wal and -shm files the main file's mode.
-    OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .mode(0o600)
         .open(path)
-        .map_err(|source| StoreError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
+        .map_err(io(path))?;
+    // A file that already existed keeps whatever mode it had, and it holds
+    // token hashes, identities and claims: tighten it, and any -wal/-shm
+    // left beside it, before SQLite opens them.
+    file.set_permissions(Permissions::from_mode(0o600))
+        .map_err(io(path))?;
+    for suffix in ["-wal", "-shm"] {
+        let mut side = path.as_os_str().to_owned();
+        side.push(suffix);
+        let side = Path::new(&side);
+        match OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(side)
+        {
+            Ok(file) => file
+                .set_permissions(Permissions::from_mode(0o600))
+                .map_err(io(side))?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(io(side)(e)),
+        }
+    }
     let mut conn = connect(path)?;
     let mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
     if !mode.eq_ignore_ascii_case("wal") {
@@ -187,6 +210,26 @@ mod tests {
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .expect("user_version");
         assert_eq!(version, schema_version());
+    }
+
+    #[test]
+    fn an_existing_database_and_its_wal_are_tightened_to_0600() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("janus.db");
+        drop(open(&path).expect("open"));
+        let mut wal = path.as_os_str().to_owned();
+        wal.push("-wal");
+        let wal = std::path::PathBuf::from(wal);
+        std::fs::write(&wal, b"").expect("wal");
+        for file in [&path, &wal] {
+            std::fs::set_permissions(file, Permissions::from_mode(0o644)).expect("chmod");
+        }
+        let conn = open(&path).expect("reopen");
+        for file in [&path, &wal] {
+            let mode = std::fs::metadata(file).expect("stat").permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "{}", file.display());
+        }
+        drop(conn);
     }
 
     #[test]

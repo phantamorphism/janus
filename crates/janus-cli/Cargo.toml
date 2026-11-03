@@ -12,8 +12,11 @@ path = "src/main.rs"
 
 [dependencies]
 janus-core.workspace = true
+# The daemon library supplies what the CLI must not reimplement: the
+# `plugin tls init` generator, `check-config`'s full startup validation,
+# the config loader (for `data_dir`) and the request-log outcome names.
+janus-daemon.workspace = true
 tokio.workspace = true
-futures.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
@@ -21,13 +24,16 @@ hyper-util.workspace = true
 bytes.workspace = true
 reqwest.workspace = true
 url.workspace = true
-rcgen.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 humantime.workspace = true
-thiserror.workspace = true
 chrono.workspace = true
 clap.workspace = true
+libc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+rustls-pki-types.workspace = true

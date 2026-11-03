@@ -33,23 +33,62 @@ them. The reasoning behind the scope is recorded in
 - **Errors are JSON.**
   `{ "error": { "code": "<snake_case>", "message": "..." } }` with a
   conventional HTTP status. `code` is the stable contract; `message` is for
-  humans.
+  humans. A malformed body, query or path parameter gets the same envelope
+  (`invalid_request`, 400), and so do unknown endpoints (`not_found`, 404) and
+  methods (`method_not_allowed`, 405). See
+  <ref target="docs/admin-surface#errors">error codes</ref>.
+- **Responses are objects.** A list is wrapped in an envelope named for its
+  resource (`{ "credentials": [...] }`, `{ "identities": [...] }`,
+  `{ "requests": [...], "next": ..., "disabled": ... }`), so a list can gain
+  fields without a breaking change. Creation answers `201` with the created
+  resource, other mutations `200` with the resource's new state, and deletion
+  `204` with no body. Unknown body and query fields are refused.
+- **Authentication is per listener.** On the unix socket, filesystem permissions
+  authenticate the caller and no token is needed. On the TCP admin listener and
+  on the UI listener, every API request carries
+  `Authorization: Bearer <admin token>`, loopback included. The token is taken
+  from that header and from nowhere else — never the query string, never a
+  cookie. A missing or wrong token is `401 unauthorized`, with
+  `WWW-Authenticate: Bearer`. No CORS preflight is answered: an `OPTIONS`
+  request carries no token, so it is refused like any other request.
 
 ## Endpoints {#endpoints}
 
 ### Status {#status-endpoint}
 
-- `GET /v1/status` — daemon identity and health in one document: `version`,
-  `build`, `started_at`, the bound listeners, each configured upstream with its
-  identity binding method, the request log's size and retention, and a `plugin`
-  object: `mode` (`none` | `linked` | `unix` | `tls` | `plaintext`), `endpoint`,
-  `health` (`unknown` before any call has been attempted, then `ok` |
-  `unreachable` | `timeout` | `tls_error` | `no_client_auth` |
-  `rejected_client_cert` | `error` — the failure classes of
-  <ref target="docs/plugin-contract#plugin-config">configuring the plugin</ref>
-  without their `plugin_` prefix), `last_error`, `last_ok_at`, and when TLS is
-  in use `client_cert_expires_at` and `server_cert_expires_at`. This is what
-  `janus status` prints and what the UI overview renders.
+`GET /v1/status` returns daemon identity and health in one document. This is
+what `janus status` prints and what the UI overview renders. Its fields:
+
+- `version`, `build`, `started_at`.
+- `listeners` — `admin_socket` (its path); `admin_tcp` and `ui`, each `null`
+  when not configured, otherwise `{ address, tls, url }`; and `data_plane` (its
+  address).
+- `upstreams` — one entry per `[[upstream]]`: `name`, `path_prefix`, `base_url`,
+  `binding` (the upstream-wide binding's method, or `null` when none resolves),
+  and `routes`, a list of `{ path, binding }`.
+- `request_log` — `enabled`, `retain` (human-readable), `retain_seconds`, and
+  `rows` (the rows currently stored).
+- `credentials` — `total`, and `by_status`, which counts every status (`active`,
+  `invalid`, `disabled`, `rate_limited`), zeros included.
+- `plugin`:
+  - `mode` — `none`, `linked`, `unix`, `tls` or `plaintext`.
+  - `endpoint` — `null` for `none` and `linked`.
+  - `health` — `unknown` before any call has been attempted, then `ok`,
+    `unreachable`, `timeout`, `tls_error`, `no_client_auth`,
+    `rejected_client_cert` or `error`. These are the failure classes of
+    <ref target="docs/plugin-contract#plugin-config">configuring the
+    plugin</ref> without their `plugin_` prefix.
+  - `last_error`, `last_ok_at`.
+  - `dropped_events` — the `Notify` events dropped since start because the
+    bounded delivery queue was full. `Notify` never blocks the request path, so
+    a non-zero count is the operator's only sign that settlement events a plugin
+    relies on went missing.
+  - `client_cert_expires_at` and `server_cert_expires_at` — present on the TLS
+    transport only. The server certificate's expiry appears once a handshake has
+    seen it.
+
+  With no `[plugin]` block, `mode` is `none`, `endpoint` is `null` and `health`
+  stays `unknown`.
 
 ### Credentials {#credentials-endpoint}
 
@@ -71,16 +110,23 @@ for that upstream), `label`, `source` (`pool` | `env` | `file`), `status`
   kind-specific object the upstream implementation knows how to store (an API
   key; the contents of a vendor CLI's credential file). The daemon writes the
   pool slot and the credential is live without a restart.
-- `PUT /v1/credentials/{ref}/material` — replace the material and clear an
-  `invalid` status. The rotation path.
+- `PUT /v1/credentials/{ref}/material` — body `{ "material": { ... } }`; replace
+  the material and clear an `invalid` status. The rotation path.
 - `POST /v1/credentials/{ref}/disable`, `POST /v1/credentials/{ref}/enable` —
   take a credential out of, or back into, the default chain and plugin
   resolution. A plugin that names a disabled `ref` gets a failed request, not a
   silent fall-through — the same posture as step 4 of
   <ref target="docs/architecture#request-lifecycle">the request lifecycle</ref>.
 - `POST /v1/credentials/{ref}/refresh` — force a refresh of an expiring
-  credential now rather than on next use.
+  credential now rather than on next use. A credential with nothing to refresh
+  (an API key) is `409 not_refreshable`; a refresh the vendor refuses is
+  `502 refresh_failed`.
 - `DELETE /v1/credentials/{ref}` — remove the slot.
+
+A credential declared in config (`source` `env` or `file`, see
+<ref target="docs/configuration#credentials">config credentials</ref>) belongs
+to the config: it can be enabled, disabled and refreshed here, but replacing its
+material or deleting it is `409 not_pool_managed`.
 
 ### Identities {#identities-endpoint}
 
@@ -92,11 +138,14 @@ server-assigned `id`, never by the token.
 - `POST /v1/identities` — register. Body: `identity` (the `caller_identity`
   string policy will see), optional `claims` (string map, becomes
   `identity_claims`), optional `label`, optional `expires_in` (duration) or
-  `expires_at`. Response: the entry's metadata plus `token`, returned **once**
-  and never retrievable again. The caller of this endpoint is normally the
-  deployment's provisioner, which hands the token to the sandbox it is creating.
+  `expires_at` (not both). The token is always generated by the daemon; a body
+  that tries to supply one is refused. Response: `201` with the entry's metadata
+  plus `token`, returned **once** and never retrievable again. The caller of
+  this endpoint is normally the deployment's provisioner, which hands the token
+  to the sandbox it is creating.
 - `GET /v1/identities[?identity=&include_revoked=&include_expired=]` — list.
-  Several entries may share one `identity` (a rotation in progress).
+  Several entries may share one `identity` (a rotation in progress). Revoked and
+  expired entries are left out unless asked for.
 - `GET /v1/identities/{id}` — one entry: `id`, `identity`, `claims`, `label`,
   `created_at`, `expires_at`, `revoked_at`, `last_seen_at`.
 - `POST /v1/identities/{id}/revoke` — immediate: the next request presenting
@@ -112,15 +161,30 @@ record shape.
 
 - `GET /v1/requests?identity=&upstream=&outcome=&credential=&since=&until=&limit=&before=`
   — newest first, cursor-paginated (`before` is the cursor from the previous
-  page's `next`). `limit` defaults to 100 and is capped at 1000.
+  page's `next`). `limit` defaults to 100 and is capped at 1000; `limit=0` and
+  an unknown `outcome` are refused.
 - `GET /v1/requests/{request_id}` — one record.
 - `GET /v1/requests/stream?identity=&upstream=&outcome=` — a live tail as
-  `text/event-stream`: one `request` event per completed record matching the
-  filter, plus a periodic `ping`. SSE rather than a WebSocket because `curl`,
-  the CLI and a browser `fetch` all consume it with nothing extra. The stream
-  takes the admin token in the `Authorization` header like every other endpoint,
-  never in the query string, so the UI reads it with `fetch` and a streaming
-  body rather than with `EventSource`, which cannot set headers.
+  `text/event-stream`. SSE rather than a WebSocket because `curl`, the CLI and a
+  browser `fetch` all consume it with nothing extra. Events:
+  - `ping` — first on connect, then every 10 seconds; data `{ "at": ... }`.
+  - `request` — one per completed record matching the filter; data is the
+    record.
+  - `lagged` — the subscriber fell behind and records were skipped; data
+    `{ "missed": n }`.
+  - `disabled` — sent once, alone, when the request log is disabled; data
+    `{ "disabled": true }`.
+
+  The stream is live only: events carry no `id` and there is no replay, so a
+  reconnecting client — or one that saw `lagged` — fills the gap with
+  `GET /v1/requests?since=`. The stream ends when the daemon shuts down. It
+  takes the admin token in the `Authorization` header like every other
+  endpoint, so the UI reads it with `fetch` and a streaming body rather than
+  with `EventSource`, which cannot set headers.
+
+With the request log disabled, the query endpoints return an empty list with
+`"disabled": true`, and `GET /v1/requests/{request_id}` for a record that is not
+stored is `404 request_log_disabled` rather than `request_not_found`.
 
 ### Plugin {#plugin-endpoint}
 
@@ -128,12 +192,42 @@ record shape.
 - `POST /v1/plugin/check` — actively verify the channel: perform a full
   handshake with the configured material, then — on the TLS transport — two
   handshakes the plugin must *reject*, one with a throwaway self-signed client
-  certificate and one with none. Returns each result; on the socket transport,
-  the path-permission walk and a connection attempt. This is how an operator
-  confirms the plugin is actually requiring daemon authentication, which the
-  daemon can otherwise only observe passively — see
+  certificate and one with none. Returns
+  `{ mode, endpoint, passed, steps: [...] }`, where each step names what ran
+  (`path_permissions`, `connect`, `handshake`, `throwaway_cert_rejected`,
+  `no_cert_rejected`) with `passed` and a `detail`, plus the failure `class`
+  when it failed. On the socket transport the steps are the path-permission walk
+  and a connection attempt; on the plaintext transport, a connection attempt; a
+  linked plugin has no channel and returns no steps. With no `[plugin]` block
+  the call is `409 no_plugin`. This is how an operator confirms the plugin is
+  actually requiring daemon authentication, which the daemon can otherwise only
+  observe passively — see
   <ref target="docs/plugin-contract#channel-security">securing the
   channel</ref>.
+
+### Error codes {#errors}
+
+| Code | Status | When |
+|---|---|---|
+| `invalid_request` | 400 | malformed body, query or path parameter; unknown field |
+| `invalid_ref` | 400 | a `ref` that breaks the naming rule |
+| `invalid_material` | 400 | material the upstream implementation cannot store |
+| `unauthorized` | 401 | missing or wrong admin token |
+| `not_found` | 404 | unknown endpoint |
+| `credential_not_found`, `identity_not_found`, `request_not_found` | 404 | no such resource |
+| `no_default_credential` | 404 | the default chain has no `active` credential |
+| `request_log_disabled` | 404 | a record lookup while the log is disabled |
+| `method_not_allowed` | 405 | known endpoint, wrong method |
+| `credential_exists` | 409 | `POST /v1/credentials` with a `ref` already in use |
+| `wrong_upstream` | 409 | the `ref` belongs to a different upstream |
+| `credential_unavailable` | 409 | the credential cannot be used in its current state |
+| `not_pool_managed` | 409 | replacing or deleting a config credential |
+| `not_refreshable` | 409 | refreshing a credential that has nothing to refresh |
+| `no_plugin` | 409 | `POST /v1/plugin/check` with no `[plugin]` block |
+| `payload_too_large` | 413 | request body over the limit |
+| `unsupported_media_type` | 415 | a body that is not JSON |
+| `internal` | 500 | anything else |
+| `refresh_failed` | 502 | the vendor refused a refresh |
 
 ## The request log {#request-log}
 
@@ -145,7 +239,7 @@ or response bodies. Fields:
 - `request_id` — Janus-assigned; the same value a plugin sees in `ResolveRoute`
   and `Notify`.
 - `received_at`, `duration_ms`.
-- `upstream`, `route` (the matched path pattern, if a route binding applied),
+- `upstream`, `route` (the matched route path, if a route binding applied),
   `method`, `path`.
 - `binding` — the identity method that ran (`hmac`, `jwt`, `opaque`,
   `trusted_header`, `custom:<name>`, or `none`).
@@ -255,15 +349,16 @@ API supports both, so adding them later is a UI-only change. Identity *creation*
 is likewise absent: it is the provisioner's call, made by a program at sandbox
 creation, not an operator's.
 
-Authentication: the UI listener requires the admin token on every API call,
-loopback included. A browser is a hostile environment — any page a user visits
-can issue requests to a loopback port, and through DNS rebinding can even do so
-same-origin — so the only thing that makes such a request fail is a secret the
-page does not have. The token travels in an `Authorization` header, which also
-means a cross-origin request is preflighted, and the daemon answers no CORS
-preflight. The UI prompts for the token once and keeps it in session storage;
-the daemon logs the UI URL and the token file's path at startup. A non-loopback
-UI bind carries the same TLS requirement as a non-loopback admin bind.
+Authentication: the UI listener serves its static assets without a token and
+requires the admin token on every `/v1` call, loopback included. A browser is a
+hostile environment — any page a user visits can issue requests to a loopback
+port, and through DNS rebinding can even do so same-origin — so the only thing
+that makes such a request fail is a secret the page does not have. The token
+travels in an `Authorization` header, which also means a cross-origin request is
+preflighted, and the daemon answers no CORS preflight. The UI prompts for the
+token once and keeps it in session storage; the daemon logs the UI URL and the
+token file's path at startup. A non-loopback UI bind carries the same TLS
+requirement as a non-loopback admin bind.
 
 ## Storage {#storage}
 

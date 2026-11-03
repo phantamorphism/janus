@@ -57,6 +57,43 @@ async fn post(rt: &Running, path: &str, token: Option<&str>) -> reqwest::Respons
     req.send().await.expect("request reaches the data plane")
 }
 
+const CHAT: &str = "/openrouter/v1/chat/completions";
+
+/// `alice`'s chat completion through the data plane.
+async fn post_alice(rt: &Running) -> reqwest::Response {
+    post(rt, CHAT, Some(&token("alice"))).await
+}
+
+/// An ok upstream and a daemon whose gRPC plugin answers `reply`, with
+/// `timeout_ms` as the plugin timeout when given.
+async fn with_grpc(
+    env: &Env,
+    reply: Reply,
+    timeout_ms: Option<u64>,
+) -> (GrpcPlugin, Upstream, Running) {
+    let plugin = GrpcPlugin::serve(&env.socket(), reply);
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let mut o = Opts::new(&base);
+    o.plugin = PluginCfg::Grpc;
+    if let Some(timeout_ms) = timeout_ms {
+        o.timeout_ms = timeout_ms;
+    }
+    let rt = env.start(&o, Embedded::default()).await;
+    (plugin, up, rt)
+}
+
+/// An ok upstream and a daemon with a linked plugin answering `reply`.
+async fn with_linked(env: &Env, reply: Reply) -> (Arc<Recorder>, Upstream, Running) {
+    let recorder = Recorder::new(reply);
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let mut o = Opts::new(&base);
+    o.plugin = PluginCfg::Linked;
+    let rt = env.start(&o, linked(&recorder)).await;
+    (recorder, up, rt)
+}
+
 /// Nothing accepts connections on `addr`.
 async fn not_listening(addr: &str) -> bool {
     tokio::net::TcpStream::connect(addr).await.is_err()
@@ -72,12 +109,7 @@ async fn free_addr() -> String {
 #[tokio::test(flavor = "multi_thread")]
 async fn unidentified_request_never_reaches_plugin() {
     let env = Env::new();
-    let plugin = GrpcPlugin::serve(&env.socket(), Reply::UseDefault);
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Grpc;
-    let mut rt = env.start(&o, Embedded::default()).await;
+    let (plugin, up, mut rt) = with_grpc(&env, Reply::UseDefault, None).await;
 
     let response = post(&rt, "/openrouter/v1/chat/completions", None).await;
     assert_eq!(response.status(), 401);
@@ -94,12 +126,7 @@ async fn unidentified_request_never_reaches_plugin() {
 
     // A valid request afterwards proves the plugin is reachable and that
     // its event stream is flowing: the rejected one left no trace there.
-    let ok = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let ok = post_alice(&rt).await;
     assert_eq!(ok.status(), 200);
     let ok_record = rt.record().await;
     plugin
@@ -194,12 +221,7 @@ async fn unbound_upstream_is_rejected_never_open() {
     o.default_identity = false;
     let mut rt = env.start(&o, Embedded::default()).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 401);
     let record = rt.record().await;
     assert_eq!(
@@ -242,6 +264,84 @@ async fn admin_paths_on_the_data_plane_are_404() {
         assert_eq!(record.path, path);
     }
     assert!(up.seen().is_empty());
+    rt.stop().await;
+}
+
+/// Send `target` as the raw request-target (no client-side normalisation)
+/// and return the status code.
+async fn raw_post(addr: &str, target: &str, host: &str, token: &str) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+    let request = format!(
+        "POST {target} HTTP/1.1\r\nhost: {host}\r\nauthorization: Bearer {token}\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{{}}"
+    );
+    stream.write_all(request.as_bytes()).await.expect("write");
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).await.expect("read");
+    let text = String::from_utf8_lossy(&response);
+    text.split(' ')
+        .nth(1)
+        .and_then(|code| code.parse().ok())
+        .unwrap_or_else(|| panic!("no status line for {target}: {text}"))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn path_tricks_never_leave_the_upstream_base() {
+    let env = Env::new();
+    let up = Upstream::start(ok_upstream()).await;
+    let base = format!("{}/api", up.base_url());
+    let mut rt = env.start(&Opts::new(&base), Embedded::default()).await;
+    let addr = rt.base.trim_start_matches("http://").to_owned();
+    let caller = token("alice");
+
+    for target in [
+        "/openrouter/../../escape",
+        "/openrouter/v1/../../escape",
+        "/openrouter/v1/%2e%2e/%2e%2e/escape",
+        "/openrouter/v1/.%2e/.%2e/escape",
+        "/openrouter/v1/..%2f..%2fescape",
+        "/openrouter/v1/%2E%2E%5C%2E%2E%5Cescape",
+        "/openrouter//evil.example/v1",
+        "/openrouter/@evil.example/v1",
+        // Absolute-form: the authority is the caller's, never the upstream's.
+        "http://169.254.169.254/openrouter/v1/chat/completions",
+    ] {
+        let status = raw_post(&addr, target, "169.254.169.254", &caller).await;
+        let record = rt.record().await;
+        assert!(
+            !record.path.contains("169.254.169.254"),
+            "authority recorded as path: {}",
+            record.path
+        );
+        if status == 200 {
+            assert_eq!(record.outcome, Outcome::Forwarded, "{target}");
+        }
+    }
+
+    let seen = up.seen();
+    assert!(
+        seen.iter().any(|s| s.target == "/api/v1/chat/completions"),
+        "the absolute-form request was forwarded to the configured upstream: {seen:?}"
+    );
+    for s in &seen {
+        // An upstream that resolves dot segments (decoded or not) must
+        // still land under `/api`: none may survive into the target.
+        let path = s.target.split('?').next().unwrap_or_default();
+        let dot_segment = path
+            .split('/')
+            .map(|seg| seg.to_ascii_lowercase().replace("%2e", "."))
+            .any(|seg| seg == "." || seg == "..");
+        assert!(
+            path.starts_with("/api/") && !dot_segment,
+            "forwarded outside the base path: {}",
+            s.target
+        );
+        assert_eq!(
+            s.headers["host"],
+            up.addr.to_string(),
+            "the upstream's host, not the caller's"
+        );
+    }
     rt.stop().await;
 }
 
@@ -364,19 +464,9 @@ async fn identity_leak_through_allowlist_refuses_to_forward() {
 #[tokio::test(flavor = "multi_thread")]
 async fn forwarded_response_is_relayed_unmodified_and_settled() {
     let env = Env::new();
-    let recorder = Recorder::new(Reply::UseDefault);
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Linked;
-    let mut rt = env.start(&o, linked(&recorder)).await;
+    let (recorder, _up, mut rt) = with_linked(&env, Reply::UseDefault).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 200);
     assert_eq!(response.headers()["x-upstream-marker"], "yes");
     let (_, view) = caller_view(response).await;
@@ -423,19 +513,9 @@ async fn forwarded_response_is_relayed_unmodified_and_settled() {
 #[tokio::test(flavor = "multi_thread")]
 async fn plugin_selected_credential_is_used() {
     let env = Env::new();
-    let plugin = GrpcPlugin::serve(&env.socket(), Reply::Credential("or-spare".into()));
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Grpc;
-    let mut rt = env.start(&o, Embedded::default()).await;
+    let (plugin, up, mut rt) = with_grpc(&env, Reply::Credential("or-spare".into()), None).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     let (status, view) = caller_view(response).await;
     assert_eq!(status, 200);
     assert_no_credential(&view);
@@ -466,12 +546,7 @@ async fn streaming_response_is_relayed_as_it_arrives() {
     let base = up.base_url();
     let mut rt = env.start(&Opts::new(&base), Embedded::default()).await;
 
-    let mut response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let mut response = post_alice(&rt).await;
     assert_eq!(response.status(), 200);
     let first = tokio::time::timeout(Duration::from_secs(5), response.chunk())
         .await
@@ -493,19 +568,9 @@ async fn streaming_response_is_relayed_as_it_arrives() {
 #[tokio::test(flavor = "multi_thread")]
 async fn denied_request_never_reaches_upstream() {
     let env = Env::new();
-    let plugin = GrpcPlugin::serve(&env.socket(), Reply::Deny("budget exhausted".into()));
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Grpc;
-    let mut rt = env.start(&o, Embedded::default()).await;
+    let (plugin, up, mut rt) = with_grpc(&env, Reply::Deny("budget exhausted".into()), None).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     let (status, body) = caller_view(response).await;
     assert_eq!(status, 403);
     assert!(
@@ -534,19 +599,9 @@ async fn denied_request_never_reaches_upstream() {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_abandoned_sent_on_resolve_failure() {
     let env = Env::new();
-    let plugin = GrpcPlugin::serve(&env.socket(), Reply::Fail);
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Grpc;
-    let mut rt = env.start(&o, Embedded::default()).await;
+    let (plugin, up, mut rt) = with_grpc(&env, Reply::Fail, None).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     let (status, body) = caller_view(response).await;
     assert_eq!(status, 503, "fail closed");
     assert!(body.contains("plugin_error"));
@@ -574,20 +629,10 @@ async fn call_abandoned_sent_on_resolve_failure() {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_abandoned_sent_on_resolve_timeout() {
     let env = Env::new();
-    let plugin = GrpcPlugin::serve(&env.socket(), Reply::Slow(Duration::from_millis(600)));
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Grpc;
-    o.timeout_ms = 150;
-    let mut rt = env.start(&o, Embedded::default()).await;
+    let (plugin, up, mut rt) =
+        with_grpc(&env, Reply::Slow(Duration::from_millis(600)), Some(150)).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 503);
     let record = rt.record().await;
     assert_eq!(
@@ -614,12 +659,7 @@ async fn unplugged_plugin_fails_closed() {
     o.plugin = PluginCfg::Grpc; // nothing serves the socket
     let mut rt = env.start(&o, Embedded::default()).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 503);
     let record = rt.record().await;
     assert_eq!(
@@ -635,19 +675,10 @@ async fn unplugged_plugin_fails_closed() {
 #[tokio::test(flavor = "multi_thread")]
 async fn unusable_credential_fails_without_fall_through() {
     let env = Env::new();
-    let recorder = Recorder::new(Reply::Credential("no-such-credential".into()));
-    let up = Upstream::start(ok_upstream()).await;
-    let base = up.base_url();
-    let mut o = Opts::new(&base);
-    o.plugin = PluginCfg::Linked;
-    let mut rt = env.start(&o, linked(&recorder)).await;
+    let (recorder, up, mut rt) =
+        with_linked(&env, Reply::Credential("no-such-credential".into())).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     let (status, body) = caller_view(response).await;
     assert_eq!(status, 503);
     assert_no_credential(&body);
@@ -675,12 +706,7 @@ async fn upstream_unreachable_is_upstream_error_and_abandoned_at_forward() {
     o.plugin = PluginCfg::Linked;
     let mut rt = env.start(&o, linked(&recorder)).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     let (status, body) = caller_view(response).await;
     assert_eq!(status, 502);
     assert_no_credential(&body);
@@ -704,12 +730,7 @@ async fn no_plugin_makes_zero_proto_calls() {
     let mut rt = env.start(&Opts::new(&base), Embedded::default()).await;
 
     for _ in 0..3 {
-        let response = post(
-            &rt,
-            "/openrouter/v1/chat/completions",
-            Some(&token("alice")),
-        )
-        .await;
+        let response = post_alice(&rt).await;
         assert_eq!(response.status(), 200, "the default chain decides");
         let record = rt.record().await;
         assert_eq!(record.outcome, Outcome::Forwarded);
@@ -796,12 +817,7 @@ async fn credential_invalid_reaches_pool_and_plugin() {
     o.plugin = PluginCfg::Linked;
     let mut rt = env.start(&o, linked(&recorder)).await;
 
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 401);
     let first = rt.record().await;
     assert_eq!(first.outcome, Outcome::Forwarded);
@@ -813,12 +829,7 @@ async fn credential_invalid_reaches_pool_and_plugin() {
 
     // The pool now holds or-spare invalid: naming it again fails at the
     // credential step instead of reaching the upstream.
-    let response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let response = post_alice(&rt).await;
     assert_eq!(response.status(), 503);
     let second = rt.record().await;
     assert_eq!(second.outcome, Outcome::CredentialUnavailable);
@@ -913,12 +924,7 @@ async fn caller_disconnect_mid_stream_settles_exactly_once() {
     o.plugin = PluginCfg::Linked;
     let mut rt = env.start(&o, linked(&recorder)).await;
 
-    let mut response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let mut response = post_alice(&rt).await;
     assert_eq!(response.status(), 200);
     response.chunk().await.expect("chunk").expect("bytes");
     drop(response);
@@ -1000,12 +1006,7 @@ async fn shutdown_lets_inflight_streams_finish_and_records_them() {
     let addr = rt.base.trim_start_matches("http://").to_owned();
     let mut records = rt.daemon.requests().subscribe();
 
-    let mut response = post(
-        &rt,
-        "/openrouter/v1/chat/completions",
-        Some(&token("alice")),
-    )
-    .await;
+    let mut response = post_alice(&rt).await;
     response.chunk().await.expect("chunk").expect("first bytes");
     let shutdown = tokio::spawn(rt.stop());
     // The listener closes while the stream is still open.
@@ -1033,6 +1034,175 @@ async fn shutdown_lets_inflight_streams_finish_and_records_them() {
         .expect("the record was committed before shutdown returned");
     assert_eq!(record.outcome, Outcome::Forwarded);
     assert_eq!(record.error, None);
+}
+
+/// A small deterministic generator, so a failing run can be replayed from
+/// the seed it prints.
+struct Lcg(u64);
+
+impl Lcg {
+    fn below(&mut self, n: u64) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        (self.0 >> 33) % n
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
+    const REQUESTS: u64 = 200;
+    let env = Env::new();
+    let plugin = GrpcPlugin::serve(&env.socket(), Reply::Slow(Duration::from_millis(15)));
+    // openrouter streams forever (a caller that leaves aborts mid-stream);
+    // anthropic answers at once (a caller that waits long enough completes).
+    let endless = Upstream::start(Script::Endless {
+        chunk: "data: tick\n\n",
+    })
+    .await;
+    let quick = Upstream::start(ok_upstream()).await;
+    let (endless_base, quick_base) = (endless.base_url(), quick.base_url());
+    let mut o = Opts::new(&endless_base);
+    o.anthropic = Some(&quick_base);
+    o.plugin = PluginCfg::Grpc;
+    o.timeout_ms = 5000;
+    let rt = env.start(&o, Embedded::default()).await;
+
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos() as u64;
+    eprintln!("seed {seed}");
+    let mut rng = Lcg(seed);
+    let caller = token("alice");
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..REQUESTS {
+        // Abort anywhere from before the head is sent to mid-stream.
+        let abort_after = Duration::from_millis(rng.below(120));
+        let request = if rng.below(2) == 0 {
+            client().post(rt.url(CHAT)).bearer_auth(&caller).body("{}")
+        } else {
+            client()
+                .post(rt.url("/anthropic/v1/messages"))
+                .header("x-api-key", &caller)
+                .body("{}")
+        };
+        tasks.spawn(async move {
+            let exchange = async {
+                let mut response = request.send().await.ok()?;
+                while let Ok(Some(_)) = response.chunk().await {}
+                Some(())
+            };
+            let _ = tokio::time::timeout(abort_after, exchange).await;
+        });
+    }
+    while tasks.join_next().await.is_some() {}
+
+    let recorder = &plugin.recorder;
+    let settled = |request_id: &str| {
+        recorder
+            .events_for(request_id)
+            .into_iter()
+            .filter(|e| e.event_type == "call_completed" || e.event_type == "call_abandoned")
+            .count()
+    };
+    eventually("every resolved request to settle", || {
+        recorder
+            .resolved()
+            .iter()
+            .all(|r| settled(&r.request_id) >= 1)
+    })
+    .await;
+    // Late duplicates (a relay outcome after an abandon, say) would land now.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let resolved = recorder.resolved();
+    assert!(
+        resolved.len() as u64 > REQUESTS / 4,
+        "enough requests reached the plugin (seed {seed}): {}",
+        resolved.len()
+    );
+    let ids: std::collections::HashSet<_> = resolved.iter().map(|r| r.request_id.clone()).collect();
+    assert_eq!(
+        ids.len(),
+        resolved.len(),
+        "a request was resolved twice (seed {seed})"
+    );
+    for r in &resolved {
+        assert_eq!(
+            settled(&r.request_id),
+            1,
+            "request {} (seed {seed}): {:?}",
+            r.request_id,
+            recorder.events_for(&r.request_id)
+        );
+    }
+    // A caller that leaves while `ResolveRoute` is on the wire may get a
+    // `call_abandoned` the plugin never saw the request for: the contract
+    // allows that (a refund of a charge never made is a no-op), but only at
+    // the resolve stage, and still only once per request.
+    let mut per_request = std::collections::HashMap::<String, usize>::new();
+    let mut kinds = std::collections::BTreeMap::<String, usize>::new();
+    for e in recorder.events() {
+        if e.event_type == "call_completed" || e.event_type == "call_abandoned" {
+            let id = e
+                .request_id
+                .clone()
+                .expect("a settlement names its request");
+            if !ids.contains(&id) {
+                assert_eq!(e.event_type, "call_abandoned", "{e:?}");
+                assert_eq!(e.payload["stage"], "resolve", "{e:?}");
+            }
+            *per_request.entry(id).or_default() += 1;
+            *kinds.entry(e.event_type.clone()).or_default() += 1;
+        }
+    }
+    for (id, count) in &per_request {
+        assert_eq!(
+            *count, 1,
+            "request {id} settled {count} times (seed {seed})"
+        );
+    }
+    eprintln!("settlements {kinds:?}");
+    assert!(
+        kinds.get("call_completed").is_some_and(|n| *n > 0)
+            && kinds.get("call_abandoned").is_some_and(|n| *n > 0),
+        "the run exercised both endings (seed {seed}): {kinds:?}"
+    );
+    rt.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_status_reports_the_bound_data_plane_address() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let env = Env::new();
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    // `127.0.0.1:0`: only the bound address says which port was taken.
+    let rt = env.start(&Opts::new(&base), Embedded::default()).await;
+    let bound = rt.daemon.data_plane_addr();
+    assert_ne!(bound.port(), 0);
+
+    let socket = env.path("data").join("admin.sock");
+    let mut stream = tokio::net::UnixStream::connect(&socket)
+        .await
+        .expect("admin socket");
+    stream
+        .write_all(b"GET /v1/status HTTP/1.1\r\nhost: janus\r\nconnection: close\r\n\r\n")
+        .await
+        .expect("write");
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).await.expect("read");
+    let text = String::from_utf8_lossy(&response);
+    let body = text.split_once("\r\n\r\n").map(|(_, b)| b).expect("body");
+    let status: serde_json::Value = serde_json::from_str(body).expect("status JSON");
+    assert_eq!(
+        status["listeners"]["data_plane"],
+        bound.to_string(),
+        "{status}"
+    );
+    rt.stop().await;
 }
 
 // ------------------------------------------------------------ startup refusals
@@ -1118,6 +1288,40 @@ async fn startup_refuses_occupied_data_plane_port() {
         .await
         .expect_err("port in use");
     assert!(matches!(err, RunError::Bind { .. }), "{err}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_refusals_happen_before_the_data_plane_binds() {
+    let env = Env::new();
+    let addr = free_addr().await;
+    let mut o = Opts::new("https://openrouter.ai/api");
+    o.data_plane = &addr;
+    let no_index = env.path("no-ui");
+    std::fs::create_dir(&no_index).expect("assets dir");
+    let toml = format!(
+        "{}\n[ui]\nbind = \"127.0.0.1:0\"\nassets_dir = \"{}\"\n",
+        env.toml(&o),
+        no_index.display()
+    );
+    let path = env.path("janus.toml");
+    std::fs::write(&path, &toml).expect("write config");
+
+    let config = DaemonConfig::from_toml_str(&toml).expect("config parses");
+    let err = Daemon::start(config, Embedded::default())
+        .await
+        .expect_err("UI assets without index.html must not start");
+    assert!(matches!(err, RunError::Admin(_)), "{err}");
+    assert!(not_listening(&addr).await);
+
+    let bad = std::process::Command::new(env!("CARGO_BIN_EXE_janus-daemon"))
+        .args(["check-config", "--config"])
+        .arg(&path)
+        .output()
+        .expect("run check-config");
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(!bad.status.success(), "{stderr}");
+    assert!(stderr.contains("UI assets"), "{stderr}");
+    assert!(!env.path("data").join("admin.sock").exists());
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -14,14 +14,18 @@
 //!   plugin that was reached;
 //! - **reconnection**: the channel dials lazily and re-dials after a
 //!   connection is lost. Every dial of a unix socket re-runs the
-//!   socket-path walk first; every TLS dial is a full handshake with the
-//!   current material;
+//!   socket-path walk first and checks the uid serving the socket; every
+//!   TLS dial is a full handshake with the current material. Every dial is
+//!   bounded by `CONNECT_TIMEOUT`, and HTTP/2 keepalive drops a connection
+//!   the plugin stopped answering on (see [`super::transport`]), so a
+//!   vanished plugin address is noticed and redialed within seconds;
 //! - **the `Notify` stream**: one long-lived client-streaming call fed from
 //!   a bounded queue (see [`super::notify`] for what is dropped when). When
 //!   the stream fails, events already handed to it may be lost; events still
 //!   queued are kept and the stream is reopened with exponential backoff.
 //!   `Notify` has no deadline. Rotating TLS material ends the stream
-//!   cleanly so the next one is opened with the new material. The stream
+//!   cleanly so the next one is opened with the new material. Keepalive
+//!   ends a stream whose connection went silent, so it is reopened. The stream
 //!   runs on its own connection: a plugin that stops reading it can exhaust
 //!   that connection's HTTP/2 flow-control window, and must not thereby
 //!   stall `ResolveRoute`.
@@ -45,7 +49,6 @@ use janus_core::contract::plugin::{
 };
 use janus_core::contract::proto;
 use janus_core::contract::proto::janus_plugin_client::JanusPluginClient;
-use tokio::net::{TcpStream, UnixStream};
 use tokio::sync::{mpsc, watch};
 use tonic::transport::{Channel, Endpoint, Uri};
 
@@ -53,7 +56,9 @@ use super::check::{self, ChannelCheck};
 use super::notify::{NotifyQueue, NOTIFY_QUEUE_CAPACITY};
 use super::socket;
 use super::tls::{self, TlsDialer, TlsSettings, MATERIAL_POLL_INTERVAL};
-use super::transport::{classify_plain, RecordingIo, TransportLog};
+use super::transport::{
+    classify_plain, connect_tcp, RecordingIo, TransportLog, KEEPALIVE_INTERVAL, KEEPALIVE_TIMEOUT,
+};
 use super::SetupError;
 use crate::contract::config::{invalid, ConfigError, PluginTransport};
 
@@ -73,27 +78,22 @@ pub(crate) enum Target {
     Plaintext(String),
 }
 
-/// Makes connections and records how they fail.
+/// Makes connections.
 #[derive(Debug)]
 pub(crate) struct Dialer {
     pub(crate) target: Target,
-    pub(crate) log: Arc<TransportLog>,
 }
 
 impl Dialer {
-    async fn open(&self) -> Result<RecordingIo, PluginError> {
-        let log = Arc::clone(&self.log);
+    /// A connection whose failures are recorded in `log`.
+    async fn open(&self, log: &Arc<TransportLog>) -> Result<RecordingIo, PluginError> {
+        let log = Arc::clone(log);
         match &self.target {
             Target::Unix(path) => {
                 let walk = socket::check_full(path).map_err(|e| {
                     PluginError::new(PluginFailureClass::Unreachable, e.to_string())
                 })?;
-                let stream = UnixStream::connect(&walk.socket).await.map_err(|e| {
-                    PluginError::new(
-                        PluginFailureClass::Unreachable,
-                        format!("cannot connect to plugin socket {}: {e}", path.display()),
-                    )
-                })?;
+                let stream = walk.connect().await?;
                 Ok(RecordingIo::new(Box::new(stream), log, classify_plain))
             }
             Target::Tls(dialer) => {
@@ -105,25 +105,20 @@ impl Dialer {
                 ))
             }
             Target::Plaintext(authority) => {
-                let stream = TcpStream::connect(authority.as_str()).await.map_err(|e| {
-                    PluginError::new(
-                        PluginFailureClass::Unreachable,
-                        format!("cannot connect to plugin at {authority}: {e}"),
-                    )
-                })?;
-                let _ = stream.set_nodelay(true);
+                let stream = connect_tcp(authority.as_str(), authority).await?;
                 Ok(RecordingIo::new(Box::new(stream), log, classify_plain))
             }
         }
     }
 
-    /// One connection for the channel; a failure is recorded before it is
-    /// returned, so the call that triggered the dial can find it.
-    async fn dial(&self) -> Result<TokioIo<RecordingIo>, PluginError> {
-        match self.open().await {
+    /// One connection for a channel; a failure is recorded in the
+    /// channel's `log` before it is returned, so the call that triggered
+    /// the dial can find it.
+    async fn dial(&self, log: &Arc<TransportLog>) -> Result<TokioIo<RecordingIo>, PluginError> {
+        match self.open(log).await {
             Ok(io) => Ok(TokioIo::new(io)),
             Err(err) => {
-                self.log.record(err.clone());
+                log.record(err.clone());
                 Err(err)
             }
         }
@@ -144,14 +139,21 @@ impl Dialer {
     }
 }
 
-fn new_channel(dialer: &Arc<Dialer>) -> Result<Channel, ConfigError> {
+/// A lazily dialed channel whose connections record into `log`. HTTP/2
+/// keepalive drops a connection the plugin stopped answering on, so the
+/// next call dials afresh instead of timing out against it indefinitely.
+fn new_channel(dialer: &Arc<Dialer>, log: &Arc<TransportLog>) -> Result<Channel, ConfigError> {
     let (uri, origin) = dialer.uris();
-    let mut endpoint = Endpoint::from_shared(uri).map_err(|e| {
-        invalid(
-            "plugin.endpoint",
-            format!("cannot build a gRPC endpoint: {e}"),
-        )
-    })?;
+    let mut endpoint = Endpoint::from_shared(uri)
+        .map_err(|e| {
+            invalid(
+                "plugin.endpoint",
+                format!("cannot build a gRPC endpoint: {e}"),
+            )
+        })?
+        .http2_keep_alive_interval(KEEPALIVE_INTERVAL)
+        .keep_alive_timeout(KEEPALIVE_TIMEOUT)
+        .keep_alive_while_idle(true);
     if let Some(origin) = origin {
         let origin: Uri = origin
             .parse()
@@ -159,10 +161,12 @@ fn new_channel(dialer: &Arc<Dialer>) -> Result<Channel, ConfigError> {
         endpoint = endpoint.origin(origin);
     }
     let dialer = Arc::clone(dialer);
+    let log = Arc::clone(log);
     Ok(
         endpoint.connect_with_connector_lazy(tower::service_fn(move |_: Uri| {
             let dialer = Arc::clone(&dialer);
-            async move { dialer.dial().await }
+            let log = Arc::clone(&log);
+            async move { dialer.dial(&log).await }
         })),
     )
 }
@@ -174,11 +178,18 @@ struct Channels {
     notify: Channel,
 }
 
+/// Each channel's transport failures, kept across channel rebuilds.
+#[derive(Debug, Default)]
+struct Logs {
+    rpc: Arc<TransportLog>,
+    notify: Arc<TransportLog>,
+}
+
 impl Channels {
-    fn new(dialer: &Arc<Dialer>) -> Result<Self, ConfigError> {
+    fn new(dialer: &Arc<Dialer>, logs: &Logs) -> Result<Self, ConfigError> {
         Ok(Channels {
-            rpc: new_channel(dialer)?,
-            notify: new_channel(dialer)?,
+            rpc: new_channel(dialer, &logs.rpc)?,
+            notify: new_channel(dialer, &logs.notify)?,
         })
     }
 }
@@ -190,6 +201,7 @@ struct Shared {
     mode: PluginMode,
     endpoint: String,
     timeout: Duration,
+    logs: Logs,
     channels: Mutex<Channels>,
     /// Bumped when TLS material is rotated.
     generation: watch::Sender<u64>,
@@ -212,8 +224,8 @@ impl Shared {
 
     /// Classify a failed call: a transport failure recorded while it was in
     /// flight, else an RPC error from the plugin.
-    fn failure(&self, mark: u64, status: &tonic::Status) -> PluginError {
-        self.dialer.log.since(mark).unwrap_or_else(|| {
+    fn failure(&self, log: &TransportLog, mark: u64, status: &tonic::Status) -> PluginError {
+        log.since(mark).unwrap_or_else(|| {
             PluginError::new(
                 PluginFailureClass::Error,
                 format!(
@@ -232,7 +244,7 @@ impl Shared {
         dialer.reload()?;
         // A fresh channel, so the next call dials with the new material;
         // calls in flight finish on the old connection.
-        let fresh = Channels::new(&self.dialer)?;
+        let fresh = Channels::new(&self.dialer, &self.logs)?;
         *self.channels.lock().unwrap_or_else(|p| p.into_inner()) = fresh;
         self.generation.send_modify(|g| *g += 1);
         tracing::info!(endpoint = %self.endpoint, "plugin TLS material reloaded");
@@ -312,19 +324,18 @@ impl GrpcPluginClient {
     pub fn new(transport: &PluginTransport, timeout: Duration) -> Result<Self, SetupError> {
         let runtime = tokio::runtime::Handle::try_current().map_err(|_| SetupError::NoRuntime)?;
         let (target, mode, endpoint) = settings_for(transport)?;
-        let dialer = Arc::new(Dialer {
-            target,
-            log: Arc::new(TransportLog::default()),
-        });
+        let dialer = Arc::new(Dialer { target });
+        let logs = Logs::default();
         // Entering the runtime: the channel spawns its worker when built.
         let _guard = runtime.enter();
-        let channels = Channels::new(&dialer)?;
+        let channels = Channels::new(&dialer, &logs)?;
         let (generation, _) = watch::channel(0);
         let shared = Arc::new(Shared {
             dialer,
             mode,
             endpoint,
             timeout,
+            logs,
             channels: Mutex::new(channels),
             generation,
         });
@@ -381,7 +392,7 @@ impl GrpcPluginClient {
 impl PluginClient for GrpcPluginClient {
     async fn resolve_route(&self, req: ResolveRoute) -> Result<RouteOutcome, PluginError> {
         let shared = &self.shared;
-        let mark = shared.dialer.log.mark();
+        let mark = shared.logs.rpc.mark();
         let mut client = JanusPluginClient::new(shared.channels().rpc);
         let request = proto::ResolveRouteRequest::from(req);
         let response =
@@ -395,7 +406,7 @@ impl PluginClient for GrpcPluginClient {
                         ),
                     ))
                 }
-                Ok(Err(status)) => return Err(shared.failure(mark, &status)),
+                Ok(Err(status)) => return Err(shared.failure(&shared.logs.rpc, mark, &status)),
                 Ok(Ok(response)) => response.into_inner(),
             };
         Ok(RouteOutcome::try_from(response)?)
@@ -459,7 +470,7 @@ async fn run_notify(shared: Arc<Shared>, rx: mpsc::Receiver<NotifyEvent>) {
             generation: shared.generation.subscribe(),
             taken: Arc::clone(&taken),
         });
-        let mark = shared.dialer.log.mark();
+        let mark = shared.logs.notify.mark();
         let mut client = JanusPluginClient::new(shared.channels().notify);
         let result = client.notify(stream).await;
         // An opening event the stream never took was not sent.
@@ -467,7 +478,7 @@ async fn run_notify(shared: Arc<Shared>, rx: mpsc::Receiver<NotifyEvent>) {
         match result {
             Ok(_) => backoff = NOTIFY_RETRY_MIN,
             Err(status) => {
-                let err = shared.failure(mark, &status);
+                let err = shared.failure(&shared.logs.notify, mark, &status);
                 tracing::warn!(
                     endpoint = %shared.endpoint,
                     class = %err.class,
@@ -483,7 +494,8 @@ async fn run_notify(shared: Arc<Shared>, rx: mpsc::Receiver<NotifyEvent>) {
     }
 }
 
-/// Reload TLS material when its files change. Ends when the client does.
+/// Reload TLS material when its files change, and warn about certificates
+/// nearing expiry. Ends when the client does.
 async fn watch_material(shared: Weak<Shared>) {
     let mut tick = tokio::time::interval(MATERIAL_POLL_INTERVAL);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -493,7 +505,11 @@ async fn watch_material(shared: Weak<Shared>) {
         let Some(shared) = shared.upgrade() else {
             return;
         };
-        if !shared.tls().is_some_and(TlsDialer::files_changed) {
+        let Some(tls) = shared.tls() else {
+            return;
+        };
+        tls.warn_expiring();
+        if !tls.files_changed() {
             continue;
         }
         match shared.reload_tls() {
@@ -516,9 +532,10 @@ async fn watch_material(shared: Weak<Shared>) {
 mod tests {
     use super::*;
     use crate::plugin::testutil::{
-        closed_port, event, eventually, request, serve_plaintext, serve_unix, socket_dir,
-        FakePlugin, Reply,
+        client_files, closed_port, event, eventually, request, serve_plaintext, serve_unix,
+        socket_dir, tls_transport, ymd, FakePlugin, Leaf, Relay, Reply, TlsFixture,
     };
+    use crate::plugin::transport::CONNECT_TIMEOUT;
     use janus_core::contract::proto::resolve_route_response::Outcome;
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
@@ -537,8 +554,12 @@ mod tests {
     }
 
     fn plaintext_client(addr: std::net::SocketAddr) -> GrpcPluginClient {
+        plaintext_client_with(addr, T)
+    }
+
+    fn plaintext_client_with(addr: std::net::SocketAddr, timeout: Duration) -> GrpcPluginClient {
         let endpoint = url::Url::parse(&format!("http://{addr}")).expect("url");
-        GrpcPluginClient::new(&PluginTransport::Plaintext { endpoint }, T).expect("client")
+        GrpcPluginClient::new(&PluginTransport::Plaintext { endpoint }, timeout).expect("client")
     }
 
     #[tokio::test]
@@ -682,6 +703,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn socket_symlink_in_a_writable_directory_is_never_connected() {
+        let (_dir, path) = socket_dir();
+        let plugin = FakePlugin::credential("c");
+        let _server = serve_unix(&plugin, &path);
+        let links = tempfile::tempdir().expect("tempdir");
+        let link = links.path().join("p.sock");
+        std::os::unix::fs::symlink(&path, &link).expect("symlink");
+        let client = unix_client(&link, T);
+        // After startup, anyone is let into the link's directory and could
+        // repoint the link: the dial must refuse it.
+        std::fs::set_permissions(links.path(), std::fs::Permissions::from_mode(0o777))
+            .expect("chmod");
+        let err = client
+            .resolve_route(request("s"))
+            .await
+            .expect_err("link's directory is writable");
+        assert_eq!(err.class, PluginFailureClass::Unreachable);
+        assert!(err.message.contains("writable"), "{err}");
+        assert_eq!(plugin.request_count(), 0, "never connected through it");
+        std::fs::set_permissions(links.path(), std::fs::Permissions::from_mode(0o700))
+            .expect("chmod");
+        assert!(
+            client.resolve_route(request("s")).await.is_ok(),
+            "a link in a sound directory is followed"
+        );
+    }
+
+    #[tokio::test]
+    async fn blackholed_connection_is_dropped_and_redialed() {
+        // The plugin's address vanishes without a reset: every byte on the
+        // existing connections disappears, while a fresh dial reaches it.
+        let plugin = FakePlugin::credential("c");
+        let (_server, addr) = serve_plaintext(&plugin).await;
+        let relay = Relay::start(addr).await;
+        let client = plaintext_client_with(relay.addr, Duration::from_millis(300));
+        client.notify(event("before"));
+        assert!(eventually(T, || plugin.event_types() == ["before"]).await);
+        assert!(client.resolve_route(request("s")).await.is_ok());
+        assert_eq!(
+            relay.connections(),
+            2,
+            "one for Notify, one for ResolveRoute"
+        );
+
+        relay.blackhole_existing();
+        let started = Instant::now();
+        let err = client
+            .resolve_route(request("s"))
+            .await
+            .expect_err("black-holed");
+        assert_eq!(err.class, PluginFailureClass::Timeout, "{err:?}");
+        let bound =
+            KEEPALIVE_INTERVAL + KEEPALIVE_TIMEOUT + CONNECT_TIMEOUT + Duration::from_secs(3);
+        while client.resolve_route(request("s")).await.is_err() {
+            assert!(started.elapsed() < bound, "ResolveRoute never redialed");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        // The Notify stream went silent too, and is reopened.
+        let mut n = 0;
+        while !plugin.event_types().iter().any(|e| e.starts_with("after-")) {
+            assert!(started.elapsed() < bound, "Notify stream never reopened");
+            client.notify(event(&format!("after-{n}")));
+            n += 1;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        assert!(relay.connections() >= 4, "both channels redialed");
+    }
+
+    #[tokio::test]
+    async fn notify_connection_closing_does_not_reclassify_a_resolve_route_error() {
+        let plugin = FakePlugin::credential("c");
+        let (_server, addr) = serve_plaintext(&plugin).await;
+        let relay = Relay::start(addr).await;
+        let client = Arc::new(plaintext_client(relay.addr));
+        client.notify(event("open"));
+        assert!(eventually(T, || plugin.event_types() == ["open"]).await);
+        assert_eq!(relay.connections(), 1, "the Notify connection");
+        plugin.set_reply(Reply::SlowStatus(
+            Duration::from_millis(500),
+            tonic::Code::Internal,
+            "policy db down",
+        ));
+        let call = {
+            let client = Arc::clone(&client);
+            tokio::spawn(async move { client.resolve_route(request("s")).await })
+        };
+        assert!(eventually(T, || plugin.request_count() == 1).await);
+        // The Notify connection ends while ResolveRoute is in flight.
+        relay.close(0);
+        let err = call.await.expect("joined").expect_err("rpc error");
+        assert_eq!(err.class, PluginFailureClass::Error, "{err:?}");
+        assert!(err.message.contains("policy db down"), "{err}");
+    }
+
+    #[tokio::test]
     async fn client_reconnects_after_plugin_restart() {
         let (_dir, path) = socket_dir();
         let plugin = FakePlugin::credential("c");
@@ -775,6 +891,28 @@ mod tests {
                 .contains(&"after".to_owned()))
             .await,
             "delivered over a new stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn material_watcher_warns_about_expiring_certificates() {
+        let fx = TlsFixture::new();
+        let now = Utc::now();
+        let expiring = fx.ca.issue(&Leaf {
+            window: Some((
+                ymd(now - chrono::TimeDelta::days(1)),
+                ymd(now + chrono::TimeDelta::days(20)),
+            )),
+            ..Leaf::client()
+        });
+        let files = client_files(fx.dir.path(), &fx.ca.pem(), &expiring);
+        let addr: std::net::SocketAddr = "127.0.0.1:9".parse().expect("addr");
+        let client = GrpcPluginClient::new(&tls_transport(addr, &files, false, None, None), T)
+            .expect("client");
+        let tls = client.shared.tls().expect("tls");
+        assert!(
+            eventually(T, || tls.warned() == ["client"]).await,
+            "the running client warns without a reload"
         );
     }
 

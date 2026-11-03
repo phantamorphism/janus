@@ -20,9 +20,13 @@
 //!   into the same document, every other field kept.
 //! - Usage: `usage` of a Chat Completions or Responses body or stream chunk,
 //!   or `response.usage` of a Responses stream's `response.completed`.
-//! - Feedback: 401/403 reject the credential; 429 `insufficient_quota`
-//!   blames the account; any other 429 throttles (a Codex
-//!   `usage_limit_reached` until its reset time).
+//! - Feedback (the rule is in `feedback`): only a 401 whose error code is
+//!   [`INVALID_CREDENTIAL_CODES`] rejects the credential. A 403 (a
+//!   restricted key's missing scopes, an unsupported region, a ChatGPT
+//!   edge challenge) and any other 401 (the platform's "insufficient
+//!   permissions ... missing scopes" carries no code) are relayed without
+//!   a verdict. 429 `insufficient_quota` blames the account; any other 429
+//!   throttles (a Codex `usage_limit_reached` until its reset time).
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -53,6 +57,10 @@ pub const OPENAI_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 
 /// The OAuth client Codex CLI tokens are issued to.
 const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
+
+/// The 401 error codes that say the key or token itself is not valid: a
+/// wrong or revoked key, a key of a deactivated account.
+const INVALID_CREDENTIAL_CODES: [&str; 2] = ["invalid_api_key", "account_deactivated"];
 
 const CHATGPT_ACCOUNT_ID: HeaderName = HeaderName::from_static("chatgpt-account-id");
 
@@ -102,17 +110,27 @@ impl OpenAiUpstream {
         self
     }
 
-    /// The Codex-backend equivalent of a platform-API target: everything
-    /// after its `/v1` segment, on the Codex base.
-    fn codex_target(&self, platform: &Url) -> Result<Url, UpstreamError> {
-        let bad = || UpstreamError::BadPath(platform.to_string());
-        let path = platform.path();
-        let after = match path.find("/v1/") {
-            Some(at) => &path[at + 3..],
-            None if path.ends_with("/v1") => "",
-            None => return Err(bad()),
+    /// The Codex-backend equivalent of a platform-API target: the part of
+    /// the path after the `/v1` segment, on the Codex base. That segment is
+    /// either the last of `base_url`'s path (`https://proxy.corp/openai/v1`)
+    /// or the first of `rest`; a `/v1` anywhere else (`/dashboard/v1/x`,
+    /// `/v1x/v1/...`) is not the platform surface, and is refused.
+    fn codex_target(&self, base_url: &Url, rest: &str) -> Result<Url, UpstreamError> {
+        let (path, query) = match rest.split_once('?') {
+            Some((path, query)) => (path, Some(query)),
+            None => (rest, None),
         };
-        let rest = match platform.query() {
+        let base_is_v1 = base_url.path().trim_end_matches('/').rsplit('/').next() == Some("v1");
+        let after = if base_is_v1 {
+            path
+        } else if path == "/v1" {
+            ""
+        } else if path.starts_with("/v1/") {
+            &path["/v1".len()..]
+        } else {
+            return Err(UpstreamError::BadPath(rest.to_owned()));
+        };
+        let rest = match query {
             Some(query) => format!("{after}?{query}"),
             None => after.to_owned(),
         };
@@ -156,9 +174,7 @@ impl UpstreamImpl for OpenAiUpstream {
         UpstreamKind::OpenAi
     }
 
-    fn forwarded_headers(&self) -> &[HeaderName] {
-        &FORWARDED
-    }
+    upstream_forwarding!(FORWARDED);
 
     fn outbound_url(
         &self,
@@ -166,10 +182,9 @@ impl UpstreamImpl for OpenAiUpstream {
         rest: &str,
         kind: CredentialKind,
     ) -> Result<Url, UpstreamError> {
-        let platform = join_base(base_url, rest)?;
         match kind {
-            CredentialKind::ApiKey => Ok(platform),
-            CredentialKind::Oauth => self.codex_target(&platform),
+            CredentialKind::ApiKey => join_base(base_url, rest),
+            CredentialKind::Oauth => self.codex_target(base_url, rest),
         }
     }
 
@@ -262,11 +277,12 @@ impl UpstreamImpl for OpenAiUpstream {
     ) -> Option<UpstreamFeedback> {
         let error = ErrorBody::parse(body);
         match status {
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            StatusCode::UNAUTHORIZED if INVALID_CREDENTIAL_CODES.iter().any(|c| error.is(c)) => {
                 Some(UpstreamFeedback::CredentialInvalid {
                     reason: error.reason(status),
                 })
             }
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => None,
             StatusCode::TOO_MANY_REQUESTS if error.is("insufficient_quota") => {
                 Some(UpstreamFeedback::AccountError {
                     reason: error.reason(status),
@@ -295,17 +311,8 @@ fn codex_reset(error: &Value, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
 mod tests {
     use std::sync::Arc;
 
-    use base64::Engine;
-
     use super::*;
-    use crate::proxy::testkit::{self, Reply};
-
-    fn jwt(claims: Value) -> String {
-        let b64 = |v: &Value| {
-            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(v).unwrap())
-        };
-        format!("{}.{}.sig", b64(&json!({"alg": "RS256"})), b64(&claims))
-    }
+    use crate::proxy::testkit::{self, jwt, Reply};
 
     #[tokio::test]
     async fn upstream_auth_applied_per_scheme_for_openai_including_codex_routing() {
@@ -421,8 +428,34 @@ mod tests {
             .unwrap(),
             "https://chatgpt.com/backend-api/codex/models?client_version=1"
         );
+        assert_eq!(
+            target(platform, "/v1", CredentialKind::Oauth).unwrap(),
+            "https://chatgpt.com/backend-api/codex"
+        );
+        // `/v1` must be the surface's own segment, not one found anywhere.
+        for outside in [
+            "/dashboard/x",
+            "/dashboard/v1/x",
+            "/v1x/v1/responses",
+            "/v1x",
+            "/x/v1",
+        ] {
+            assert!(
+                matches!(
+                    target(platform, outside, CredentialKind::Oauth),
+                    Err(UpstreamError::BadPath(_))
+                ),
+                "{outside}"
+            );
+        }
+        // A base whose path merely ends in the letters `v1` is not `/v1`.
         assert!(matches!(
-            target(platform, "/dashboard/x", CredentialKind::Oauth),
+            target("https://proxy.corp/apiv1", "/models", CredentialKind::Oauth),
+            Err(UpstreamError::BadPath(_))
+        ));
+        // The Codex target gets the same traversal checks as any other.
+        assert!(matches!(
+            target(platform, "/v1/../../x", CredentialKind::Oauth),
             Err(UpstreamError::BadPath(_))
         ));
         assert!(target(platform, "/dashboard/x", CredentialKind::ApiKey).is_ok());
@@ -551,9 +584,40 @@ mod tests {
             })
         );
         assert!(matches!(
-            classify(403, json!({})),
+            classify(
+                401,
+                json!({"error": {"message": "This key is associated with a deactivated account.", "type": "invalid_request_error", "code": "account_deactivated"}})
+            ),
             Some(UpstreamFeedback::CredentialInvalid { .. })
         ));
+        // A caller can provoke these with a request the key may not make;
+        // none of them may bench the shared credential.
+        for (status, body) in [
+            (
+                403,
+                json!({"error": {"message": "You have insufficient permissions for this operation. Missing scopes: api.files.read.", "type": "invalid_request_error", "code": null}}),
+            ),
+            (
+                401,
+                json!({"error": {"message": "You have insufficient permissions for this operation. Missing scopes: api.model.read.", "type": "invalid_request_error", "param": null, "code": null}}),
+            ),
+            (
+                403,
+                json!({"error": {"code": "unsupported_country_region_territory", "message": "Country, region, or territory not supported"}}),
+            ),
+            (403, json!({})),
+            (401, json!({})),
+        ] {
+            assert_eq!(classify(status, body.clone()), None, "{status} {body}");
+        }
+        assert_eq!(
+            upstream.classify(
+                StatusCode::FORBIDDEN,
+                &HeaderMap::new(),
+                b"<html><title>Just a moment...</title></html>"
+            ),
+            None
+        );
         assert!(matches!(
             classify(
                 429,

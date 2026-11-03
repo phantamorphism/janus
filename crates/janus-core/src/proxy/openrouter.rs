@@ -7,19 +7,19 @@
 //!   `http-referer` and `x-title`.
 //! - Usage: the `usage` object of a completion body, or of the final chunk
 //!   of a stream (which includes OpenRouter's `cost`).
-//! - Feedback: 401 rejects the key; 402 (out of credits) blames the
-//!   account; 429 throttles. A 403 is OpenRouter's moderation refusal of the
-//!   request's content, not a verdict on the key, so it is left alone.
+//! - Feedback (the rule is in `feedback`): a 401 carrying OpenRouter's own
+//!   JSON error (`code` 401) rejects the key; a 401 without one (an edge's
+//!   page) is relayed without a verdict. 402 (out of credits) blames the
+//!   account; 429 throttles. A 403 is OpenRouter's moderation refusal of
+//!   the request's content, not a verdict on the key, so it is left alone.
 
 use async_trait::async_trait;
 use chrono::Utc;
-use http::header::{self, HeaderMap, HeaderName};
+use http::header::{self, HeaderMap};
 use http::StatusCode;
-use url::Url;
 
 use super::feedback::{retry_after, ErrorBody};
 use super::material::{ensure_for, plain_api_key, secret_value};
-use super::outbound::join_base;
 use super::usage::{ShapeObserver, UsageShape};
 use crate::contract::credential::{
     CredentialKind, CredentialMaterial, MaterialDocument, UpstreamFeedback,
@@ -46,18 +46,7 @@ impl UpstreamImpl for OpenRouterUpstream {
         UpstreamKind::OpenRouter
     }
 
-    fn forwarded_headers(&self) -> &[HeaderName] {
-        &FORWARDED
-    }
-
-    fn outbound_url(
-        &self,
-        base_url: &Url,
-        rest: &str,
-        _kind: CredentialKind,
-    ) -> Result<Url, UpstreamError> {
-        join_base(base_url, rest)
-    }
+    upstream_forwarding!(FORWARDED, target = base_url);
 
     fn apply_auth(
         &self,
@@ -104,14 +93,16 @@ impl UpstreamImpl for OpenRouterUpstream {
         headers: &HeaderMap,
         body: &[u8],
     ) -> Option<UpstreamFeedback> {
-        let reason = || ErrorBody::parse(body).reason(status);
+        let error = ErrorBody::parse(body);
         match status {
-            StatusCode::UNAUTHORIZED => {
-                Some(UpstreamFeedback::CredentialInvalid { reason: reason() })
+            StatusCode::UNAUTHORIZED if error.is("401") => {
+                Some(UpstreamFeedback::CredentialInvalid {
+                    reason: error.reason(status),
+                })
             }
-            StatusCode::PAYMENT_REQUIRED => {
-                Some(UpstreamFeedback::AccountError { reason: reason() })
-            }
+            StatusCode::PAYMENT_REQUIRED => Some(UpstreamFeedback::AccountError {
+                reason: error.reason(status),
+            }),
             StatusCode::TOO_MANY_REQUESTS => Some(UpstreamFeedback::RateLimited {
                 until: retry_after(headers, Utc::now()),
             }),
@@ -198,6 +189,13 @@ mod tests {
             Some(UpstreamFeedback::CredentialInvalid {
                 reason: "401 Unauthorized: 401: User not found.".into()
             })
+        );
+        // An edge's page or a body that is not OpenRouter's error says
+        // nothing about the key.
+        assert_eq!(classify(401, json!({})), None);
+        assert_eq!(
+            OpenRouterUpstream.classify(StatusCode::UNAUTHORIZED, &HeaderMap::new(), b"<html>"),
+            None
         );
         assert!(matches!(
             classify(

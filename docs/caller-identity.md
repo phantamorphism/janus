@@ -124,6 +124,20 @@ Four ship in `janus-core`, each constructed from config with no code:
   JWKS endpoint or a configured public key, with issuer and audience checked.
   The method for deployments where an existing identity provider is already the
   minting authority. Janus verifies and projects a claim; it never issues.
+  - The accepted algorithms come from the key, never from the token. HMAC
+    algorithms and symmetric keys are refused, and `exp`, `iss` and `aud` are
+    required.
+  - `jwks_url` must be `https://` with a host, and so must every redirect a
+    fetch follows. Plain `http://` is accepted only for a numeric loopback
+    address (`127.0.0.0/8`, `[::1]`); `localhost` is refused, because its
+    resolution is not Janus's to vouch for. Whoever answers the key fetch can
+    mint any identity, so there is no opt-in for plaintext to a remote host.
+  - Against a JWKS, a token's `kid` must name a key in the set. A token whose
+    `kid` is unknown triggers a refetch, throttled so that callers cannot make
+    Janus flood the endpoint. A key set past its maximum age is refreshed in the
+    background while requests keep verifying against the keys already held.
+  - A `public_key_file` is one key, so a token's `kid` is not consulted against
+    it: mainstream issuers always set `kid`, and the signature check decides.
 - **`opaque`** — the material is a bare random string with no internal
   structure, verified by looking it up in a registry the daemon's
   <ref target="docs/architecture#admin-surface">admin surface</ref> manages —
@@ -146,6 +160,16 @@ sits. `header { name, scheme }` (with an optional prefix such as `Bearer ` to
 strip), `query { name }`, or `basic_password` for upstreams whose SDKs only
 offer HTTP basic auth.
 
+- A `scheme` must be present on the header, is matched case-insensitively, and
+  is stripped. It must end in the separator that divides it from the material:
+  `scheme = "Bearer "` is correct. `"Bearer"` is refused at startup, because it
+  would also match `Bearerxyz` and pass `xyz` to the verifier. A blank scheme is
+  refused as well; to take the whole header value, omit `scheme`.
+- A header or query parameter that appears more than once is invalid material,
+  because which occurrence carries the identity would be ambiguous.
+- Surrounding whitespace is not part of the material. An absent or empty value
+  counts as *no material presented*.
+
 Separating source from method is what makes one deployment's identity work
 across upstreams with different auth conventions. The gateway Janus builds on
 has a single hardcoded source — `Authorization: Bearer` — and makes it work by
@@ -162,7 +186,7 @@ not be changeable at all.
 
 Extraction is configured per request type, resolved most-specific-first:
 
-1. a **route** binding — one path pattern within an upstream,
+1. a **route** binding — one path within an upstream,
 2. the **upstream** binding — every path under that upstream's prefix,
 3. the **daemon default** — anything not covered above.
 
@@ -230,14 +254,52 @@ base_url   = "https://api.openai.com"
 
 An upstream's `[upstream.identity]` block is merged over the daemon default
 field by field, so overriding only `source` keeps the default method, secret and
-claim mapping. A route's `identity` block replaces the resolved upstream binding
-outright — a route that differs at all usually differs completely.
+claim mapping. The correlation setting and the JWT key source (`jwks_url` /
+`public_key_file`) each count as one field, and an upstream block that names a
+different method inherits nothing. A route's `identity` block replaces the
+resolved upstream binding outright — a route that differs at all usually differs
+completely. The whole file's layout is in
+<ref target="docs/configuration#upstreams">daemon configuration</ref>.
+
+A route `path` is one literal path, compared against the request path with the
+upstream's `path_prefix` removed. Both sides are compared in canonical form:
+
+- runs of `/` collapse to one;
+- a trailing `/` is dropped;
+- percent-encoded unreserved characters (`A-Z a-z 0-9 - . _ ~`) are decoded, and
+  other escapes are upper-cased.
+
+So `/v1/messages/`, `//v1/messages` and `/v1/%6Dessages` all select the
+`/v1/messages` route. Without this, a route stricter than its upstream could be
+bypassed by spelling the path differently. Matching stays case-sensitive. A
+configured route path must:
+
+- start with `/`;
+- already be in canonical form;
+- contain no `.` or `..` segment;
+- contain no query, fragment or wildcard character (`* ? # { }`).
+
+Each route path is declared at most once per upstream. Anything else is a
+startup error, so the path the operator wrote is the path that matches, and it
+is the path the request log reports.
 
 Config is validated at startup, not per request: every binding is resolved into
-a constructed extractor before the data-plane listener binds, and a binding that
-names a missing secret, an unreachable JWKS endpoint, or an unregistered custom
-extractor is a startup failure. A daemon that cannot establish who is calling
-must not start and serve traffic anyway.
+a constructed extractor before the data-plane listener binds. A daemon that
+cannot establish who is calling must not start and serve traffic anyway. Each of
+the following is therefore a startup failure:
+
+- a binding with no `method`;
+- a field the method does not use;
+- a missing required field, or two fields that contradict each other;
+- an invalid `scheme`;
+- a `secret_ref` with no `[secrets.<name>]`, or a secret that is unset,
+  unreadable or empty;
+- a `public_key_file` that does not hold a usable public key;
+- a `jwks_url` that is not acceptable, or a JWKS endpoint that does not answer
+  with a key set at startup;
+- a `trusted_header` binding with a non-header source or a `correlation_claim`;
+- an unregistered custom extractor;
+- an invalid route path.
 
 ## Correlation values are not identities {#correlation}
 

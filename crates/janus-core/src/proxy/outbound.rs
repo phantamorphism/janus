@@ -233,18 +233,32 @@ pub(crate) fn join_base(base_url: &Url, rest: &str) -> Result<Url, UpstreamError
     url.set_path(&format!("{base_path}{path}"));
     url.set_query(query.filter(|q| !q.is_empty()));
     url.set_fragment(None);
-    if !url.path().starts_with(base_path) {
+    // The authoritative check, on the URL as the url crate normalised it
+    // (which can differ from what the segment check above saw: it drops
+    // tabs and newlines, so `.\t.` becomes `..` only here). By segment, so
+    // base `/api` does not admit `/apix`.
+    if !within_base(base_path, url.path()) {
         return Err(bad());
     }
     Ok(url)
+}
+
+/// Whether `path` is `base` or lies below it, segment by segment.
+fn within_base(base: &str, path: &str) -> bool {
+    match path.strip_prefix(base) {
+        Some(below) => base.is_empty() || below.is_empty() || below.starts_with('/'),
+        None => false,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::contract::credential::{CredentialKind, Secret};
+    use crate::proxy::testkit::{self, Probe};
     use crate::proxy::{AnthropicUpstream, OpenAiUpstream, OpenRouterUpstream};
     use http::{HeaderValue, Method};
+    use std::sync::Arc;
 
     fn head(method: Method, uri: &str, headers: &[(&str, &str)]) -> RequestHead {
         let mut map = HeaderMap::new();
@@ -363,69 +377,26 @@ mod tests {
         assert_eq!(parts.uri.query(), Some("a=1&b=%20two"));
     }
 
-    /// An upstream whose allowlist wrongly names identity-bearing headers:
-    /// the D6 misconfiguration.
-    struct LeakyAllowlist(AnthropicUpstream, Vec<HeaderName>);
-
-    #[async_trait::async_trait]
-    impl UpstreamImpl for LeakyAllowlist {
-        fn kind(&self) -> UpstreamKind {
-            self.0.kind()
-        }
-        fn forwarded_headers(&self) -> &[HeaderName] {
-            &self.1
-        }
-        fn outbound_url(
-            &self,
-            base_url: &Url,
-            rest: &str,
-            _kind: CredentialKind,
-        ) -> Result<Url, UpstreamError> {
-            // Deliberately keeps the identity parameter the substitution
-            // stripped, to prove the query assertion runs on the result.
-            join_base(base_url, &format!("{rest}?token=again"))
-        }
-        fn apply_auth(
-            &self,
-            request: &mut http::request::Parts,
-            material: &CredentialMaterial,
-        ) -> Result<(), UpstreamError> {
-            self.0.apply_auth(request, material)
-        }
-        fn decode_material(
-            &self,
-            doc: &crate::contract::credential::MaterialDocument,
-        ) -> Result<crate::contract::upstream::DecodedMaterial, UpstreamError> {
-            self.0.decode_material(doc)
-        }
-        async fn refresh(
-            &self,
-            doc: &crate::contract::credential::MaterialDocument,
-        ) -> Result<crate::contract::credential::MaterialDocument, UpstreamError> {
-            self.0.refresh(doc).await
-        }
-        fn usage_observer(&self) -> Box<dyn crate::contract::upstream::UsageObserver> {
-            self.0.usage_observer()
-        }
-        fn classify(
-            &self,
-            status: http::StatusCode,
-            headers: &HeaderMap,
-            body: &[u8],
-        ) -> Option<crate::contract::credential::UpstreamFeedback> {
-            self.0.classify(status, headers, body)
+    /// An upstream whose allowlist is `forwarded`: the D6 misconfiguration
+    /// when it names an identity-bearing header.
+    fn leaky(forwarded: Vec<HeaderName>) -> Probe {
+        Probe {
+            forwarded: Some(forwarded),
+            ..Probe::new(Arc::new(AnthropicUpstream::new().unwrap()))
         }
     }
 
     #[test]
     fn identity_material_absent_from_outbound_even_when_allowlist_names_it() {
-        let leaky = LeakyAllowlist(
-            AnthropicUpstream::new().unwrap(),
-            vec![
+        let leaky = Probe {
+            // Deliberately re-adds the identity parameter the substitution
+            // stripped, to prove the query assertion runs on the result.
+            query_suffix: Some("?token=again"),
+            ..leaky(vec![
                 header::CONTENT_TYPE,
                 HeaderName::from_static("x-caller-identity"),
-            ],
-        );
+            ])
+        };
         let base = Url::parse("https://api.anthropic.com").unwrap();
         let material = key(UpstreamKind::Anthropic, "sk-real");
         let at = PresentedAt::Header(HeaderName::from_static("x-caller-identity"));
@@ -488,15 +459,19 @@ mod tests {
     }
 
     #[test]
-    fn identity_material_absent_from_outbound_when_auth_would_copy_it() {
-        // Basic-auth identity and an allowlist naming `authorization`: the
-        // pre-auth assertion catches it before the credential is applied.
-        let leaky = LeakyAllowlist(
-            AnthropicUpstream::new().unwrap(),
-            vec![header::AUTHORIZATION],
-        );
+    fn identity_material_absent_from_outbound_when_allowlist_names_the_auth_header() {
+        // Basic-auth identity and an allowlist naming `authorization`, with
+        // an OAuth credential whose auth then overwrites `authorization`:
+        // only the pre-auth assertion sees the misconfiguration (afterwards
+        // the header holds the credential, not the caller's value).
+        let leaky = leaky(vec![header::AUTHORIZATION]);
         let base = Url::parse("https://api.anthropic.com").unwrap();
-        let material = key(UpstreamKind::Anthropic, "sk-real");
+        let material = testkit::material(
+            UpstreamKind::Anthropic,
+            CredentialKind::Oauth,
+            "sk-ant-oat-real",
+            None,
+        );
         let err = build_outbound(
             &head(
                 Method::POST,
@@ -519,22 +494,56 @@ mod tests {
     }
 
     #[test]
+    fn identity_material_absent_from_outbound_when_auth_would_copy_it() {
+        // The allowlist is sound, but the auth step writes caller-supplied
+        // bytes into the identity header: only the post-auth assertion,
+        // which compares against what the caller presented, catches it.
+        let identity = HeaderName::from_static("x-caller-identity");
+        let copier = Probe {
+            forwarded: Some(vec![
+                header::CONTENT_TYPE,
+                HeaderName::from_static("x-other"),
+            ]),
+            auth_copies: Some((HeaderName::from_static("x-other"), identity.clone())),
+            ..Probe::new(Arc::new(AnthropicUpstream::new().unwrap()))
+        };
+        let base = Url::parse("https://api.anthropic.com").unwrap();
+        let material = key(UpstreamKind::Anthropic, "sk-real");
+        let err = build_outbound(
+            &head(
+                Method::POST,
+                "/a/v1/messages",
+                &[("x-caller-identity", "tok"), ("x-other", "tok")],
+            ),
+            Substitution {
+                upstream: &copier,
+                base_url: &base,
+                rest: "/v1/messages",
+                material: &material,
+                presented_at: Some(&PresentedAt::Header(identity)),
+            },
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SubstitutionError::IdentityLeak { location, .. } if location == "header x-caller-identity"),
+            "{err}"
+        );
+    }
+
+    #[test]
     fn hop_by_hop_headers_stripped_from_outbound_request() {
         // An allowlist that names hop-by-hop headers still never copies
         // them, nor a header the inbound `Connection` declares hop-by-hop.
-        let leaky = LeakyAllowlist(
-            AnthropicUpstream::new().unwrap(),
-            vec![
-                header::CONNECTION,
-                header::TRANSFER_ENCODING,
-                header::TE,
-                header::UPGRADE,
-                header::HOST,
-                HeaderName::from_static("keep-alive"),
-                HeaderName::from_static("x-per-hop"),
-                header::CONTENT_TYPE,
-            ],
-        );
+        let leaky = leaky(vec![
+            header::CONNECTION,
+            header::TRANSFER_ENCODING,
+            header::TE,
+            header::UPGRADE,
+            header::HOST,
+            HeaderName::from_static("keep-alive"),
+            HeaderName::from_static("x-per-hop"),
+            header::CONTENT_TYPE,
+        ]);
         let inbound = head(
             Method::POST,
             "/a/v1/messages",
@@ -626,6 +635,10 @@ mod tests {
             "/./x",
             "/v1\\..\\x",
             "/v1/x#frag",
+            // Passes the segment check (`.\t.` is not `..`), but the url
+            // crate drops the tabs and resolves `/api/v1/../../apix/y`:
+            // outside the base by segment, though it shares its prefix.
+            "/v1/.\t./.\t./apix/y",
         ] {
             assert_eq!(
                 join_base(&base, bad),
@@ -633,6 +646,15 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn within_base_compares_whole_segments() {
+        assert!(within_base("/api", "/api"));
+        assert!(within_base("/api", "/api/v1/x"));
+        assert!(within_base("", "/anything"));
+        assert!(!within_base("/api", "/apix/y"));
+        assert!(!within_base("/api", "/"));
     }
 
     #[test]

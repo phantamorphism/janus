@@ -28,7 +28,8 @@ is it over its rate budget — via plugins rather than hardcoded rules.
 Named for the Roman god of doors and thresholds, depicted two-faced, looking
 both directions at once: one face toward the caller, one toward the upstream.
 
-**Status: early scaffold. Nothing is implemented yet.**
+**Status:** the daemon, `janus-core` and the admin UI are implemented; the
+`janus` CLI is not yet built. See [docs/status.md](docs/status.md).
 
 ## First upstreams
 

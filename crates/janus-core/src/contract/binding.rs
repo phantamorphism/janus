@@ -16,7 +16,8 @@
 //! - An upstream block that leaves `method` unset, or repeats the default's
 //!   method, inherits every field it does not set. Correlation is one
 //!   logical field: setting `correlation_claim` or `correlation` replaces
-//!   both.
+//!   both. The JWT key source is one logical field in the same way:
+//!   setting `jwks_url` or `public_key_file` replaces both.
 //! - An upstream block that names a *different* method inherits nothing:
 //!   the default's fields belong to the default's method, and carrying them
 //!   over (a `correlation_claim` onto `trusted_header`, an `identity_claim`
@@ -153,6 +154,28 @@ impl Source {
     }
 }
 
+/// A header source's `scheme` is a prefix stripped before verification, so
+/// it must end in the separator that divides it from the material: a prefix
+/// ending in a letter or digit (`"Bearer"`) would also match
+/// `Bearerxyz` and hand `xyz` to the verifier, and an empty or blank prefix
+/// matches every value. Refused rather than repaired, so the operator sees
+/// the mistake.
+fn check_scheme(scheme: String) -> Result<String, String> {
+    if scheme.trim().is_empty() {
+        return Err(format!(
+            "source `scheme` {scheme:?} is empty; omit `scheme` for a header with no prefix"
+        ));
+    }
+    if scheme.ends_with(|c: char| c.is_ascii_alphanumeric()) {
+        return Err(format!(
+            "source `scheme` {scheme:?} would also match {:?}; end the prefix with its separator, e.g. {:?}",
+            format!("{scheme}xyz"),
+            format!("{scheme} ")
+        ));
+    }
+    Ok(scheme)
+}
+
 fn parse_header_name(name: &str) -> Result<HeaderName, BindingError> {
     HeaderName::from_bytes(name.as_bytes())
         .map_err(|_| BindingError::InvalidHeaderName(name.to_owned()))
@@ -204,7 +227,10 @@ impl<'de> Deserialize<'de> for Source {
                 match (header, scheme, query) {
                     (Some(h), scheme, None) => Ok(Source::Header {
                         name: parse_header_name(&h).map_err(de::Error::custom)?,
-                        scheme,
+                        scheme: match scheme {
+                            Some(s) => Some(check_scheme(s).map_err(de::Error::custom)?),
+                            None => None,
+                        },
                     }),
                     (None, None, Some(q)) if !q.is_empty() => Ok(Source::Query { name: q }),
                     (None, None, Some(_)) => Err(de::Error::custom(
@@ -271,7 +297,8 @@ impl IdentityBindingConfig {
     /// daemon default) field by field: every field `self` sets wins, every
     /// other field is inherited. The correlation setting is one logical
     /// field: setting either `correlation_claim` or `correlation` replaces
-    /// both. When `self` names a method other than `base`'s, nothing is
+    /// both, and likewise the JWT key source (`jwks_url` /
+    /// `public_key_file`). When `self` names a method other than `base`'s, nothing is
     /// inherited (see the module docs).
     pub fn merged_over(&self, base: &IdentityBindingConfig) -> IdentityBindingConfig {
         if self.method.is_some() && self.method != base.method {
@@ -286,6 +313,14 @@ impl IdentityBindingConfig {
             } else {
                 (base.correlation_claim.clone(), base.correlation.clone())
             };
+        // The JWT key source is one logical field too: an upstream naming a
+        // `public_key_file` replaces an inherited `jwks_url`, and vice versa.
+        let (jwks_url, public_key_file) =
+            if self.jwks_url.is_some() || self.public_key_file.is_some() {
+                (self.jwks_url.clone(), self.public_key_file.clone())
+            } else {
+                (base.jwks_url.clone(), base.public_key_file.clone())
+            };
         IdentityBindingConfig {
             method: pick(&self.method, &base.method),
             source: pick(&self.source, &base.source),
@@ -296,8 +331,8 @@ impl IdentityBindingConfig {
             correlation,
             issuer: pick(&self.issuer, &base.issuer),
             audience: pick(&self.audience, &base.audience),
-            jwks_url: pick(&self.jwks_url, &base.jwks_url),
-            public_key_file: pick(&self.public_key_file, &base.public_key_file),
+            jwks_url,
+            public_key_file,
         }
     }
 
@@ -505,12 +540,44 @@ pub struct HmacSpec {
     pub correlation: Option<Correlation>,
 }
 
-/// The key a `jwt` binding names: exactly one of `jwks_url` (an http(s)
-/// URL) or `public_key_file` (a PEM file path).
+/// The key a `jwt` binding names: exactly one of `jwks_url` (see
+/// [`jwks_url_refusal`]) or `public_key_file` (a PEM file path).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JwtKey {
     Jwks { url: Url },
     PublicKeyFile(PathBuf),
+}
+
+/// Why `url` may not serve a `jwt` binding's key set, or `None` when it may.
+///
+/// The key set is the root of trust for every identity the binding
+/// verifies: whoever can answer the fetch can mint any `caller_identity`.
+/// So the URL must be `https://` with a host. Plain `http://` is accepted
+/// only for a loopback IP literal (`127.0.0.0/8`, `[::1]`), for an issuer
+/// or JWKS cache on the same host; `localhost` is refused because its
+/// resolution is the resolver's to change. There is deliberately no opt-in
+/// for plaintext to a remote host: the docs define none, and unlike the
+/// plugin channel no topology makes an unauthenticated key fetch correct.
+/// The same rule applies to every redirect the fetch follows.
+pub fn jwks_url_refusal(url: &Url) -> Option<&'static str> {
+    if url.host_str().is_none_or(str::is_empty) {
+        return Some("must be an https:// URL with a host");
+    }
+    match url.scheme() {
+        "https" => None,
+        "http" => {
+            let loopback = match url.host() {
+                Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+                Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+                _ => false,
+            };
+            (!loopback).then_some(
+                "plain http:// is accepted only for a loopback IP literal (127.0.0.1, [::1]); \
+                 anyone on the path to the endpoint could serve their own keys and forge any identity — use https://",
+            )
+        }
+        _ => Some("must be an https:// URL with a host"),
+    }
 }
 
 fn parse_jwks_url(raw: &str) -> Result<Url, BindingError> {
@@ -518,13 +585,13 @@ fn parse_jwks_url(raw: &str) -> Result<Url, BindingError> {
         url: raw.to_owned(),
         reason: e.to_string(),
     })?;
-    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none_or(str::is_empty) {
-        return Err(BindingError::InvalidJwksUrl {
+    match jwks_url_refusal(&url) {
+        Some(reason) => Err(BindingError::InvalidJwksUrl {
             url: raw.to_owned(),
-            reason: "must be an http(s) URL with a host".into(),
-        });
+            reason: reason.into(),
+        }),
+        None => Ok(url),
     }
-    Ok(url)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -764,6 +831,107 @@ public_key_file = "/etc/janus/idp.pem"
             assert!(
                 matches!(bad_url.resolve(), Err(BindingError::InvalidJwksUrl { .. })),
                 "{url}"
+            );
+        }
+    }
+
+    #[test]
+    fn jwks_url_must_be_https_except_on_a_loopback_ip() {
+        let with_url = |url: &str| {
+            parse(&format!(
+                r#"
+method = "jwt"
+source = {{ header = "authorization", scheme = "Bearer " }}
+issuer = "https://idp"
+audience = "janus"
+identity_claim = "sub"
+jwks_url = "{url}"
+"#
+            ))
+            .resolve()
+        };
+        for refused in [
+            "http://idp.internal/jwks",
+            "http://10.0.0.5:8080/jwks",
+            "http://localhost:8080/jwks",
+            "http://127.0.0.1.nip.io/jwks",
+            "ftp://idp.internal/jwks",
+        ] {
+            assert!(
+                matches!(with_url(refused), Err(BindingError::InvalidJwksUrl { .. })),
+                "{refused} must be refused"
+            );
+        }
+        for accepted in [
+            "https://idp.internal/.well-known/jwks.json",
+            "http://127.0.0.1:8080/jwks",
+            "http://127.9.9.9/jwks",
+            "http://[::1]:8080/jwks",
+        ] {
+            assert!(
+                matches!(with_url(accepted), Ok(BindingSpec::Jwt(_))),
+                "{accepted} must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn upstream_can_switch_the_jwt_key_source() {
+        let default = parse(
+            r#"
+method = "jwt"
+source = { header = "authorization", scheme = "Bearer " }
+issuer = "https://idp"
+audience = "janus"
+identity_claim = "sub"
+jwks_url = "https://idp/jwks"
+"#,
+        );
+        let pem = parse(r#"public_key_file = "/etc/janus/idp.pem""#).merged_over(&default);
+        assert_eq!(pem.jwks_url, None);
+        assert!(matches!(
+            pem.resolve(),
+            Ok(BindingSpec::Jwt(JwtSpec {
+                key: JwtKey::PublicKeyFile(_),
+                ..
+            }))
+        ));
+        let back = parse(r#"jwks_url = "https://other/jwks""#).merged_over(&pem);
+        assert_eq!(back.public_key_file, None);
+        assert!(matches!(
+            back.resolve(),
+            Ok(BindingSpec::Jwt(JwtSpec {
+                key: JwtKey::Jwks { .. },
+                ..
+            }))
+        ));
+        // Not naming a key source still inherits it.
+        let inherit = parse(r#"audience = "other""#).merged_over(&default);
+        assert_eq!(inherit.jwks_url, default.jwks_url);
+    }
+
+    #[test]
+    fn header_scheme_must_end_in_its_separator() {
+        #[derive(Deserialize)]
+        struct S {
+            source: Source,
+        }
+        let src = |scheme: &str| {
+            toml::from_str::<S>(&format!(
+                r#"source = {{ header = "authorization", scheme = "{scheme}" }}"#
+            ))
+            .map(|s| s.source)
+        };
+        for bad in ["Bearer", "", "   ", "Token1"] {
+            assert!(src(bad).is_err(), "{bad:?} must be refused");
+        }
+        for good in ["Bearer ", "Token ", "jwt="] {
+            assert_eq!(
+                src(good).expect("accepted"),
+                Source::Header {
+                    name: HeaderName::from_static("authorization"),
+                    scheme: Some(good.into())
+                }
             );
         }
     }

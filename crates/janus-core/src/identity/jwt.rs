@@ -6,8 +6,22 @@
 //! key admits its own family (RSA, EC or EdDSA), a JWK its declared `alg` or
 //! else its family. HMAC algorithms and symmetric (`oct`) JWKs are never
 //! accepted, so a token cannot have its public key used as an HMAC secret.
+//!
+//! Key selection. A `public_key_file` is one key with no `kid`, so a token's
+//! `kid` header is not consulted against it: every mainstream issuer sets
+//! `kid`, and the signature check is what decides. Against a JWKS a token's
+//! `kid` must name a key in the set.
+//!
+//! Key-set freshness. The JWKS URL must pass
+//! [`jwks_url_refusal`](crate::contract::binding::jwks_url_refusal), and so
+//! must every redirect a fetch follows. A set older than `max_age` is
+//! refreshed in the background while requests keep verifying against the
+//! held keys, so a slow or hanging endpoint never stalls traffic whose key
+//! is already known; only a token whose `kid` is not in the held set waits
+//! for a (throttled) refetch, because nothing else could verify it.
 
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -18,7 +32,7 @@ use serde_json::{Map, Value};
 use tokio::sync::{Mutex, RwLock};
 use url::Url;
 
-use crate::contract::binding::JwtSpec;
+use crate::contract::binding::{jwks_url_refusal, JwtSpec};
 use crate::contract::identity::{
     ExtractedIdentity, ExtractionError, ExtractorBuildError, IdentityExtractor, JwtKeyInput,
     RequestHead,
@@ -59,6 +73,8 @@ struct Jwks {
     state: RwLock<JwksState>,
     /// Serializes refetches so concurrent misses cause one fetch.
     refetch: Mutex<()>,
+    /// A background refresh is scheduled or running.
+    refreshing: AtomicBool,
 }
 
 struct JwksState {
@@ -70,7 +86,7 @@ struct JwksState {
 enum Keys {
     /// `public_key_file`.
     Static(Arc<Vec<VerifyKey>>),
-    Jwks(Box<Jwks>),
+    Jwks(Arc<Jwks>),
 }
 
 pub(crate) struct JwtExtractor {
@@ -91,9 +107,15 @@ impl JwtExtractor {
         let keys = match key {
             JwtKeyInput::PublicKeyPem(pem) => Keys::Static(Arc::new(vec![pem_key(&pem)?])),
             JwtKeyInput::Jwks(url) => {
+                if let Some(reason) = jwks_url_refusal(&url) {
+                    return Err(ExtractorBuildError::InvalidKey(format!(
+                        "jwks_url {url}: {reason}"
+                    )));
+                }
                 let client = reqwest::Client::builder()
                     .timeout(refresh.timeout)
                     .connect_timeout(refresh.timeout)
+                    .redirect(redirect_policy())
                     .build()
                     .map_err(|e| ExtractorBuildError::JwksUnreachable {
                         url: url.to_string(),
@@ -101,7 +123,7 @@ impl JwtExtractor {
                     })?;
                 let keys = fetch_jwks(&client, &url).await?;
                 let now = Instant::now();
-                Keys::Jwks(Box::new(Jwks {
+                Keys::Jwks(Arc::new(Jwks {
                     url,
                     client,
                     refresh,
@@ -111,6 +133,7 @@ impl JwtExtractor {
                         attempted_at: now,
                     }),
                     refetch: Mutex::new(()),
+                    refreshing: AtomicBool::new(false),
                 }))
             }
         };
@@ -151,7 +174,8 @@ impl JwtExtractor {
         }
         let kid = header.kid.as_deref();
         let candidates = match &self.keys {
-            Keys::Static(keys) => matching(keys, header.alg, kid),
+            // One configured key: `kid` names nothing to choose between.
+            Keys::Static(keys) => matching(keys, header.alg, None),
             Keys::Jwks(jwks) => jwks.candidates(header.alg, kid).await,
         };
         if candidates.is_empty() {
@@ -238,11 +262,30 @@ fn matching(keys: &[VerifyKey], alg: Algorithm, kid: Option<&str>) -> Vec<Verify
         .collect()
 }
 
+/// Follow at most a few redirects, and only to URLs a `jwks_url` itself
+/// could name: an `https://` key set must not be downgraded to plaintext.
+fn redirect_policy() -> reqwest::redirect::Policy {
+    const MAX_REDIRECTS: usize = 5;
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= MAX_REDIRECTS {
+            return attempt.error("too many redirects");
+        }
+        match jwks_url_refusal(attempt.url()) {
+            Some(reason) => {
+                let refused = format!("redirect to {}: {reason}", attempt.url());
+                attempt.error(refused)
+            }
+            None => attempt.follow(),
+        }
+    })
+}
+
 impl Jwks {
-    /// Keys admitting `alg`/`kid`, refetching first when the set is stale
-    /// or has no such key, subject to `min_interval`. A failed refetch keeps
-    /// the keys already held.
-    async fn candidates(&self, alg: Algorithm, kid: Option<&str>) -> Vec<VerifyKey> {
+    /// Keys admitting `alg`/`kid`. Held keys are returned at once, with a
+    /// background refresh scheduled when the set is older than `max_age`;
+    /// with no such key held, refetch first, subject to `min_interval`. A
+    /// failed refetch keeps the keys already held.
+    async fn candidates(self: &Arc<Self>, alg: Algorithm, kid: Option<&str>) -> Vec<VerifyKey> {
         let (found, stale) = {
             let state = self.state.read().await;
             (
@@ -250,13 +293,36 @@ impl Jwks {
                 state.fetched_at.elapsed() >= self.refresh.max_age,
             )
         };
-        if !found.is_empty() && !stale {
+        if !found.is_empty() {
+            if stale {
+                self.refresh_in_background().await;
+            }
             return found;
         }
         self.refetch_if_due().await;
         // Re-read either way: a refetch by a concurrent caller may have
         // landed while this one waited for the lock.
         matching(&self.state.read().await.keys, alg, kid)
+    }
+
+    /// Schedule one refetch off the request path; a refresh already
+    /// scheduled or running absorbs this one. Without a tokio runtime to
+    /// spawn on, refetch inline.
+    async fn refresh_in_background(self: &Arc<Self>) {
+        if self.refreshing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let jwks = Arc::clone(self);
+        let work = async move {
+            jwks.refetch_if_due().await;
+            jwks.refreshing.store(false, Ordering::Release);
+        };
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => {
+                runtime.spawn(work);
+            }
+            Err(_) => work.await,
+        }
     }
 
     async fn refetch_if_due(&self) {
@@ -719,7 +785,165 @@ mod tests {
         server.fail();
         let t1 = sign_jwt(Algorithm::EdDSA, ED_PRIVATE, Some("k1"), &claims());
         assert!(stale.extract(&bearer(&t1)).await.is_ok());
-        assert_eq!(server.fetches(), 3, "stale set was refetched (and failed)");
+        assert!(
+            eventually(|| server.fetches() == 3).await,
+            "stale set was refetched (and failed)"
+        );
+        assert!(stale.extract(&bearer(&t1)).await.is_ok());
+    }
+
+    /// Poll `cond` for up to five seconds.
+    async fn eventually(cond: impl Fn() -> bool) -> bool {
+        for _ in 0..500 {
+            if cond() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        cond()
+    }
+
+    #[tokio::test]
+    async fn jwt_pem_key_verifies_tokens_that_carry_a_kid() {
+        // Auth0, Okta, Entra and Keycloak always set `kid`; one static key
+        // has nothing to select by it.
+        let ex = pem_extractor(ED_PUBLIC).await;
+        let id = ex
+            .extract(&bearer(&sign_jwt(
+                Algorithm::EdDSA,
+                ED_PRIVATE,
+                Some("k1"),
+                &claims(),
+            )))
+            .await
+            .expect("verifies despite the kid");
+        assert_eq!(id.caller_identity, "user-9");
+        // The kid does not let another key's signature through.
+        assert!(matches!(
+            ex.extract(&bearer(&sign_jwt(
+                Algorithm::EdDSA,
+                ED2_PRIVATE,
+                Some("k1"),
+                &claims()
+            )))
+            .await,
+            Err(ExtractionError::Invalid(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn jwt_rejects_a_non_numeric_nbf() {
+        let ex = pem_extractor(ED_PUBLIC).await;
+        for nbf in [json!("soon"), json!(true), json!({"t": 1})] {
+            let mut c = claims();
+            c["nbf"] = nbf.clone();
+            assert!(
+                matches!(
+                    ex.extract(&bearer(&sign_jwt(Algorithm::EdDSA, ED_PRIVATE, None, &c)))
+                        .await,
+                    Err(ExtractionError::Invalid(_))
+                ),
+                "nbf {nbf}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn jwt_jwks_refuses_an_oversized_document() {
+        let pad = "x".repeat(MAX_JWKS_BYTES);
+        let server = JwksServer::start(json!({"keys": [
+            {"kty": "OKP", "crv": "Ed25519", "kid": "k1", "x": crate::identity::testkit::ED_X}
+        ], "pad": pad}))
+        .await;
+        assert!(matches!(
+            JwtExtractor::new(
+                spec(),
+                JwtKeyInput::Jwks(server.url()),
+                clock_at(NOW),
+                JwksRefresh::default()
+            )
+            .await,
+            Err(ExtractorBuildError::InvalidKey(m)) if m.contains("exceeds")
+        ));
+    }
+
+    #[tokio::test]
+    async fn jwt_jwks_refuses_plaintext_to_a_remote_host_and_downgrading_redirects() {
+        // Refused before any connection is attempted.
+        let remote = Url::parse("http://idp.example/.well-known/jwks.json").expect("url");
+        assert!(matches!(
+            JwtExtractor::new(
+                spec(),
+                JwtKeyInput::Jwks(remote),
+                clock_at(NOW),
+                JwksRefresh::default()
+            )
+            .await,
+            Err(ExtractorBuildError::InvalidKey(m)) if m.contains("http://")
+        ));
+        // A loopback endpoint that redirects to a plaintext non-IP host is
+        // not followed, though the target would answer with a good set.
+        let target = JwksServer::start(json!({"keys": [
+            {"kty": "OKP", "crv": "Ed25519", "kid": "k1", "x": crate::identity::testkit::ED_X}
+        ]}))
+        .await;
+        let port = target.url().port().expect("port");
+        let redirecting = JwksServer::start(json!({"keys": []})).await;
+        redirecting.redirect(&format!("http://localhost:{port}/.well-known/jwks.json"));
+        assert!(matches!(
+            JwtExtractor::new(
+                spec(),
+                JwtKeyInput::Jwks(redirecting.url()),
+                clock_at(NOW),
+                JwksRefresh::default()
+            )
+            .await,
+            Err(ExtractorBuildError::JwksUnreachable { .. })
+        ));
+        assert_eq!(target.fetches(), 0, "the redirect was not followed");
+        // A redirect to an acceptable URL is followed.
+        redirecting.redirect(target.url().as_str());
+        assert!(JwtExtractor::new(
+            spec(),
+            JwtKeyInput::Jwks(redirecting.url()),
+            clock_at(NOW),
+            JwksRefresh::default()
+        )
+        .await
+        .is_ok());
+        assert_eq!(target.fetches(), 1);
+    }
+
+    #[tokio::test]
+    async fn jwt_stale_jwks_refresh_does_not_stall_requests() {
+        let server = JwksServer::start(json!({"keys": [
+            {"kty": "OKP", "crv": "Ed25519", "kid": "k1", "x": crate::identity::testkit::ED_X}
+        ]}))
+        .await;
+        let ex = JwtExtractor::new(
+            spec(),
+            JwtKeyInput::Jwks(server.url()),
+            clock_at(NOW),
+            JwksRefresh {
+                max_age: Duration::ZERO,
+                min_interval: Duration::ZERO,
+                timeout: Duration::from_secs(5),
+            },
+        )
+        .await
+        .expect("fetches");
+        server.hang(Duration::from_secs(3));
+        let t1 = sign_jwt(Algorithm::EdDSA, ED_PRIVATE, Some("k1"), &claims());
+        for _ in 0..3 {
+            let answered =
+                tokio::time::timeout(Duration::from_millis(500), ex.extract(&bearer(&t1)))
+                    .await
+                    .expect("a known key verifies without waiting for the refresh");
+            assert!(answered.is_ok());
+        }
+        // The refresh did run, once, in the background.
+        assert!(eventually(|| server.fetches() == 2).await);
+        assert_eq!(server.fetches(), 2, "one refresh absorbs the others");
     }
 
     #[tokio::test]

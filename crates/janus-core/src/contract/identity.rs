@@ -41,7 +41,12 @@ use super::registry::OpaqueRegistry;
 /// Method, URI (path and query) and headers of an inbound request — never the
 /// body. Extraction happens before the body is read, so an unauthenticated
 /// request is rejected without Janus buffering anything the caller sends.
-#[derive(Debug, Clone)]
+///
+/// Its `Debug` prints the method, the path, header *names* and query
+/// parameter *names* only: header values and the query carry the caller's
+/// identity material (`authorization`, `x-api-key`, a `query` source), which
+/// must never reach a log.
+#[derive(Clone)]
 pub struct RequestHead {
     pub method: Method,
     /// The request target as received on the data plane: path plus query.
@@ -67,6 +72,23 @@ impl RequestHead {
     /// The raw query string, if any.
     pub fn query(&self) -> Option<&str> {
         self.uri.query()
+    }
+}
+
+impl fmt::Debug for RequestHead {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let query_names: Option<Vec<String>> = self.query().map(|q| {
+            url::form_urlencoded::parse(q.as_bytes())
+                .map(|(name, _)| name.into_owned())
+                .collect()
+        });
+        let header_names: Vec<&str> = self.headers.keys().map(HeaderName::as_str).collect();
+        f.debug_struct("RequestHead")
+            .field("method", &self.method)
+            .field("path", &self.path())
+            .field("query_names", &query_names)
+            .field("header_names", &header_names)
+            .finish_non_exhaustive()
     }
 }
 
@@ -317,5 +339,32 @@ mod tests {
         );
         assert_eq!(head.path(), "/v1/models");
         assert_eq!(head.query(), Some("token=abc"));
+    }
+
+    #[test]
+    fn request_head_debug_prints_no_identity_material() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer sekrit-bearer".parse().unwrap());
+        headers.insert("x-api-key", "sekrit-key".parse().unwrap());
+        let head = RequestHead::new(
+            Method::POST,
+            Uri::from_static("/v1/messages?token=sekrit-query&beta=1"),
+            headers,
+        );
+        let printed = format!("{head:?}");
+        assert!(!printed.contains("sekrit"), "{printed}");
+        for visible in [
+            "POST",
+            "/v1/messages",
+            "authorization",
+            "x-api-key",
+            "token",
+            "beta",
+        ] {
+            assert!(
+                printed.contains(visible),
+                "{visible} missing from {printed}"
+            );
+        }
     }
 }

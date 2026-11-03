@@ -2,6 +2,7 @@
 //! applies the same way, so `MemoryUsageStore` and `SqliteUsageStore` differ
 //! only in where counts and ledger entries live.
 
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::contract::metering::Apply;
@@ -52,6 +53,53 @@ pub(crate) fn key_expired(retain_until: Option<i64>, now: i64) -> bool {
     retain_until.is_some_and(|until| until < now)
 }
 
+/// When a store compacts itself. `compact` is what keeps the ledger
+/// bounded by the traffic of one TTL (`docs/plugin-contract` "Metering
+/// primitives"); a store that waited for its plugin to call it would grow
+/// without bound in a plugin that never does. So every shipped store runs a
+/// full compaction from its own write path once per a quarter of its ledger
+/// TTL (at least a second apart): the ledger then never holds entries much
+/// older than 1¼ TTLs. A plugin may still call `compact` on its own timer.
+pub(crate) struct AutoCompact {
+    /// The earliest Unix second the next compaction may run.
+    next: AtomicI64,
+    interval: i64,
+}
+
+impl AutoCompact {
+    pub(crate) fn new(ledger_ttl: Duration, now: i64) -> Self {
+        let interval = i64::try_from(ledger_ttl.as_secs() / 4)
+            .unwrap_or(i64::MAX)
+            .max(1);
+        Self {
+            next: AtomicI64::new(now.saturating_add(interval)),
+            interval,
+        }
+    }
+
+    /// Whether the caller should compact at `now`. At most one caller per
+    /// interval is told yes, so concurrent writers never compact together.
+    pub(crate) fn due(&self, now: i64) -> bool {
+        let next = self.next.load(Ordering::Relaxed);
+        now >= next
+            && self
+                .next
+                .compare_exchange(
+                    next,
+                    now.saturating_add(self.interval),
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+    }
+
+    /// Make the next write compact. For tests that cannot wait an interval.
+    #[cfg(test)]
+    pub(crate) fn expire(&self) {
+        self.next.store(i64::MIN, Ordering::Relaxed);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,5 +141,19 @@ mod tests {
         assert!(!key_expired(Some(100), 100));
         assert!(!key_expired(None, i64::MAX));
         assert!(unix_now() > 1_700_000_000);
+    }
+
+    #[test]
+    fn auto_compact_is_due_once_per_quarter_ttl() {
+        let auto = AutoCompact::new(Duration::from_secs(3600), 1_000);
+        assert!(!auto.due(1_000));
+        assert!(!auto.due(1_899));
+        assert!(auto.due(1_900));
+        assert!(!auto.due(1_900), "one caller per interval");
+        assert!(!auto.due(2_799));
+        assert!(auto.due(2_800));
+        let tiny = AutoCompact::new(Duration::ZERO, 0);
+        assert!(!tiny.due(0));
+        assert!(tiny.due(1), "at least a second apart");
     }
 }

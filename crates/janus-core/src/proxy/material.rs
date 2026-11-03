@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 
-use base64::Engine;
 use chrono::{DateTime, Utc};
 use http::HeaderValue;
 use serde_json::Value;
@@ -15,26 +14,38 @@ use crate::contract::upstream::{UpstreamError, UpstreamKind};
 /// A token endpoint answers a small JSON exchange; it gets this long.
 const REFRESH_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// A plain API key document: the key as a JSON string, or `{"api_key":
-/// "<key>"}`. Surrounding whitespace (a trailing newline from a file or
-/// stdin) is not part of a key. `None` when `doc` is neither form.
+/// A plain API key document: the key as a JSON string, or exactly
+/// `{"api_key": "<key>"}` (the pool's canonical stored form). Surrounding
+/// whitespace (a trailing newline from a file or stdin) is not part of a
+/// key. `None` when `doc` is neither form.
+///
+/// A key is one token of printable, non-space ASCII — what every launch
+/// upstream issues. Anything else claimed as a key is an error, never a
+/// secret: in particular text that starts like a JSON document, which is
+/// what a credential file read mid-rewrite (`{"tokens":{"access_tok`)
+/// looks like once it has failed to parse as JSON. Sending that upstream
+/// would leak the file's other secrets as an auth header.
 pub(crate) fn plain_api_key(doc: &MaterialDocument) -> Option<Result<Secret, UpstreamError>> {
     let key = match doc.expose() {
         Value::String(key) => key,
-        Value::Object(fields) => match fields.get("api_key") {
+        Value::Object(fields) if fields.len() == 1 => match fields.get("api_key") {
             Some(Value::String(key)) => key,
             _ => return None,
         },
         _ => return None,
     };
     let key = key.trim();
-    Some(if key.is_empty() {
-        Err(UpstreamError::InvalidMaterial(
-            "the API key is empty".into(),
-        ))
-    } else {
-        Ok(Secret::new(key))
-    })
+    let refuse = |why: &str| Some(Err(UpstreamError::InvalidMaterial(why.into())));
+    if key.is_empty() {
+        return refuse("the API key is empty");
+    }
+    if key.starts_with(['{', '[', '"']) {
+        return refuse("the API key is a fragment of a JSON document, not a key");
+    }
+    if !key.bytes().all(|b| b.is_ascii_graphic()) {
+        return refuse("the API key contains whitespace or non-printable characters");
+    }
+    Some(Ok(Secret::new(key)))
 }
 
 /// Refuse material resolved for a different upstream: applying it would
@@ -83,12 +94,8 @@ pub(crate) fn string_field<'v>(
 /// to refresh, never to trust anything. `None` when `token` is not a JWT
 /// with a numeric `exp`.
 pub(crate) fn jwt_expiry(token: &str) -> Option<DateTime<Utc>> {
-    let payload = token.split('.').nth(1)?;
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(payload.trim_end_matches('='))
-        .ok()?;
-    let claims: Value = serde_json::from_slice(&bytes).ok()?;
-    DateTime::from_timestamp(claims.get("exp")?.as_i64()?, 0)
+    let data = jsonwebtoken::dangerous::insecure_decode::<Value>(token).ok()?;
+    DateTime::from_timestamp(data.claims.get("exp")?.as_i64()?, 0)
 }
 
 /// POST a JSON refresh-token grant to `token_url` and return the JSON
@@ -145,25 +152,42 @@ mod tests {
             Some(Err(UpstreamError::InvalidMaterial(_)))
         ));
         assert!(key(json!({"tokens": {}})).is_none());
+        assert!(key(json!({"api_key": "sk", "tokens": {}})).is_none());
         assert!(key(json!(42)).is_none());
     }
 
     #[test]
+    fn a_truncated_json_document_is_an_error_never_a_key() {
+        // What a config `file` credential read mid-rewrite becomes once it
+        // fails to parse as JSON and is taken as text, in either form.
+        let fragment = r#"{"tokens":{"access_token":"at","refresh_token":"rt""#;
+        for doc in [
+            json!(fragment),
+            json!({ "api_key": fragment }),
+            json!("[1,"),
+            json!("\"sk-quoted"),
+            json!("sk one"),
+            json!("sk\u{7f}"),
+        ] {
+            assert!(
+                matches!(
+                    plain_api_key(&MaterialDocument::new(doc.clone())),
+                    Some(Err(UpstreamError::InvalidMaterial(_)))
+                ),
+                "{doc}"
+            );
+        }
+    }
+
+    #[test]
     fn jwt_expiry_is_read_unverified() {
-        let b64 = |v: Value| {
-            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&v).unwrap())
-        };
-        let token = format!(
-            "{}.{}.sig",
-            b64(json!({"alg": "RS256"})),
-            b64(json!({"exp": 1_900_000_000}))
-        );
+        let token = crate::proxy::testkit::jwt(json!({"exp": 1_900_000_000}));
         assert_eq!(
             jwt_expiry(&token),
             DateTime::from_timestamp(1_900_000_000, 0)
         );
         assert_eq!(jwt_expiry("opaque-token"), None);
-        let no_exp = format!("h.{}.s", b64(json!({"sub": "x"})));
+        let no_exp = crate::proxy::testkit::jwt(json!({"sub": "x"}));
         assert_eq!(jwt_expiry(&no_exp), None);
     }
 }

@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use tokio::sync::oneshot;
 
-use super::ledger::{evaluate, ledger_cutoff, unix_now};
+use super::ledger::{evaluate, ledger_cutoff, unix_now, AutoCompact};
 use crate::contract::metering::{
     Apply, Bound, Durability, MeterKey, OpId, Phase, UsageError, UsageStore, DEFAULT_LEDGER_TTL,
 };
@@ -28,12 +28,17 @@ use crate::contract::metering::{
 /// The lock is taken on a `<path>-lock` file beside the database, because on
 /// some platforms (macOS) a whole-file advisory lock on the database itself
 /// conflicts with SQLite's own byte-range locks.
+///
+/// `compact` also runs by itself, on the writer thread after an `apply`,
+/// once per a quarter of the ledger TTL, so the file stays bounded by recent
+/// traffic even if the plugin never calls it.
 pub struct SqliteUsageStore {
     jobs: mpsc::Sender<Job>,
     writer: Option<JoinHandle<()>>,
     /// Holds the advisory lock until the writer has closed the connection.
     _lock: File,
     ledger_ttl: Duration,
+    auto_compact: AutoCompact,
 }
 
 type Job = Box<dyn FnOnce(&mut Connection) + Send>;
@@ -134,6 +139,7 @@ impl SqliteUsageStore {
             writer: Some(writer),
             _lock: lock,
             ledger_ttl,
+            auto_compact: AutoCompact::new(ledger_ttl, unix_now()),
         })
     }
 
@@ -157,12 +163,21 @@ impl SqliteUsageStore {
 impl Drop for SqliteUsageStore {
     /// Stop the writer after the jobs already queued and wait for it to close
     /// the connection, so the file is unlocked only once nothing writes it.
+    /// Dropped on a multi-threaded tokio runtime, the wait is announced with
+    /// `block_in_place`, so the worker's other tasks move to another thread
+    /// instead of stalling behind the writer's queue.
     fn drop(&mut self) {
         let (closed, _) = mpsc::channel();
         drop(std::mem::replace(&mut self.jobs, closed));
         if let Some(writer) = self.writer.take() {
             // A writer that panicked has nothing left to flush.
-            let _ = writer.join();
+            let join = move || drop(writer.join());
+            match tokio::runtime::Handle::try_current().map(|rt| rt.runtime_flavor()) {
+                Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(join),
+                // Off a runtime nothing else is waiting on this thread; on a
+                // current-thread runtime there is no other worker to hand to.
+                _ => join(),
+            }
         }
     }
 }
@@ -399,6 +414,20 @@ fn release_op(conn: &mut Connection, op: &OpId) -> rusqlite::Result<bool> {
     Ok(true)
 }
 
+/// Drop keys whose `retain_until` is before `now` and ledger entries stamped
+/// before `cutoff`, in one transaction. Returns how many were dropped.
+fn compact_op(conn: &mut Connection, now: i64, cutoff: i64) -> rusqlite::Result<u64> {
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let keys = tx.execute(
+        "DELETE FROM usage_counts WHERE retain_until IS NOT NULL AND retain_until < ?1",
+        [now],
+    )?;
+    // Cascades to `usage_ledger_keys`, which is not counted.
+    let entries = tx.execute("DELETE FROM usage_ledger WHERE created_at < ?1", [cutoff])?;
+    tx.commit()?;
+    Ok((keys + entries) as u64)
+}
+
 #[async_trait]
 impl UsageStore for SqliteUsageStore {
     async fn apply(
@@ -416,8 +445,23 @@ impl UsageStore for SqliteUsageStore {
                 retain_until: bound.retain_until,
             })
             .collect();
-        self.call(move |conn| apply_op(conn, &op, &bounds, amount))
-            .await
+        let now = unix_now();
+        let compact = self
+            .auto_compact
+            .due(now)
+            .then(|| (now, ledger_cutoff(now, self.ledger_ttl)));
+        self.call(move |conn| {
+            let result = apply_op(conn, &op, &bounds, amount)?;
+            if let Some((now, cutoff)) = compact {
+                // The op is committed; a failed compaction is retried at the
+                // next interval and must not turn its answer into an error.
+                if let Err(err) = compact_op(conn, now, cutoff) {
+                    tracing::warn!(error = %err, "usage store compaction failed");
+                }
+            }
+            Ok(result)
+        })
+        .await
     }
 
     async fn release(&self, op: &OpId) -> Result<bool, UsageError> {
@@ -445,18 +489,7 @@ impl UsageStore for SqliteUsageStore {
 
     async fn compact(&self, now: i64) -> Result<u64, UsageError> {
         let cutoff = ledger_cutoff(now, self.ledger_ttl);
-        self.call(move |conn| {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let keys = tx.execute(
-                "DELETE FROM usage_counts WHERE retain_until IS NOT NULL AND retain_until < ?1",
-                [now],
-            )?;
-            // Cascades to `usage_ledger_keys`, which is not counted.
-            let entries = tx.execute("DELETE FROM usage_ledger WHERE created_at < ?1", [cutoff])?;
-            tx.commit()?;
-            Ok((keys + entries) as u64)
-        })
-        .await
+        self.call(move |conn| compact_op(conn, now, cutoff)).await
     }
 
     fn durability(&self) -> Durability {
@@ -681,5 +714,95 @@ mod tests {
         }
         assert_eq!(allowed, 100);
         assert_eq!(meter.store().get(&credits()).await.expect("get"), 100);
+    }
+
+    #[tokio::test]
+    async fn sqlite_store_compacts_itself_without_a_compact_call() {
+        let (store, _dir) = fresh();
+        let now = unix_now();
+        let apply = |request_id: &'static str, meter: &'static str, retain_until: i64| {
+            let store = &store;
+            async move {
+                let key = MeterKey {
+                    identity: "alice".into(),
+                    meter: meter.into(),
+                    period_secs: 60,
+                    window_start: now,
+                };
+                let op = OpId {
+                    identity: "alice".into(),
+                    meter: meter.into(),
+                    request_id: request_id.into(),
+                    phase: Phase::Reserve,
+                };
+                let bound = Bound {
+                    key: &key,
+                    limit: None,
+                    retain_until: Some(retain_until),
+                };
+                store.apply(&op, &[bound], 1).await.expect("apply");
+            }
+        };
+        let rows = || {
+            store.call(|conn| {
+                let n = |table: &str| {
+                    conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                };
+                Ok((n("usage_counts")?, n("usage_ledger")?))
+            })
+        };
+        apply("old", "tokens", now - 60).await;
+        let aged = now - DEFAULT_LEDGER_TTL.as_secs() as i64 - 1;
+        store
+            .call(move |conn| {
+                conn.execute("UPDATE usage_ledger SET created_at = ?1", [aged])
+                    .map(drop)
+            })
+            .await
+            .expect("age the entry");
+        apply("r1", "requests", now + 60).await;
+        assert_eq!(rows().await.expect("rows"), (2, 2), "not yet due");
+        store.auto_compact.expire();
+        apply("r2", "requests", now + 60).await;
+        assert_eq!(
+            rows().await.expect("rows"),
+            (1, 2),
+            "the expired key and the aged entry are gone"
+        );
+    }
+
+    /// Dropping the store waits for its writer; on a multi-threaded runtime
+    /// that wait must not hold the worker the dropping task runs on.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn sqlite_drop_does_not_stall_the_runtime_worker() {
+        let (store, _dir) = fresh();
+        let (release, held) = mpsc::channel::<()>();
+        let (started, writer_busy) = oneshot::channel();
+        // Occupy the writer until another task on the runtime releases it.
+        store
+            .jobs
+            .send(Box::new(move |_| {
+                let _ = started.send(());
+                let _ = held.recv_timeout(Duration::from_secs(10));
+            }))
+            .expect("queue");
+        writer_busy.await.expect("writer started");
+        let dropper = tokio::spawn(async move {
+            let unblocker = tokio::spawn(async move {
+                let _ = release.send(());
+            });
+            let begun = std::time::Instant::now();
+            drop(store);
+            let waited = begun.elapsed();
+            unblocker.await.expect("unblocker");
+            waited
+        });
+        let waited = dropper.await.expect("dropper");
+        assert!(
+            waited < Duration::from_secs(5),
+            "drop held the only worker for {waited:?}"
+        );
     }
 }

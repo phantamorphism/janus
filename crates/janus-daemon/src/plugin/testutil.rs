@@ -7,7 +7,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -44,6 +44,8 @@ pub(crate) enum Reply {
     /// Sleep this long, then answer `use_default`.
     Slow(Duration),
     Status(tonic::Code, &'static str),
+    /// Sleep this long, then fail with this status.
+    SlowStatus(Duration, tonic::Code, &'static str),
 }
 
 /// A scripted out-of-process plugin.
@@ -127,6 +129,10 @@ impl JanusPlugin for FakePlugin {
                 Some(Outcome::UseDefault(true))
             }
             Reply::Status(code, message) => return Err(tonic::Status::new(code, message)),
+            Reply::SlowStatus(d, code, message) => {
+                tokio::time::sleep(d).await;
+                return Err(tonic::Status::new(code, message));
+            }
         };
         Ok(tonic::Response::new(proto::ResolveRouteResponse {
             outcome,
@@ -227,6 +233,113 @@ pub(crate) async fn serve_plaintext(plugin: &Arc<FakePlugin>) -> (Running, Socke
         Some((conn, l))
     });
     (Running::spawn(Arc::clone(plugin), incoming), addr)
+}
+
+/// One connection through a [`Relay`].
+#[derive(Debug, Default)]
+struct RelayConn {
+    blackholed: AtomicBool,
+    closed: CancellationToken,
+}
+
+/// A TCP relay in front of a plugin, standing in for the network between
+/// them. Each connection through it can be black-holed — bytes discarded
+/// both ways with the sockets left open, as when the plugin's address
+/// vanishes without a reset — or closed.
+pub(crate) struct Relay {
+    pub addr: SocketAddr,
+    conns: Arc<Mutex<Vec<Arc<RelayConn>>>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+async fn shovel(
+    conn: &RelayConn,
+    mut from: tokio::net::tcp::OwnedReadHalf,
+    mut to: tokio::net::tcp::OwnedWriteHalf,
+) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut buf = vec![0u8; 16 * 1024];
+    loop {
+        let n = match from.read(&mut buf).await {
+            Ok(0) | Err(_) => return,
+            Ok(n) => n,
+        };
+        if conn.blackholed.load(Ordering::SeqCst) {
+            continue;
+        }
+        if to.write_all(&buf[..n]).await.is_err() {
+            return;
+        }
+    }
+}
+
+impl Relay {
+    /// Relay connections on a fresh loopback port to `upstream`.
+    pub(crate) async fn start(upstream: SocketAddr) -> Relay {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let conns: Arc<Mutex<Vec<Arc<RelayConn>>>> = Arc::default();
+        let registry = Arc::clone(&conns);
+        let task = tokio::spawn(async move {
+            while let Ok((client, _)) = listener.accept().await {
+                let conn = Arc::new(RelayConn::default());
+                registry.lock().expect("lock").push(Arc::clone(&conn));
+                tokio::spawn(async move {
+                    let Ok(server) = TcpStream::connect(upstream).await else {
+                        return;
+                    };
+                    let (client_r, client_w) = client.into_split();
+                    let (server_r, server_w) = server.into_split();
+                    tokio::select! {
+                        _ = shovel(&conn, client_r, server_w) => {}
+                        _ = shovel(&conn, server_r, client_w) => {}
+                        _ = conn.closed.cancelled() => {}
+                    }
+                });
+            }
+        });
+        Relay { addr, conns, task }
+    }
+
+    /// Connections accepted so far.
+    pub(crate) fn connections(&self) -> usize {
+        self.conns.lock().expect("lock").len()
+    }
+
+    /// Black-hole every connection made so far; later ones relay normally.
+    pub(crate) fn blackhole_existing(&self) {
+        for conn in self.conns.lock().expect("lock").iter() {
+            conn.blackholed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    /// Close the `n`th connection (both ends see it end).
+    pub(crate) fn close(&self, n: usize) {
+        self.conns.lock().expect("lock")[n].closed.cancel();
+    }
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        self.task.abort();
+        for conn in self.conns.lock().unwrap_or_else(|p| p.into_inner()).iter() {
+            conn.closed.cancel();
+        }
+    }
+}
+
+/// A TCP listener that accepts connections, holds them open and never
+/// sends a byte: a peer that stalls a handshake.
+pub(crate) async fn silent_listener() -> (tokio::task::JoinHandle<()>, SocketAddr) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("addr");
+    let task = tokio::spawn(async move {
+        let mut held = Vec::new();
+        while let Ok((conn, _)) = listener.accept().await {
+            held.push(conn);
+        }
+    });
+    (task, addr)
 }
 
 /// A loopback port nothing listens on.
@@ -450,6 +563,12 @@ impl Issued {
 
 /// A calendar date as `(year, month, day)`.
 pub(crate) type Ymd = (i32, u8, u8);
+
+/// The calendar date of `at`.
+pub(crate) fn ymd(at: chrono::DateTime<chrono::Utc>) -> Ymd {
+    use chrono::Datelike;
+    (at.year(), at.month() as u8, at.day() as u8)
+}
 
 /// What a leaf certificate says.
 pub(crate) struct Leaf {

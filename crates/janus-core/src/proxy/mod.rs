@@ -63,6 +63,31 @@ macro_rules! forwarding_allowlist {
     };
 }
 
+/// The [`UpstreamImpl`] methods an upstream shares verbatim with the
+/// others, emitted inside its `impl UpstreamImpl` block:
+/// `forwarded_headers` returning the static allowlist `$forwarded`, and
+/// with `target = base_url` also an `outbound_url` that is the plain
+/// [`outbound::join_base`] rewrite, whatever the credential's kind.
+macro_rules! upstream_forwarding {
+    ($forwarded:ident) => {
+        fn forwarded_headers(&self) -> &[http::HeaderName] {
+            &$forwarded
+        }
+    };
+    ($forwarded:ident, target = base_url) => {
+        upstream_forwarding!($forwarded);
+
+        fn outbound_url(
+            &self,
+            base_url: &url::Url,
+            rest: &str,
+            _kind: $crate::contract::credential::CredentialKind,
+        ) -> Result<url::Url, $crate::contract::upstream::UpstreamError> {
+            super::outbound::join_base(base_url, rest)
+        }
+    };
+}
+
 mod anthropic;
 mod feedback;
 mod material;
@@ -82,23 +107,49 @@ pub use outbound::{build_outbound, Substitution, SubstitutionError};
 pub use relay::{BoxError, ForwardError, Forwarder, RelayBody, RelayEnd, RelayOutcome, Relayed};
 
 /// How long establishing a connection to an upstream (or a token endpoint)
-/// may take. There is deliberately no whole-request timeout on the
-/// forwarding path: a streamed response legitimately runs for minutes.
+/// may take.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How long the connection to an upstream may go without delivering a
+/// byte: waiting for the response head, or between two reads of the body.
+/// There is deliberately no whole-request timeout on the forwarding path,
+/// since a streamed response legitimately runs for many minutes; what is
+/// bounded is silence. Streaming upstreams send events (or keep-alive
+/// pings) every few seconds, but a non-streamed completion sends nothing
+/// at all until it is done, so the bound is the ten minutes the launch
+/// upstreams' own SDKs allow a request before giving up on it.
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// The HTTP client could not be constructed (TLS initialisation failed).
 #[derive(Debug, thiserror::Error)]
 #[error("cannot construct the upstream HTTP client: {0}")]
 pub struct ClientInitError(String);
 
-/// The client every outbound call uses. Redirects are never followed: a
-/// redirect is part of the upstream's response and is relayed to the caller
-/// as is, and following one would carry the substituted credential to
-/// wherever the redirect points.
+/// The client every outbound call uses.
+///
+/// - Redirects are never followed: a redirect is part of the upstream's
+///   response and is relayed to the caller as is, and following one would
+///   carry the substituted credential to wherever the redirect points
+///   (reqwest strips only `authorization` on a cross-host hop, not
+///   `x-api-key` or `chatgpt-account-id`).
+/// - No proxy, whatever the environment says: `HTTP(S)_PROXY`/`ALL_PROXY`
+///   in the daemon's environment would otherwise route every substituted
+///   credential and token refresh through that proxy, in plaintext for an
+///   `http://` base URL. An operator who wants egress through a proxy
+///   points `base_url` at it.
+/// - Bounded silence ([`READ_IDLE_TIMEOUT`]), so a stalled upstream ends
+///   the call (and settles it) instead of holding it until the caller
+///   gives up.
 fn http_client() -> Result<reqwest::Client, ClientInitError> {
+    http_client_with(READ_IDLE_TIMEOUT)
+}
+
+fn http_client_with(read_idle_timeout: Duration) -> Result<reqwest::Client, ClientInitError> {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
         .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(read_idle_timeout)
         .build()
         .map_err(|e| ClientInitError(e.to_string()))
 }
@@ -150,6 +201,88 @@ impl UpstreamSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Set in the environment of the child process
+    /// [`outbound_calls_ignore_proxy_environment`] runs.
+    const PROXY_ENV_CHILD: &str = "JANUS_TEST_PROXY_ENV_CHILD";
+
+    #[test]
+    fn outbound_calls_ignore_proxy_environment() {
+        // The proxy variables are process-wide and read when a client is
+        // built, so the check runs in a child process of its own rather
+        // than racing every other test's clients.
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "proxy::tests::proxy_environment_child",
+                "--test-threads=1",
+                "--nocapture",
+            ])
+            .env(PROXY_ENV_CHILD, "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    /// The child half of [`outbound_calls_ignore_proxy_environment`]; a
+    /// no-op anywhere else.
+    #[test]
+    fn proxy_environment_child() {
+        if std::env::var_os(PROXY_ENV_CHILD).is_none() {
+            return;
+        }
+        // A proxy that accepts connections and never answers: a client
+        // that used it would hang into the timeout below.
+        let trap = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        trap.set_nonblocking(true).unwrap();
+        let trap_url = format!("http://{}", trap.local_addr().unwrap());
+        for var in [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ] {
+            std::env::set_var(var, &trap_url);
+        }
+        std::env::remove_var("NO_PROXY");
+        std::env::remove_var("no_proxy");
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let upstream =
+                testkit::spawn(|_req| testkit::Reply::bytes(200, &[], b"ok".to_vec())).await;
+            let mut parts = http::Request::new(()).into_parts().0;
+            parts.uri = upstream.url.join("v1/x").unwrap().as_str().parse().unwrap();
+            let relayed = tokio::time::timeout(
+                Duration::from_secs(5),
+                Forwarder::new().unwrap().forward(
+                    Arc::new(OpenRouterUpstream),
+                    parts,
+                    http_body_util::Empty::<bytes::Bytes>::new(),
+                ),
+            )
+            .await
+            .expect("sent directly, not through the environment's proxy")
+            .unwrap();
+            assert_eq!(relayed.response.status(), 200);
+            assert_eq!(upstream.received().len(), 1);
+        });
+        assert_eq!(
+            trap.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock,
+            "the proxy was contacted"
+        );
+    }
 
     #[test]
     fn upstream_set_supplies_an_implementation_for_every_kind() {

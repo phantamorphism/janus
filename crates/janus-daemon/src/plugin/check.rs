@@ -18,12 +18,12 @@ use std::time::Duration;
 use janus_core::contract::plugin::{PluginError, PluginFailureClass, PluginMode};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpStream, UnixStream};
 
 use super::grpc::{Dialer, Target};
 use super::socket::{self, PathWalk};
 use super::tls::{self, ClientIdentity, TlsDialer};
 use super::tls_init;
+use super::transport::connect_tcp;
 
 /// How long a probe waits for the plugin's verdict after its handshake.
 pub const PROBE_WAIT: Duration = Duration::from_secs(2);
@@ -125,18 +125,12 @@ pub(crate) async fn run(dialer: &Dialer, mode: PluginMode, endpoint: &str) -> Ch
     let steps = match &dialer.target {
         Target::Unix(path) => check_socket(path).await,
         Target::Tls(tls) => check_tls(tls).await,
-        Target::Plaintext(authority) => vec![match TcpStream::connect(authority.as_str()).await {
+        Target::Plaintext(authority) => vec![match connect_tcp(authority.as_str(), authority).await {
             Ok(_) => CheckStep::pass(
                 CheckStepKind::Connect,
                 format!("connected to {authority}; plaintext: the channel is not authenticated by Janus"),
             ),
-            Err(e) => CheckStep::failed_call(
-                CheckStepKind::Connect,
-                PluginError::new(
-                    PluginFailureClass::Unreachable,
-                    format!("cannot connect to {authority}: {e}"),
-                ),
-            ),
+            Err(e) => CheckStep::failed_call(CheckStepKind::Connect, e),
         }],
     };
     ChannelCheck::new(mode, Some(endpoint.to_owned()), steps)
@@ -158,18 +152,15 @@ async fn check_socket(path: &std::path::Path) -> Vec<CheckStep> {
             ]
         }
     };
-    let connect = match UnixStream::connect(&walk.socket).await {
+    let connect = match walk.connect().await {
         Ok(_) => CheckStep::pass(
             CheckStepKind::Connect,
-            format!("connected to {}", walk.socket.display()),
-        ),
-        Err(e) => CheckStep::failed_call(
-            CheckStepKind::Connect,
-            PluginError::new(
-                PluginFailureClass::Unreachable,
-                format!("cannot connect to {}: {e}", walk.socket.display()),
+            format!(
+                "connected to {}, served by an allowed uid",
+                walk.socket.display()
             ),
         ),
+        Err(e) => CheckStep::failed_call(CheckStepKind::Connect, e),
     };
     let mut perms = CheckStep::pass(
         CheckStepKind::PathPermissions,
@@ -330,8 +321,9 @@ mod tests {
     use crate::contract::config::PluginTransport;
     use crate::plugin::grpc::GrpcPluginClient;
     use crate::plugin::testutil::{
-        closed_port, serve_unix, socket_dir, ClientAuth, FakePlugin, TlsFixture,
+        closed_port, serve_unix, silent_listener, socket_dir, ClientAuth, FakePlugin, TlsFixture,
     };
+    use crate::plugin::transport::CONNECT_TIMEOUT;
 
     /// Run the check against a TLS plugin with `client_auth`.
     async fn check_tls_plugin(client_auth: impl FnOnce(&TlsFixture) -> ClientAuth) -> ChannelCheck {
@@ -389,6 +381,40 @@ mod tests {
             let step = check.step(kind).expect("ran");
             assert!(!step.passed);
             assert!(step.detail.contains("does not request"), "{step:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn check_is_bounded_against_a_plugin_that_never_answers() {
+        // Accepts TCP, then never speaks: every probe's handshake stalls.
+        let (_listener, addr) = silent_listener().await;
+        let fx = TlsFixture::new();
+        let check = tokio::time::timeout(
+            CONNECT_TIMEOUT * 3 + Duration::from_secs(3),
+            fx.client(addr).check(),
+        )
+        .await
+        .expect("plugin check must not hang");
+        assert!(!check.passed);
+        let handshake = check.step(CheckStepKind::Handshake).expect("ran");
+        assert_eq!(
+            handshake.class,
+            Some(PluginFailureClass::TlsError),
+            "{handshake:?}"
+        );
+        assert!(
+            handshake.detail.contains("did not complete within"),
+            "{handshake:?}"
+        );
+        for kind in [
+            CheckStepKind::ThrowawayCertRejected,
+            CheckStepKind::NoCertRejected,
+        ] {
+            let step = check.step(kind).expect("ran");
+            assert!(
+                !step.passed && step.detail.contains("inconclusive"),
+                "{step:?}"
+            );
         }
     }
 

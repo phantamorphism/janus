@@ -338,6 +338,9 @@ a silent degradation:
   instead is the worst possible interpretation.
 - config names a gRPC endpoint *and* a plugin is linked → refuse to start.
   Ambiguous, and guessing either way surprises someone.
+- a plugin is linked but config has no `[plugin]` block → refuse to start. A
+  build that carries policy does not run without it because a config file forgot
+  to say so.
 
 Build tooling beyond this — whether the custom crate lives in the Janus
 workspace, how it pins a Janus version — is an operator's own packaging choice
@@ -355,11 +358,17 @@ add nothing but a way for them to disagree. A container that needs to inject the
 endpoint templates the file, as it already must for the rest.
 
 ```toml
+# A plugin on a local socket.
 [plugin]
-endpoint   = "unix:///run/janus/policy.sock"   # or "https://policy.internal:7443"
+endpoint   = "unix:///run/janus/policy.sock"
 timeout_ms = 250                               # ResolveRoute deadline; default
+```
 
-  # Required when the endpoint scheme is https://. See "Securing the channel".
+```toml
+# A plugin across the network, over mutual TLS. See "Securing the channel".
+[plugin]
+endpoint = "https://policy.internal:7443"
+
   [plugin.tls]
   ca_file     = "/etc/janus/plugin-ca.pem"     # exactly one of ca_file / pinned_cert
   client_cert = "/etc/janus/daemon.pem"
@@ -380,13 +389,26 @@ The rules:
   plugin client and makes zero calls defined in `janus.proto`.
 - **Exactly one of `endpoint` or `linked = true`.** Both, or neither inside a
   present block, is a startup failure.
-- **The `endpoint` scheme selects the transport.** `unix://` is the local-socket
-  model; `https://` is the network model with mutual TLS and requires
-  `[plugin.tls]`; `http://` is refused unless `allow_plaintext = true` is set
-  alongside it. No other scheme is accepted.
-- **`timeout_ms`** is the deadline on each `ResolveRoute`. A plugin that does
-  not answer within it has, for that request, failed closed. `Notify` has no
-  deadline because nothing waits on it.
+- **The `endpoint` scheme selects the transport.** `unix:///absolute/path` (no
+  host) is the local-socket model; `https://` is the network model with mutual
+  TLS and requires `[plugin.tls]`; `http://` is refused unless
+  `allow_plaintext = true` is set alongside it. No other scheme is accepted.
+  `[plugin.tls]` belongs to `https://` only, and `allow_plaintext` to `http://`
+  only.
+- **`timeout_ms`** (default 250, never 0) is the deadline on each
+  `ResolveRoute`, linked plugins included. A plugin that does not answer within
+  it has, for that request, failed closed. `Notify` has no deadline because
+  nothing waits on it.
+
+Over gRPC, every dial and TLS handshake is bounded by a 3-second connect
+timeout, `plugin check` probes included. Connections carry HTTP/2 keepalive
+pings, idle or not, so a plugin that vanishes is detected within about ten
+seconds and redialed rather than leaving requests to time out one by one.
+`Notify` runs on its own connection, so a backed-up event stream never delays a
+`ResolveRoute`; a dropped stream is reopened with backoff (100 ms rising to 5
+s). Events wait in a bounded queue of 1024; when it is full, new events are
+dropped rather than blocking the request path, counted in the plugin's
+`dropped_events` on the admin surface, and logged as a warning.
 
 Configuration is validated at startup — scheme, that every named file exists and
 parses, that the client key matches the client certificate and the certificate
@@ -426,20 +448,30 @@ the kernel has not already.
 
 The plugin binds its socket mode `0660` inside a directory owned by the plugin's
 user with mode `0750`, and the daemon's user is in that directory's group. The
-daemon walks every directory on the socket's path and rejects the path if any of
-them is writable by group or others, or is owned by anyone other than root, the
-daemon's user, or the owner of the socket's own directory — the same posture as
-`sshd`'s `StrictModes`, for the same reason: an attacker who owns or can write
-to a parent directory can substitute a socket of their own. It does this at
-startup over the part of the path that exists, refusing to start on a failure,
-and again over the full path before every connection and reconnection, because
+daemon resolves the socket's path one component at a time and checks every
+directory a name is looked up in — including the directory holding each symlink
+it follows, up to 40 — rejecting the path if any of them is writable by group or
+others, or is owned by anyone other than root, the daemon's user, or the owner
+of the socket's own directory. This is the same posture as `sshd`'s
+`StrictModes`, for the same reason: an attacker who owns or can write to a
+parent directory, or to the directory a symlink points through, can substitute a
+socket of their own. It does this at startup over the part of the path that
+exists, refusing to start on a failure; while the socket's directory does not
+exist yet, every existing ancestor must be owned by root or the daemon's user.
+It walks the full path again before every connection and reconnection, because
 the plugin may create its directory after the daemon starts and a path that was
-sound at startup can be changed later; a failure then fails the request closed
-as `plugin_unreachable`, with the offending directory in `last_error`. A plugin
-that wants to verify the daemon's side can read the connecting peer's uid from
-the socket (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS); `janus-core`
-ships a `tonic` interceptor that does this for Rust plugins, and the check is a
-few lines in any other language's gRPC stack.
+sound at startup can be changed later. After connecting, the daemon reads the
+uid of the process serving the socket, which must be in the same owner set. A
+failure of either fails the request closed as `plugin_unreachable`, with the
+offending directory or uid in `last_error`.
+
+A plugin that wants to verify the daemon's side reads the connecting peer's uid
+from the socket (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS). For Rust
+plugins `janus-core` ships `peer::PeerUid`, a `tonic` interceptor installed with
+`JanusPluginServer::with_interceptor(plugin, PeerUid::new(daemon_uid))`. It
+fails closed: a call with no peer credentials, or from any other uid, is refused
+with `PERMISSION_DENIED`. In any other language's gRPC stack the check is a few
+lines.
 
 ### Network {#channel-network}
 
@@ -508,8 +540,9 @@ correct configuration. The check says which. Under TLS 1.3 a server's rejection
 of a client certificate arrives after the client's side of the handshake has
 finished, so each probe reads from the connection to observe it, and none of
 them issues a `ResolveRoute`. On the socket transport it reports the
-path-permission walk and a connection attempt. It is the operator's answer to
-"is this actually secured, or does it just work?"
+path-permission walk and a connection attempt, on the plaintext transport a
+connection attempt; a linked plugin has no channel to check. It is the
+operator's answer to "is this actually secured, or does it just work?"
 
 ## Metering primitives {#metering-primitives}
 

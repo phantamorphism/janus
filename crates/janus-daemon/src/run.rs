@@ -17,11 +17,14 @@
 //!    unregistered custom extractor refuses here;
 //! 6. the credential pool (pool slots and `[[credential]]` entries);
 //! 7. the plugin client (socket-path walk, TLS material);
-//! 8. the admin surface, whose own listener and TLS rules refuse before
-//!    it binds;
-//! 9. the data-plane listener.
+//! 8. the admin surface's static rules ([`admin::check_config`]: admin and
+//!    UI listeners, their TLS material, the UI assets, an existing admin
+//!    token);
+//! 9. the data-plane listener is bound (not yet served), then the admin
+//!    surface starts with the bound address, then the data plane serves. A
+//!    refusal at this step (a port in use) leaves nothing serving.
 //!
-//! [`check_config`] runs steps 1–7 and binds nothing. Shutdown (SIGINT or
+//! [`check_config`] runs steps 1–8 and binds nothing. Shutdown (SIGINT or
 //! SIGTERM in [`run`], or [`Daemon::shutdown`]) closes the listeners, lets
 //! in-flight requests finish for up to [`SHUTDOWN_GRACE`](crate::dataplane::SHUTDOWN_GRACE), waits for their
 //! settlement (request-log records, `Notify` events), then stops the
@@ -187,7 +190,7 @@ fn configured_credentials(config: &DaemonConfig) -> Result<Vec<ConfiguredCredent
         .collect()
 }
 
-/// Steps 1–7 of startup.
+/// Steps 1–8 of startup.
 async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared, RunError> {
     config.validate()?;
     embedded.check_against(config)?;
@@ -223,6 +226,7 @@ async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared,
         configured: configured_credentials(config)?,
     })?;
     let plugin = PluginHandle::from_config(config.plugin.as_ref(), embedded.plugin.clone())?;
+    admin::check_config(config, &data_dir)?;
 
     Ok(Prepared {
         data_dir,
@@ -268,6 +272,17 @@ impl Daemon {
         let requests = Arc::clone(prepared.store.requests());
         let pool: Arc<dyn CredentialPool> = prepared.pool;
 
+        // Bind the data plane first, without serving, so the admin surface
+        // reports the address actually bound (port 0 included); nothing is
+        // accepted until `serve` runs, after the admin surface is up.
+        let addr = config.data_plane.bind;
+        let listener = TcpListener::bind(addr)
+            .await
+            .map_err(|source| RunError::Bind { addr, source })?;
+        let data_plane_addr = listener
+            .local_addr()
+            .map_err(|source| RunError::Bind { addr, source })?;
+
         let admin = admin::start(
             AdminDeps {
                 config: Arc::clone(&config),
@@ -277,21 +292,11 @@ impl Daemon {
                 requests: Arc::clone(&requests),
                 plugin: prepared.plugin.clone(),
                 started_at: SystemTime::now(),
+                data_plane_addr,
             },
             cancel.clone(),
         )
         .await?;
-
-        let addr = config.data_plane.bind;
-        let listener = match TcpListener::bind(addr).await {
-            Ok(listener) => listener,
-            Err(source) => {
-                cancel.cancel();
-                admin.wait().await;
-                return Err(RunError::Bind { addr, source });
-            }
-        };
-        let data_plane_addr = listener.local_addr().unwrap_or(addr);
 
         let jobs_cancel = CancellationToken::new();
         let jobs = prepared.store.spawn_jobs(

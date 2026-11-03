@@ -165,6 +165,10 @@ impl OpaqueRegistry for FakeRegistry {
 struct JwksState {
     document: Value,
     failing: bool,
+    /// Answer only after this long (a hanging endpoint).
+    delay: Option<std::time::Duration>,
+    /// Answer `302 Found` to this location instead of the document.
+    redirect: Option<String>,
 }
 
 /// A JWKS endpoint on a loopback port that counts its requests.
@@ -181,6 +185,8 @@ impl JwksServer {
         let state = Arc::new(Mutex::new(JwksState {
             document,
             failing: false,
+            delay: None,
+            redirect: None,
         }));
         let fetches = Arc::new(AtomicUsize::new(0));
         let (st, count) = (state.clone(), fetches.clone());
@@ -193,15 +199,25 @@ impl JwksServer {
                         let s = st.lock().expect("lock");
                         let (status, body) = if s.failing {
                             (StatusCode::INTERNAL_SERVER_ERROR, "down".to_owned())
+                        } else if s.redirect.is_some() {
+                            (StatusCode::FOUND, String::new())
                         } else {
                             (StatusCode::OK, s.document.to_string())
                         };
-                        let resp = Response::builder()
+                        let mut resp = Response::builder()
                             .status(status)
-                            .header("content-type", "application/json")
-                            .body(Full::new(Bytes::from(body)))
-                            .expect("response");
-                        async move { Ok::<_, Infallible>(resp) }
+                            .header("content-type", "application/json");
+                        if let Some(location) = &s.redirect {
+                            resp = resp.header("location", location);
+                        }
+                        let resp = resp.body(Full::new(Bytes::from(body))).expect("response");
+                        let delay = s.delay;
+                        async move {
+                            if let Some(delay) = delay {
+                                tokio::time::sleep(delay).await;
+                            }
+                            Ok::<_, Infallible>(resp)
+                        }
                     });
                     // A connection error only ends that connection.
                     let _ = http1::Builder::new()
@@ -227,6 +243,16 @@ impl JwksServer {
 
     pub(crate) fn fail(&self) {
         self.state.lock().expect("lock").failing = true;
+    }
+
+    /// Make every later answer take `delay`.
+    pub(crate) fn hang(&self, delay: std::time::Duration) {
+        self.state.lock().expect("lock").delay = Some(delay);
+    }
+
+    /// Answer every later request with a redirect to `location`.
+    pub(crate) fn redirect(&self, location: &str) {
+        self.state.lock().expect("lock").redirect = Some(location.to_owned());
     }
 
     pub(crate) fn fetches(&self) -> usize {

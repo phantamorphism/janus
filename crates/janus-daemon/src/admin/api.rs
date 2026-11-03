@@ -11,7 +11,9 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Extension, Router};
+use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
+use tower::ServiceExt;
 
 use super::error::ApiError;
 use super::status::{Listeners, UpstreamSummary};
@@ -42,6 +44,8 @@ pub(crate) struct Inner {
     pub upstreams: Vec<UpstreamSummary>,
     /// Daemon shutdown: ends live tails.
     pub cancel: CancellationToken,
+    /// One permit per open live tail, across every listener.
+    pub tails: Arc<Semaphore>,
 }
 
 #[derive(Clone)]
@@ -67,6 +71,7 @@ impl AdminState {
             listeners,
             upstreams,
             cancel,
+            tails: Arc::new(Semaphore::new(requests::MAX_TAILS)),
         }))
     }
 }
@@ -114,6 +119,11 @@ where
         .map_err(ApiError::from)?
         .map_err(Into::into)
 }
+
+/// The largest request body the API accepts (enforced by the `Body`
+/// extractor). The biggest body it takes is a credential's material
+/// document, a few kilobytes at most.
+pub const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 /// The `/v1` routes, relative to `/v1`.
 fn v1(state: AdminState) -> Router {
@@ -169,12 +179,43 @@ pub(crate) fn token_router(state: AdminState, token: Arc<AdminToken>) -> Router 
 }
 
 /// The UI listener's router: the token-gated API under `/v1`, and the UI's
-/// static assets everywhere else.
+/// static assets everywhere else. Every path under `/v1` is the API's —
+/// one no route matches (`/v1/`, a trailing slash) is the API's token-gated
+/// `404`, never the single-page app's `index.html`.
 pub(crate) fn ui_router(state: AdminState, token: Arc<AdminToken>, assets: &Path) -> Router {
-    let api = Router::new()
+    let assets = ui::service(assets);
+    Router::new()
         .nest("/v1", v1(state))
-        .layer(middleware::from_fn_with_state(token, require_token));
-    api.fallback_service(ui::service(assets))
+        .fallback(move |req: Request| {
+            let assets = assets.clone();
+            async move {
+                if is_api_path(req.uri().path()) {
+                    not_found().await.into_response()
+                } else {
+                    assets.oneshot(req).await.into_response()
+                }
+            }
+        })
+        .layer(middleware::from_fn_with_state(token, require_token_on_api))
+}
+
+/// `/v1` and everything below it.
+fn is_api_path(path: &str) -> bool {
+    path.strip_prefix("/v1")
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+/// [`require_token`] on API paths; the UI's assets are public.
+async fn require_token_on_api(
+    State(token): State<Arc<AdminToken>>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if is_api_path(req.uri().path()) {
+        require_token(State(token), req, next).await
+    } else {
+        next.run(req).await
+    }
 }
 
 /// The admin token check. The token is taken only from the `Authorization`

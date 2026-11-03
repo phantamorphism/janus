@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto;
 use hyper_util::service::TowerToHyperService;
 use rand::RngCore;
@@ -30,6 +30,13 @@ use crate::contract::config::ListenerTls;
 pub const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 /// How long a client gets to complete a TLS handshake.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long an HTTP/1 client gets to send a request's headers.
+const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(10);
+/// Open connections one listener serves at once. A connection accepted
+/// beyond this is closed at once, so a peer that opens connections and
+/// never finishes a request cannot exhaust the daemon's file descriptors
+/// (which the data plane shares).
+pub const MAX_CONNECTIONS: usize = 256;
 
 /// `http://addr/` or `https://addr/`.
 pub(crate) fn url_of(addr: SocketAddr, tls: bool) -> String {
@@ -100,6 +107,20 @@ fn sun_path_capacity() -> usize {
     addr.sun_path.len()
 }
 
+/// Refuse a socket path longer than a `sockaddr_un` holds.
+pub(crate) fn check_socket_path(path: &Path) -> Result<(), AdminError> {
+    if path.as_os_str().len() >= sun_path_capacity() {
+        return Err(AdminError::Socket {
+            path: path.to_path_buf(),
+            reason: format!(
+                "the path is longer than a unix socket address holds ({} bytes); use a shorter data_dir",
+                sun_path_capacity() - 1
+            ),
+        });
+    }
+    Ok(())
+}
+
 /// The admin unix socket, bound at its final path with mode `0600`.
 pub(crate) struct UnixSocket {
     listener: UnixListener,
@@ -123,12 +144,7 @@ impl UnixSocket {
             path: path.to_path_buf(),
             reason,
         };
-        if path.as_os_str().len() >= sun_path_capacity() {
-            return Err(fail(format!(
-                "the path is longer than a unix socket address holds ({} bytes); use a shorter data_dir",
-                sun_path_capacity() - 1
-            )));
-        }
+        check_socket_path(path)?;
         match std::fs::symlink_metadata(path) {
             Ok(meta) if meta.file_type().is_socket() => {
                 match std::os::unix::net::UnixStream::connect(path) {
@@ -227,6 +243,10 @@ pub(crate) async fn serve(acceptor: Acceptor, router: Router, cancel: Cancellati
             () = cancel.cancelled() => break,
             Some(_) = conns.join_next(), if !conns.is_empty() => {}
             accepted = accept(&acceptor) => match accepted {
+                Ok(_) if conns.len() >= MAX_CONNECTIONS => {
+                    // Dropping the accepted stream closes it.
+                    tracing::warn!(limit = MAX_CONNECTIONS, "admin listener at its connection limit; closing a new connection");
+                }
                 Ok(Accepted::Unix(stream)) => {
                     conns.spawn(serve_connection(stream, router.clone(), cancel.clone()));
                 }
@@ -285,7 +305,12 @@ async fn serve_connection<I>(io: I, router: Router, cancel: CancellationToken)
 where
     I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
-    let builder = auto::Builder::new(TokioExecutor::new());
+    let mut builder = auto::Builder::new(TokioExecutor::new());
+    builder
+        .http1()
+        .timer(TokioTimer::new())
+        .header_read_timeout(HEADER_READ_TIMEOUT);
+    builder.http2().timer(TokioTimer::new());
     let conn = builder.serve_connection(TokioIo::new(io), TowerToHyperService::new(router));
     tokio::pin!(conn);
     let result = tokio::select! {
