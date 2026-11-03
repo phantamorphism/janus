@@ -2,6 +2,18 @@
 //! constructing every binding's extractor at startup and selecting one per
 //! request, route first, then the upstream's binding (which the config
 //! layer has already merged over the daemon default).
+//!
+//! Route matching. The docs call a route's `path` a pattern without giving
+//! a pattern syntax, so a route path is one literal path. It is compared in
+//! canonical form, on both sides: runs of `/` collapsed, a trailing `/`
+//! dropped, percent-encoded unreserved characters (`A-Z a-z 0-9 - . _ ~`)
+//! decoded and other escapes upper-cased. An upstream may treat
+//! `/v1/messages/`, `//v1/messages` and `/v1/%6Dessages` as `/v1/messages`;
+//! were they matched literally, a route stricter than its upstream would be
+//! bypassed by respelling the path. Paths stay case-sensitive. A configured
+//! route path must already be canonical, start with `/`, and contain no
+//! query, fragment or dot segment, so that what the operator wrote is what
+//! matches and what the request log reports.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -56,6 +68,10 @@ pub enum StartupError {
     Duplicate { at: String },
     #[error("{at}: route of an upstream whose binding was not declared first")]
     UndeclaredUpstream { at: String },
+    /// A route path that could never match, or matches under another
+    /// spelling than the one written.
+    #[error("{at}: {reason}")]
+    InvalidRoutePath { at: String, reason: String },
 }
 
 impl StartupError {
@@ -67,7 +83,8 @@ impl StartupError {
             | StartupError::Build { at, .. }
             | StartupError::UnregisteredCustom { at, .. }
             | StartupError::Duplicate { at }
-            | StartupError::UndeclaredUpstream { at } => at,
+            | StartupError::UndeclaredUpstream { at }
+            | StartupError::InvalidRoutePath { at, .. } => at,
             StartupError::DuplicateCustom { .. } => "extractors",
         }
     }
@@ -180,15 +197,16 @@ impl BindingTable {
     }
 
     /// The binding for `path` (the request path with the upstream's
-    /// `path_prefix` stripped): an exact route match, else the upstream's
-    /// binding, else [`Unbound`].
+    /// `path_prefix` stripped): the route whose path equals `path` in
+    /// canonical form (see the module docs), else the upstream's binding,
+    /// else [`Unbound`].
     pub fn select(&self, upstream: UpstreamKind, path: &str) -> Result<Selected<'_>, Unbound> {
         let unbound = || Unbound {
             upstream,
             path: path.to_owned(),
         };
         let entry = self.upstreams.get(&upstream).ok_or_else(unbound)?;
-        if let Some((route, binding)) = entry.routes.get_key_value(path) {
+        if let Some((route, binding)) = entry.routes.get_key_value(&canonical_path(path)) {
             return Ok(Selected {
                 route: Some(route),
                 binding,
@@ -203,6 +221,69 @@ impl BindingTable {
             })
             .ok_or_else(unbound)
     }
+}
+
+/// `path` in the form route paths are compared in: runs of `/` collapsed,
+/// a trailing `/` dropped (except for `/` itself), percent-encoded
+/// unreserved characters decoded and remaining escapes upper-cased.
+fn canonical_path(path: &str) -> String {
+    fn hex(b: Option<&u8>) -> Option<u8> {
+        (*b? as char).to_digit(16).map(|d| d as u8)
+    }
+    let bytes = path.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'%' {
+            if let (Some(hi), Some(lo)) = (hex(bytes.get(i + 1)), hex(bytes.get(i + 2))) {
+                let v = hi * 16 + lo;
+                if v.is_ascii_alphanumeric() || matches!(v, b'-' | b'.' | b'_' | b'~') {
+                    out.push(v);
+                } else {
+                    out.extend_from_slice(format!("%{v:02X}").as_bytes());
+                }
+                i += 3;
+                continue;
+            }
+        }
+        if !(b == b'/' && out.last() == Some(&b'/')) {
+            out.push(b);
+        }
+        i += 1;
+    }
+    while out.len() > 1 && out.last() == Some(&b'/') {
+        out.pop();
+    }
+    // Only ASCII was inserted and every other byte copied whole.
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Why `path` cannot be a route path, or `None` when it can.
+fn route_path_refusal(path: &str) -> Option<String> {
+    if !path.starts_with('/') {
+        return Some("a route path starts with '/'".into());
+    }
+    if let Some(c) = path.chars().find(|c| matches!(c, '?' | '#')) {
+        return Some(format!(
+            "a route path has no {c:?}: it is matched against the path alone"
+        ));
+    }
+    let canonical = canonical_path(path);
+    if canonical
+        .split('/')
+        .any(|segment| segment == "." || segment == "..")
+    {
+        return Some(
+            "a route path has no '.' or '..' segment: such a request is never forwarded".into(),
+        );
+    }
+    if canonical != path {
+        return Some(format!(
+            "write the route path in canonical form, {canonical:?}: it is compared that way"
+        ));
+    }
+    None
 }
 
 /// Constructs a [`BindingTable`] one binding at a time; every error is a
@@ -246,8 +327,9 @@ impl BindingTableBuilder<'_> {
         Ok(())
     }
 
-    /// Declare a route of an already-declared upstream; `path` is literal
-    /// and matched exactly.
+    /// Declare a route of an already-declared upstream. `path` is one
+    /// literal path in canonical form (see the module docs); anything else
+    /// is refused.
     pub async fn route(
         &mut self,
         upstream: UpstreamKind,
@@ -255,6 +337,12 @@ impl BindingTableBuilder<'_> {
         binding: &BindingSpec,
     ) -> Result<(), StartupError> {
         let at = format!("upstream[{upstream}].route[{path}].identity");
+        if let Some(reason) = route_path_refusal(path) {
+            return Err(StartupError::InvalidRoutePath {
+                at: format!("upstream[{upstream}].route[{path}].path"),
+                reason,
+            });
+        }
         match self.table.upstreams.get(&upstream) {
             None => return Err(StartupError::UndeclaredUpstream { at }),
             Some(entry) if entry.routes.contains_key(path) => {
@@ -565,13 +653,24 @@ mod tests {
             .expect_err("trusted_header needs its header");
         assert_eq!(err.error, ExtractionError::NoMaterial);
 
+        // Respellings of a route path an upstream may treat as the same
+        // resource take the route binding.
+        for path in [
+            "/v1/models/",
+            "//v1/models",
+            "/v1//models//",
+            "/v1/%6dodels",
+        ] {
+            let sel = table.select(UpstreamKind::OpenAi, path).expect("bound");
+            assert_eq!(sel.route, Some("/v1/models"), "{path}");
+        }
         // Everything else under the upstream takes the upstream binding,
         // including near-misses of a route path.
         for path in [
             "/v1/chat/completions",
-            "/v1/models/",
             "/v1/Models",
             "/v1/models/gpt",
+            "/v1/models%2F",
         ] {
             let sel = table.select(UpstreamKind::OpenAi, path).expect("bound");
             assert_eq!(sel.route, None, "{path}");
@@ -594,6 +693,161 @@ mod tests {
             id.presented_at,
             PresentedAt::Header(HeaderName::from_static("x-api-key"))
         );
+    }
+
+    #[tokio::test]
+    async fn a_route_stricter_than_its_upstream_cannot_be_bypassed_by_respelling() {
+        let f = factory();
+        let m = Materials::standard();
+        let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
+        b.upstream(UpstreamKind::Anthropic, Some(&BindingSpec::None))
+            .await
+            .expect("open upstream");
+        b.route(
+            UpstreamKind::Anthropic,
+            "/v1/messages",
+            &hmac_spec("x-api-key"),
+        )
+        .await
+        .expect("guarded route");
+        let table = b.finish();
+        for path in [
+            "/v1/messages",
+            "/v1/messages/",
+            "//v1/messages",
+            "/v1//messages",
+            "/v1/%6Dessages",
+            "/%76%31/messages/",
+        ] {
+            let sel = table.select(UpstreamKind::Anthropic, path).expect("bound");
+            assert_eq!(sel.binding.method(), &Method::Hmac, "{path}");
+            assert_eq!(sel.route, Some("/v1/messages"), "{path}");
+        }
+        assert_eq!(
+            table
+                .select(UpstreamKind::Anthropic, "/v1/models")
+                .expect("bound")
+                .binding
+                .method(),
+            &Method::None
+        );
+    }
+
+    #[tokio::test]
+    async fn startup_validation_rejects_route_paths_that_cannot_match_as_written() {
+        let f = factory();
+        let m = Materials::standard();
+        let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
+        b.upstream(UpstreamKind::OpenAi, None)
+            .await
+            .expect("upstream");
+        for bad in [
+            "",
+            "v1/models",
+            "/v1/models?x=1",
+            "/v1/models#a",
+            "/v1/models/",
+            "//v1/models",
+            "/v1/%6Dodels",
+            "/v1/%2fmodels",
+            "/v1/../models",
+            "/v1/%2e/models",
+        ] {
+            let err = b
+                .route(UpstreamKind::OpenAi, bad, &BindingSpec::None)
+                .await
+                .expect_err(bad);
+            assert!(
+                matches!(err, StartupError::InvalidRoutePath { .. }),
+                "{bad}: {err:?}"
+            );
+            assert_eq!(err.at(), format!("upstream[openai].route[{bad}].path"));
+        }
+        for good in ["/", "/v1/models", "/v1/a%2Fb", "/v1/~x"] {
+            b.route(UpstreamKind::OpenAi, good, &BindingSpec::None)
+                .await
+                .expect(good);
+        }
+        let table = b.finish();
+        assert_eq!(
+            table
+                .select(UpstreamKind::OpenAi, "/v1/a%2fb")
+                .expect("bound")
+                .route,
+            Some("/v1/a%2Fb")
+        );
+        assert_eq!(
+            table
+                .select(UpstreamKind::OpenAi, "/v1/%7Ex")
+                .expect("bound")
+                .route,
+            Some("/v1/~x")
+        );
+    }
+
+    #[tokio::test]
+    async fn hmac_bindings_with_different_namespaces_or_secrets_do_not_share() {
+        let spec = |namespace: &str, secret_ref: &str| {
+            BindingSpec::Hmac(HmacSpec {
+                source: Source::Header {
+                    name: HeaderName::from_static("x-api-key"),
+                    scheme: None,
+                },
+                secret_ref: secret_ref.into(),
+                namespace: namespace.into(),
+                identity_claim: "subject".into(),
+                correlation: None,
+            })
+        };
+        let m = Materials {
+            secrets: BTreeMap::from([
+                ("caller-identity".to_owned(), Secret::new(SECRET)),
+                ("other".to_owned(), Secret::new(b"another-secret".to_vec())),
+            ]),
+            ..Materials::standard()
+        };
+        let f = factory();
+        let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
+        b.upstream(
+            UpstreamKind::Anthropic,
+            Some(&spec("janus-data-plane", "caller-identity")),
+        )
+        .await
+        .expect("a");
+        b.upstream(
+            UpstreamKind::OpenAi,
+            Some(&spec("host-rpc", "caller-identity")),
+        )
+        .await
+        .expect("b");
+        b.upstream(
+            UpstreamKind::OpenRouter,
+            Some(&spec("janus-data-plane", "other")),
+        )
+        .await
+        .expect("c");
+        let table = b.finish();
+        let req = head("/x", &[("x-api-key", &token("s-1"))]);
+        let id = |up| {
+            let binding = table.select(up, "/x").expect("bound").binding.clone();
+            let req = req.clone();
+            async move { binding.identify(&req).await }
+        };
+        assert!(id(UpstreamKind::Anthropic).await.is_ok());
+        assert!(matches!(
+            id(UpstreamKind::OpenAi).await,
+            Err(Rejection {
+                error: ExtractionError::WrongNamespace(_),
+                ..
+            })
+        ));
+        assert!(matches!(
+            id(UpstreamKind::OpenRouter).await,
+            Err(Rejection {
+                error: ExtractionError::Invalid(_),
+                ..
+            })
+        ));
     }
 
     #[tokio::test]

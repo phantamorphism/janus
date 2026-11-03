@@ -44,6 +44,24 @@ pub fn accepts(addr: SocketAddr) -> bool {
     std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok()
 }
 
+/// Send `request` (a whole HTTP/1.1 request, verbatim) to `addr` and read
+/// until the server closes: what came back, or `None` if the server closed
+/// without answering. Paths go out byte for byte, unnormalised.
+pub async fn raw(addr: SocketAddr, request: &str) -> Option<String> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+    stream
+        .write_all(request.as_bytes())
+        .await
+        .expect("write request");
+    let mut reply = Vec::new();
+    match tokio::time::timeout(Duration::from_secs(15), stream.read_to_end(&mut reply)).await {
+        Ok(Ok(_)) | Ok(Err(_)) => {}
+        Err(_) => panic!("{addr}: no answer and no close"),
+    }
+    (!reply.is_empty()).then(|| String::from_utf8_lossy(&reply).into_owned())
+}
+
 /// Write `contents` to `path` with `mode`.
 pub fn write_file(path: &Path, contents: &str, mode: u32) {
     use std::os::unix::fs::PermissionsExt;
@@ -57,6 +75,8 @@ pub struct Builder {
     dir: Option<TempDir>,
     path: PathBuf,
     data_plane: SocketAddr,
+    /// What `AdminDeps::data_plane_addr` reports; `data_plane` by default.
+    data_plane_bound: Option<SocketAddr>,
     toml: String,
     linked: Option<Arc<dyn JanusPlugin>>,
     anthropic_token_url: Option<Url>,
@@ -91,6 +111,7 @@ impl Builder {
             dir,
             path,
             data_plane,
+            data_plane_bound: None,
             toml,
             linked: None,
             anthropic_token_url: None,
@@ -103,6 +124,18 @@ impl Builder {
 
     pub fn data_plane(&self) -> SocketAddr {
         self.data_plane
+    }
+
+    /// The config this builder starts with.
+    pub fn config(&self) -> DaemonConfig {
+        toml::from_str(&self.toml).expect("config parses")
+    }
+
+    /// The address the data plane "actually bound", when it differs from
+    /// `data_plane.bind` (as with port `0`).
+    pub fn data_plane_bound(mut self, addr: SocketAddr) -> Self {
+        self.data_plane_bound = Some(addr);
+        self
     }
 
     pub fn linked(mut self, plugin: Arc<dyn JanusPlugin>) -> Self {
@@ -120,8 +153,7 @@ impl Builder {
     pub async fn try_start(self) -> Result<Daemon, (AdminError, Option<TempDir>)> {
         // Parsed without `validate`, as a caller that skipped it would: the
         // admin surface must enforce its listener rules itself.
-        let config: DaemonConfig = toml::from_str(&self.toml).expect("config parses");
-        let config = Arc::new(config);
+        let config = Arc::new(self.config());
         let data_dir = self.path.clone();
         let mut anthropic = AnthropicUpstream::new().expect("client");
         if let Some(url) = self.anthropic_token_url {
@@ -166,6 +198,7 @@ impl Builder {
             requests: Arc::clone(store.requests()),
             plugin,
             started_at: SystemTime::now(),
+            data_plane_addr: self.data_plane_bound.unwrap_or(self.data_plane),
         };
         match admin::start(deps, cancel.clone()).await {
             Ok(handle) => Ok(Daemon {

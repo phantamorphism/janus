@@ -32,7 +32,7 @@ use janus_core::contract::binding::Method;
 use janus_core::contract::request_log::{Outcome, RequestRecord};
 use janus_core::contract::upstream::UpstreamKind;
 use rusqlite::types::Value;
-use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
+use rusqlite::{params, params_from_iter, Connection, ErrorCode, OptionalExtension, Row};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use super::db::{ts_from_sql, ts_to_sql};
@@ -60,6 +60,14 @@ const QUEUE_CAPACITY: usize = 4096;
 const BATCH: usize = 256;
 /// Live-tail events buffered per subscriber before it lags.
 const TAIL_CAPACITY: usize = 1024;
+/// How many more times the writer tries a batch that failed because another
+/// connection held the write lock past the busy timeout, and the pause
+/// before the first retry (doubling after each).
+const WRITE_RETRIES: u32 = 5;
+const WRITE_RETRY_BACKOFF: Duration = Duration::from_millis(100);
+/// Rows retention deletes per statement, so it never holds the write lock
+/// for long enough to starve the request-log writer, however much expired.
+const PRUNE_CHUNK: i64 = 5_000;
 
 const COLUMNS: &str = "seq, request_id, received_at, duration_ms, upstream, route, method, path, \
      binding, caller_identity, claimed_identity, correlation_id, outcome, outcome_detail, \
@@ -347,6 +355,12 @@ impl RequestLog {
     /// Delete rows received more than `retain` before `now`. Returns how
     /// many were deleted.
     pub fn prune(&self, now: DateTime<Utc>) -> Result<u64, StoreError> {
+        self.prune_in_chunks(now, PRUNE_CHUNK)
+    }
+
+    /// `prune`, at most `chunk` rows per statement: each statement is its
+    /// own short write transaction, so the writer gets the lock in between.
+    fn prune_in_chunks(&self, now: DateTime<Utc>, chunk: i64) -> Result<u64, StoreError> {
         let Some(cutoff) = chrono::Duration::from_std(self.retain)
             .ok()
             .and_then(|d| now.checked_sub_signed(d))
@@ -354,17 +368,25 @@ impl RequestLog {
             // A retention longer than the representable past keeps everything.
             return Ok(0);
         };
-        let deleted = self.lock_reader().execute(
-            "DELETE FROM requests WHERE received_at < ?1",
-            params![ts_to_sql(cutoff)],
-        )? as u64;
-        // Saturating: never wrap if the count was ever off.
-        let _ = self
-            .rows
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
-                Some(n.saturating_sub(deleted))
-            });
-        Ok(deleted)
+        let cutoff = ts_to_sql(cutoff);
+        let mut total = 0;
+        loop {
+            let deleted = self.lock_reader().execute(
+                "DELETE FROM requests WHERE seq IN \
+                 (SELECT seq FROM requests WHERE received_at < ?1 LIMIT ?2)",
+                params![cutoff, chunk],
+            )? as u64;
+            // Saturating: never wrap if the count was ever off.
+            let _ = self
+                .rows
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                    Some(n.saturating_sub(deleted))
+                });
+            total += deleted;
+            if deleted < chunk as u64 {
+                return Ok(total);
+            }
+        }
     }
 
     pub fn stats(&self) -> RequestLogStats {
@@ -404,7 +426,7 @@ fn run_writer(
             }
         }
         if !batch.is_empty() {
-            match insert_batch(&mut conn, &batch) {
+            match insert_with_retry(&mut conn, &batch) {
                 Ok(()) => {
                     rows.fetch_add(batch.len() as u64, Ordering::Relaxed);
                     for record in batch {
@@ -419,6 +441,28 @@ fn run_writer(
         }
         for done in flushes {
             let _ = done.send(());
+        }
+    }
+}
+
+/// `insert_batch`, retried while another connection holds the write lock
+/// (the retention job, a registry write): a busy database is transient, and
+/// giving up would drop every record of the batch.
+fn insert_with_retry(conn: &mut Connection, batch: &[RequestRecord]) -> Result<(), StoreError> {
+    let mut pause = WRITE_RETRY_BACKOFF;
+    let mut retries = 0;
+    loop {
+        match insert_batch(conn, batch) {
+            Err(StoreError::Sqlite(rusqlite::Error::SqliteFailure(e, _)))
+                if retries < WRITE_RETRIES
+                    && matches!(e.code, ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) =>
+            {
+                retries += 1;
+                tracing::warn!(error = %e, records = batch.len(), retry = retries, "request-log write busy; retrying");
+                std::thread::sleep(pause);
+                pause *= 2;
+            }
+            result => return result,
         }
     }
 }
@@ -785,6 +829,64 @@ mod tests {
         .await;
         assert_eq!(store.requests().prune(at(now)).expect("prune"), 1);
         assert_eq!(raw_count(&dir), 1);
+    }
+
+    #[tokio::test]
+    async fn retention_deletes_in_chunks_until_nothing_is_left() {
+        let (dir, store) = open_store();
+        let log = store.requests();
+        let now = 100 * 86_400;
+        write(
+            log,
+            (0..7).map(|i| {
+                rec(
+                    &format!("old{i}"),
+                    now - 40 * 86_400 + i,
+                    Outcome::Forwarded,
+                )
+            }),
+        )
+        .await;
+        write(log, [rec("new", now, Outcome::Forwarded)]).await;
+        assert_eq!(log.prune_in_chunks(at(now), 3).expect("prune"), 7);
+        assert_eq!(log.stats().rows, 1);
+        assert_eq!(raw_count(&dir), 1);
+    }
+
+    #[tokio::test]
+    async fn a_batch_blocked_by_another_writer_is_retried_not_dropped() {
+        let (dir, store) = open_store();
+        drop(store);
+        let path = dir.path().join("janus.db");
+        let writer = crate::store::db::connect(&path).expect("writer");
+        // Shorter than the time the lock is held below, so the first
+        // attempt fails with SQLITE_BUSY.
+        writer
+            .busy_timeout(Duration::from_millis(10))
+            .expect("busy timeout");
+        let log = RequestLog::start(
+            true,
+            Duration::from_secs(86_400),
+            crate::store::db::connect(&path).expect("reader"),
+            writer,
+        )
+        .expect("start");
+        let holder = Connection::open(&path).expect("holder");
+        holder
+            .execute_batch("BEGIN IMMEDIATE")
+            .expect("take the write lock");
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            holder.execute_batch("COMMIT").expect("release");
+        });
+        write(&log, [rec("held", 1_000, Outcome::Forwarded)]).await;
+        release.join().expect("holder thread");
+        assert_eq!(
+            raw_count(&dir),
+            1,
+            "the record was written once the lock freed"
+        );
+        assert_eq!(log.stats().rows, 1);
     }
 
     #[tokio::test]

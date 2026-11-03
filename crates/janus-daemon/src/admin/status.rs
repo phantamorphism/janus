@@ -34,7 +34,7 @@ pub(crate) struct Listeners {
     pub admin_socket: PathBuf,
     pub admin_tcp: Option<TcpListenerInfo>,
     pub ui: Option<TcpListenerInfo>,
-    /// `data_plane.bind` as configured; the data plane binds it.
+    /// The address the data plane is bound to.
     pub data_plane: SocketAddr,
 }
 

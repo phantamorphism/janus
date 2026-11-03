@@ -501,6 +501,12 @@ pub struct PluginStatus {
     /// certificate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_cert_expires_at: Option<DateTime<Utc>>,
+    /// `Notify` events dropped since start because the bounded delivery
+    /// queue was full. `Notify` never blocks the request path, so a plugin
+    /// that cannot keep up loses events; a non-zero count is the operator's
+    /// only sign that settlement the plugin relies on went missing.
+    #[serde(default)]
+    pub dropped_events: u64,
 }
 
 impl PluginStatus {
@@ -514,6 +520,7 @@ impl PluginStatus {
             last_ok_at: None,
             client_cert_expires_at: None,
             server_cert_expires_at: None,
+            dropped_events: 0,
         }
     }
 
@@ -744,6 +751,17 @@ mod tests {
         assert_eq!(json["mode"], "tls");
         assert_eq!(json["health"], "unknown");
         assert!(json.get("client_cert_expires_at").is_none());
+        assert_eq!(json["dropped_events"], 0);
+        // A document from before the counter existed still parses.
+        let mut legacy = json.clone();
+        legacy
+            .as_object_mut()
+            .expect("object")
+            .remove("dropped_events");
+        assert_eq!(
+            serde_json::from_value::<PluginStatus>(legacy).expect("de"),
+            status
+        );
 
         let now = chrono::DateTime::from_timestamp(1_700_000_000, 0).expect("ts");
         status.record_ok(now);

@@ -84,6 +84,9 @@ around that general point; the LLM upstreams are the first proof of it.
 - <ref target="docs/plugin-contract">Plugin contract</ref> — the `ResolveRoute`
   and `Notify` design, why the two are shaped differently, the three plugin
   execution models, and the metering primitives a policy plugin can link.
+- <ref target="docs/configuration">Daemon configuration</ref> — every section
+  and key of the daemon's config file, with defaults and the rules that refuse
+  startup.
 - <ref target="docs/admin-surface">Admin surface, CLI and UI</ref> — the
   operator's control channel: endpoints, the `janus` command set, what the UI
   shows, the request log, and the daemon's own storage.

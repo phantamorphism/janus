@@ -66,6 +66,16 @@ impl AdminToken {
         Ok(AdminToken::of(token.as_bytes()))
     }
 
+    /// What [`AdminToken::load_or_create`] would refuse, without creating
+    /// anything: an existing file is read and checked; an absent one passes.
+    pub(crate) fn check(path: &Path) -> Result<(), AdminError> {
+        match open_existing(path) {
+            Ok(file) => Self::read(path, file).map(drop),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(token_error(path, format!("cannot open: {e}"))),
+        }
+    }
+
     fn read(path: &Path, mut file: File) -> Result<Self, AdminError> {
         let meta = file
             .metadata()

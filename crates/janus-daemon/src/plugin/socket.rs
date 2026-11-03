@@ -9,15 +9,25 @@
 //! create its directory later); [`check_full`] runs it over the full path
 //! before every connection and reconnection.
 //!
-//! Symlinks are resolved before the walk, so the directories checked are
-//! the ones a connection actually traverses.
+//! The path is resolved one component at a time and every directory a
+//! name is looked up in is checked — the directories a connection actually
+//! traverses, including each one that holds a symlink on the way (whoever
+//! can write there can repoint the link). After connecting, the uid of the
+//! process serving the socket is held to the same owners, which closes the
+//! window between the walk and the connect.
 
+use std::collections::VecDeque;
+use std::ffi::OsString;
 use std::fmt;
 use std::io;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
+use janus_core::contract::plugin::{PluginError, PluginFailureClass};
 use serde::Serialize;
+use tokio::net::UnixStream;
+
+use super::transport::within;
 
 /// One directory the walk examined, deepest first.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -35,6 +45,9 @@ pub struct PathWalk {
     /// configured path when its directory does not exist yet.
     pub socket: PathBuf,
     pub dirs: Vec<WalkedDir>,
+    /// Owner of the socket's directory, once it exists: who may serve it.
+    #[serde(skip)]
+    socket_dir_owner: Option<u32>,
 }
 
 /// Why a socket path was refused. `dir` is the offending directory, which
@@ -113,91 +126,278 @@ fn io_error(dir: &Path, err: io::Error) -> SocketPathError {
     }
 }
 
-/// Walk `dir` and every ancestor of it, which must already be canonical.
-fn walk(dir: &Path, owners: AllowedOwners) -> Result<Vec<WalkedDir>, SocketPathError> {
-    let mut walked = Vec::new();
-    for ancestor in dir.ancestors() {
-        let meta = std::fs::metadata(ancestor).map_err(|e| io_error(ancestor, e))?;
-        let mode = meta.mode() & 0o7777;
-        if let Some(reason) = violation(meta.uid(), mode, owners) {
+/// Symlinks followed while resolving one path before it is refused, as
+/// the kernel's own limit (`MAXSYMLINKS`).
+const MAX_SYMLINKS: usize = 40;
+
+/// One step still to take while resolving a path.
+enum Step {
+    Root,
+    Parent,
+    Name(OsString),
+}
+
+fn steps(path: &Path) -> impl DoubleEndedIterator<Item = Step> + '_ {
+    path.components().filter_map(|c| match c {
+        Component::RootDir | Component::Prefix(_) => Some(Step::Root),
+        Component::ParentDir => Some(Step::Parent),
+        Component::Normal(name) => Some(Step::Name(name.to_owned())),
+        Component::CurDir => None,
+    })
+}
+
+/// Where resolution ended.
+enum Outcome {
+    /// The socket's resolved path; its directory exists and was looked in
+    /// (the socket file itself may not exist yet).
+    Socket(PathBuf),
+    /// A directory on the way does not exist yet; this is the deepest one
+    /// that does.
+    Missing(PathBuf),
+}
+
+/// Every directory a lookup of the path read, in the order first read,
+/// and where the lookup ended.
+struct Resolution {
+    looked_in: Vec<WalkedDir>,
+    outcome: Outcome,
+}
+
+fn record(looked_in: &mut Vec<WalkedDir>, dir: &Path) -> Result<(), SocketPathError> {
+    if looked_in.iter().any(|d| d.path == dir) {
+        return Ok(());
+    }
+    let meta = std::fs::symlink_metadata(dir).map_err(|e| io_error(dir, e))?;
+    looked_in.push(WalkedDir {
+        path: dir.to_path_buf(),
+        uid: meta.uid(),
+        mode: meta.mode() & 0o7777,
+    });
+    Ok(())
+}
+
+/// Resolve `socket` one component at a time, the way the kernel does,
+/// recording every directory a name is looked up in — including the
+/// directory holding each symlink, which `canonicalize` would hide: whoever
+/// can write there can repoint the link.
+fn resolve(socket: &Path) -> Result<Resolution, SocketPathError> {
+    let absolute = if socket.is_absolute() {
+        socket.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|e| io_error(socket, e))?
+            .join(socket)
+    };
+    let mut pending: VecDeque<Step> = steps(&absolute).collect();
+    let mut cur = PathBuf::from("/");
+    let mut looked_in = Vec::new();
+    let mut links = 0;
+    while let Some(step) = pending.pop_front() {
+        let name = match step {
+            Step::Root => {
+                cur = PathBuf::from("/");
+                continue;
+            }
+            Step::Parent => {
+                cur.pop();
+                continue;
+            }
+            Step::Name(name) => name,
+        };
+        record(&mut looked_in, &cur)?;
+        let next = cur.join(&name);
+        let last = pending.is_empty();
+        let meta = match std::fs::symlink_metadata(&next) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                let outcome = if last {
+                    Outcome::Socket(next)
+                } else {
+                    Outcome::Missing(cur)
+                };
+                return Ok(Resolution { looked_in, outcome });
+            }
+            Err(e) => return Err(io_error(&next, e)),
+        };
+        if meta.file_type().is_symlink() {
+            links += 1;
+            if links > MAX_SYMLINKS {
+                return Err(SocketPathError::Io {
+                    dir: next,
+                    message: format!("more than {MAX_SYMLINKS} symlinks on the path"),
+                });
+            }
+            let target = std::fs::read_link(&next).map_err(|e| io_error(&next, e))?;
+            for step in steps(&target).rev() {
+                pending.push_front(step);
+            }
+        } else if last {
+            return Ok(Resolution {
+                looked_in,
+                outcome: Outcome::Socket(next),
+            });
+        } else if meta.is_dir() {
+            cur = next;
+        } else {
+            return Err(SocketPathError::Io {
+                dir: next,
+                message: "is not a directory".to_owned(),
+            });
+        }
+    }
+    Err(SocketPathError::Io {
+        dir: socket.to_path_buf(),
+        message: "socket path has no file name".to_owned(),
+    })
+}
+
+/// Apply the rule to every directory looked in: `deepest` (the socket's own
+/// directory, or the deepest that exists yet) and its ancestors first,
+/// deepest first, then any other directory a symlink on the path led
+/// through.
+fn walk(
+    looked_in: Vec<WalkedDir>,
+    deepest: &Path,
+    owners: AllowedOwners,
+) -> Result<Vec<WalkedDir>, SocketPathError> {
+    let chain: Vec<&Path> = deepest.ancestors().collect();
+    let rank = |d: &WalkedDir| {
+        chain
+            .iter()
+            .position(|a| *a == d.path)
+            .unwrap_or(chain.len())
+    };
+    let mut ordered = looked_in;
+    // Stable: directories off the chain keep their traversal order.
+    ordered.sort_by_key(rank);
+    for dir in &ordered {
+        if let Some(reason) = violation(dir.uid, dir.mode, owners) {
             return Err(SocketPathError::Unsafe {
-                dir: ancestor.to_path_buf(),
+                dir: dir.path.clone(),
                 reason,
             });
         }
-        walked.push(WalkedDir {
-            path: ancestor.to_path_buf(),
-            uid: meta.uid(),
-            mode,
-        });
     }
-    Ok(walked)
+    Ok(ordered)
 }
 
 fn socket_dir(socket: &Path) -> &Path {
     socket.parent().unwrap_or(Path::new("/"))
 }
 
-/// The per-connect check: the socket's directory must exist and the whole
-/// path must pass the walk. Returns the resolved socket path, which is what
-/// the connection should use.
-pub fn check_full(socket: &Path) -> Result<PathWalk, SocketPathError> {
-    let dir = socket_dir(socket);
-    let canonical_dir = match std::fs::canonicalize(dir) {
-        Ok(d) => d,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            return Err(SocketPathError::MissingDir {
-                dir: dir.to_path_buf(),
-            })
-        }
-        Err(e) => return Err(io_error(dir, e)),
-    };
-    let file_name = socket.file_name().ok_or_else(|| SocketPathError::Io {
-        dir: dir.to_path_buf(),
-        message: "socket path has no file name".to_owned(),
-    })?;
-    // A socket that is itself a symlink is resolved too: the directory that
-    // matters is the one holding the real socket.
-    let mut resolved = canonical_dir.join(file_name);
-    if std::fs::symlink_metadata(&resolved).is_ok_and(|m| m.file_type().is_symlink()) {
-        resolved = std::fs::canonicalize(&resolved).map_err(|e| io_error(&resolved, e))?;
-    }
+/// The walk over a resolution that reached the socket's directory.
+fn check_resolved(
+    looked_in: Vec<WalkedDir>,
+    resolved: PathBuf,
+) -> Result<PathWalk, SocketPathError> {
     let real_dir = socket_dir(&resolved).to_path_buf();
-    let meta = std::fs::metadata(&real_dir).map_err(|e| io_error(&real_dir, e))?;
+    let owner = looked_in
+        .iter()
+        .find(|d| d.path == real_dir)
+        .map(|d| d.uid)
+        .ok_or_else(|| SocketPathError::Io {
+            dir: real_dir.clone(),
+            message: "the socket's directory was not examined".to_owned(),
+        })?;
     let owners = AllowedOwners {
         daemon: daemon_uid(),
-        socket_dir: Some(meta.uid()),
+        socket_dir: Some(owner),
     };
-    let dirs = walk(&real_dir, owners)?;
+    let dirs = walk(looked_in, &real_dir, owners)?;
     Ok(PathWalk {
         socket: resolved,
         dirs,
+        socket_dir_owner: Some(owner),
     })
 }
 
-/// The startup check: the walk over the deepest existing ancestor of the
-/// socket's directory. When the directory itself exists this is the full
-/// check; when it does not, its eventual owner is unknown, so ancestors must
-/// be owned by root or the daemon's user.
-pub fn check_existing(socket: &Path) -> Result<PathWalk, SocketPathError> {
-    let dir = socket_dir(socket);
-    if dir.exists() {
-        return check_full(socket);
+/// The per-connect check: the socket's directory must exist and every
+/// directory the path's resolution reads must pass the walk. Returns the
+/// resolved socket path, which is what the connection should use, and
+/// [`PathWalk::check_peer`] should then be run on the connected socket.
+pub fn check_full(socket: &Path) -> Result<PathWalk, SocketPathError> {
+    let resolution = resolve(socket)?;
+    match resolution.outcome {
+        Outcome::Socket(resolved) => check_resolved(resolution.looked_in, resolved),
+        Outcome::Missing(_) => Err(SocketPathError::MissingDir {
+            dir: socket_dir(socket).to_path_buf(),
+        }),
     }
-    let existing = dir
-        .ancestors()
-        .find(|a| a.exists())
-        .unwrap_or(Path::new("/"));
-    let canonical = std::fs::canonicalize(existing).map_err(|e| io_error(existing, e))?;
-    let owners = AllowedOwners {
-        daemon: daemon_uid(),
-        socket_dir: None,
-    };
-    let dirs = walk(&canonical, owners)?;
-    Ok(PathWalk {
-        socket: socket.to_path_buf(),
-        dirs,
-    })
+}
+
+/// The startup check: the walk over the part of the path that exists.
+/// When the socket's directory exists this is the full check; when it does
+/// not, its eventual owner is unknown, so every directory must be owned by
+/// root or the daemon's user.
+pub fn check_existing(socket: &Path) -> Result<PathWalk, SocketPathError> {
+    let resolution = resolve(socket)?;
+    match resolution.outcome {
+        Outcome::Socket(resolved) => check_resolved(resolution.looked_in, resolved),
+        Outcome::Missing(deepest) => {
+            let owners = AllowedOwners {
+                daemon: daemon_uid(),
+                socket_dir: None,
+            };
+            let dirs = walk(resolution.looked_in, &deepest, owners)?;
+            Ok(PathWalk {
+                socket: socket.to_path_buf(),
+                dirs,
+                socket_dir_owner: None,
+            })
+        }
+    }
+}
+
+/// Whether the process serving the socket may: the same owners as the
+/// directories. A socket can be swapped between the walk and the connect;
+/// the peer's credentials are what the connection actually reached.
+fn peer_violation(uid: u32, owners: AllowedOwners) -> Option<String> {
+    (!owners.allows(uid)).then(|| format!("is served by uid {uid}, which is not {owners}"))
+}
+
+impl PathWalk {
+    /// Check the uid of the process at the other end of a connection made
+    /// to [`PathWalk::socket`].
+    pub fn check_peer(&self, uid: u32) -> Result<(), SocketPathError> {
+        let owners = AllowedOwners {
+            daemon: daemon_uid(),
+            socket_dir: self.socket_dir_owner,
+        };
+        match peer_violation(uid, owners) {
+            None => Ok(()),
+            Some(reason) => Err(SocketPathError::Unsafe {
+                dir: self.socket.clone(),
+                reason,
+            }),
+        }
+    }
+
+    /// Connect to the resolved socket, bounded by `CONNECT_TIMEOUT`, and
+    /// check who answered. Fails as `plugin_unreachable`.
+    pub(crate) async fn connect(&self) -> Result<UnixStream, PluginError> {
+        let unreachable =
+            |message: String| PluginError::new(PluginFailureClass::Unreachable, message);
+        let socket = self.socket.display();
+        let connect = async {
+            UnixStream::connect(&self.socket)
+                .await
+                .map_err(|e| unreachable(format!("cannot connect to plugin socket {socket}: {e}")))
+        };
+        let stream = within(
+            PluginFailureClass::Unreachable,
+            format!("connecting to plugin socket {socket}"),
+            connect,
+        )
+        .await?;
+        let cred = stream.peer_cred().map_err(|e| {
+            unreachable(format!(
+                "cannot read the peer credentials of plugin socket {socket}: {e}"
+            ))
+        })?;
+        self.check_peer(cred.uid())
+            .map_err(|e| unreachable(e.to_string()))?;
+        Ok(stream)
+    }
 }
 
 #[cfg(test)]
@@ -302,6 +502,103 @@ mod tests {
             std::fs::canonicalize(&real).expect("canonical").as_path()
         );
         chmod(&real, 0o755);
+    }
+
+    /// `<root>/open`, mode 0777: a directory anyone can write.
+    fn open_dir(root: &Path) -> PathBuf {
+        let open = root.join("open");
+        std::fs::create_dir(&open).expect("mkdir");
+        chmod(&open, 0o777);
+        open
+    }
+
+    #[test]
+    fn unix_socket_symlink_in_a_writable_directory_is_refused() {
+        // The configured socket is a symlink in a world-writable directory
+        // to a socket in a sound one: whoever can write the first directory
+        // chose the target, so the link's directory is what is refused.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let target_dir = plugin_dir(tmp.path());
+        let open = open_dir(tmp.path());
+        let link = open.join("p.sock");
+        std::os::unix::fs::symlink(target_dir.join("evil.sock"), &link).expect("symlink");
+        let err = check_full(&link).expect_err("link lives in a writable directory");
+        let canonical_open = std::fs::canonicalize(&open).expect("canonical");
+        assert_eq!(err.dir(), canonical_open.as_path(), "{err}");
+        assert!(
+            err.to_string().contains("writable by group and others"),
+            "{err}"
+        );
+        assert!(check_existing(&link).is_err(), "startup refuses it too");
+
+        // The same with the symlink as a directory component.
+        let dir_link = open.join("plugin");
+        std::os::unix::fs::symlink(&target_dir, &dir_link).expect("symlink");
+        let err = check_full(&dir_link.join("p.sock")).expect_err("component link");
+        assert_eq!(err.dir(), canonical_open.as_path(), "{err}");
+        let err = check_existing(&dir_link.join("later").join("p.sock"))
+            .expect_err("startup walk follows the link too");
+        assert_eq!(err.dir(), canonical_open.as_path(), "{err}");
+        chmod(&open, 0o755);
+    }
+
+    #[test]
+    fn unix_socket_symlink_in_a_sound_directory_resolves_to_its_target() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let target_dir = plugin_dir(tmp.path());
+        let links = plugin_dir(&tmp.path().join("plugin"));
+        let link = links.join("p.sock");
+        // Relative, through `..`: resolved against the link's directory.
+        std::os::unix::fs::symlink("../real.sock", &link).expect("symlink");
+        let walk = check_full(&link).expect("every directory is sound");
+        let canonical = std::fs::canonicalize(&target_dir).expect("canonical");
+        assert_eq!(walk.socket, canonical.join("real.sock"));
+        let looked_in: Vec<_> = walk.dirs.iter().map(|d| d.path.clone()).collect();
+        assert_eq!(looked_in[0], canonical, "the socket's own directory first");
+        assert!(
+            looked_in.contains(&std::fs::canonicalize(&links).expect("canonical")),
+            "the link's directory was walked: {looked_in:?}"
+        );
+    }
+
+    #[test]
+    fn unix_socket_symlink_loop_is_refused() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = plugin_dir(tmp.path());
+        std::os::unix::fs::symlink(dir.join("b"), dir.join("a")).expect("symlink");
+        std::os::unix::fs::symlink(dir.join("a"), dir.join("b")).expect("symlink");
+        let err = check_full(&dir.join("a")).expect_err("loop");
+        assert!(err.to_string().contains("symlinks"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn unix_socket_peer_is_checked_after_connect() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = plugin_dir(tmp.path());
+        let path = dir.join("p.sock");
+        let _listener = tokio::net::UnixListener::bind(&path).expect("bind");
+        let walk = check_full(&path).expect("sound");
+        walk.connect().await.expect("served by our own uid");
+        drop(_listener);
+        let err = walk.connect().await.expect_err("nothing listening");
+        assert_eq!(err.class, PluginFailureClass::Unreachable);
+        let foreign = daemon_uid().wrapping_add(4242);
+        let err = walk.check_peer(foreign).expect_err("foreign peer");
+        assert!(err.to_string().contains(&format!("uid {foreign}")), "{err}");
+        assert_eq!(err.dir(), walk.socket.as_path());
+    }
+
+    #[test]
+    fn unix_socket_peer_rule_allows_root_daemon_and_socket_dir_owner_only() {
+        let owners = AllowedOwners {
+            daemon: 501,
+            socket_dir: Some(777),
+        };
+        assert_eq!(peer_violation(0, owners), None);
+        assert_eq!(peer_violation(501, owners), None);
+        assert_eq!(peer_violation(777, owners), None);
+        let reason = peer_violation(1234, owners).expect("foreign peer");
+        assert!(reason.contains("uid 1234"), "{reason}");
     }
 
     #[test]

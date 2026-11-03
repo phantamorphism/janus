@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use super::ledger::{evaluate, key_expired, ledger_cutoff, unix_now};
+use super::ledger::{evaluate, key_expired, ledger_cutoff, unix_now, AutoCompact};
 use crate::contract::metering::{
     Apply, Bound, Durability, MeterKey, OpId, Phase, UsageError, UsageStore, DEFAULT_LEDGER_TTL,
 };
@@ -17,10 +17,13 @@ use crate::contract::metering::{
 /// legitimately reset; `Meter::new` refuses it a `Total` quota.
 ///
 /// Expired windows of an `(identity, meter)` are swept whenever that pair is
-/// written; [`UsageStore::compact`] sweeps every pair and the ledger.
+/// written; [`UsageStore::compact`] sweeps every pair and the ledger, and
+/// runs by itself from `apply` once per a quarter of the ledger TTL, so the
+/// maps stay bounded by recent traffic even if the plugin never calls it.
 pub struct MemoryUsageStore {
     state: Mutex<State>,
     ledger_ttl: Duration,
+    auto_compact: AutoCompact,
 }
 
 #[derive(Default)]
@@ -65,6 +68,7 @@ impl MemoryUsageStore {
         Self {
             state: Mutex::new(State::default()),
             ledger_ttl,
+            auto_compact: AutoCompact::new(ledger_ttl, unix_now()),
         }
     }
 
@@ -105,6 +109,25 @@ impl State {
             .and_then(|meters| meters.get_mut(&key.meter))
     }
 
+    /// Drop every expired window and every ledger entry stamped before
+    /// `ledger_cutoff`. Returns how many were dropped.
+    fn compact(&mut self, now: i64, ledger_cutoff: i64) -> u64 {
+        let mut dropped = 0u64;
+        self.counts.retain(|_, meters| {
+            meters.retain(|_, windows| {
+                let before = windows.len();
+                windows.retain(|_, count| !key_expired(count.retain_until, now));
+                dropped += (before - windows.len()) as u64;
+                !windows.is_empty()
+            });
+            !meters.is_empty()
+        });
+        let before = self.ledger.len();
+        self.ledger
+            .retain(|_, entry| entry.created_at >= ledger_cutoff);
+        dropped + (before - self.ledger.len()) as u64
+    }
+
     /// Drop the expired windows of `key`'s `(identity, meter)`.
     fn sweep(&mut self, key: &MeterKey, now: i64) {
         if let Some(windows) = self.existing_windows_mut(key) {
@@ -126,8 +149,12 @@ impl UsageStore for MemoryUsageStore {
             return Ok(entry.result.clone());
         }
         let now = unix_now();
-        for bound in bounds {
-            state.sweep(bound.key, now);
+        if self.auto_compact.due(now) {
+            state.compact(now, ledger_cutoff(now, self.ledger_ttl));
+        } else {
+            for bound in bounds {
+                state.sweep(bound.key, now);
+            }
         }
         let current: Vec<u64> = bounds.iter().map(|bound| state.count(bound.key)).collect();
         let result = evaluate(&current, bounds.iter().map(|bound| bound.limit), amount);
@@ -195,22 +222,8 @@ impl UsageStore for MemoryUsageStore {
     }
 
     async fn compact(&self, now: i64) -> Result<u64, UsageError> {
-        let mut state = self.lock()?;
-        let mut dropped = 0u64;
-        state.counts.retain(|_, meters| {
-            meters.retain(|_, windows| {
-                let before = windows.len();
-                windows.retain(|_, count| !key_expired(count.retain_until, now));
-                dropped += (before - windows.len()) as u64;
-                !windows.is_empty()
-            });
-            !meters.is_empty()
-        });
         let cutoff = ledger_cutoff(now, self.ledger_ttl);
-        let before = state.ledger.len();
-        state.ledger.retain(|_, entry| entry.created_at >= cutoff);
-        dropped += (before - state.ledger.len()) as u64;
-        Ok(dropped)
+        Ok(self.lock()?.compact(now, cutoff))
     }
 
     fn durability(&self) -> Durability {
@@ -281,5 +294,56 @@ mod tests {
         assert_eq!(store.get(&fresh).await.expect("get"), 1);
         // A different (identity, meter) is not swept by this write.
         assert_eq!(store.get(&other_meter_stale).await.expect("get"), 4);
+    }
+
+    #[tokio::test]
+    async fn memory_store_compacts_itself_without_a_compact_call() {
+        let store = MemoryUsageStore::new();
+        let now = unix_now();
+        let stale = key("tokens", now - 120);
+        let bound = Bound {
+            key: &stale,
+            limit: None,
+            retain_until: Some(now - 60),
+        };
+        let old = reserve("tokens", "old");
+        store.apply(&old, &[bound], 4).await.expect("apply");
+        // Age the entry past the ledger TTL, as an hour of wall clock would.
+        store
+            .lock()
+            .expect("lock")
+            .ledger
+            .get_mut(&old)
+            .expect("entry")
+            .created_at = now - DEFAULT_LEDGER_TTL.as_secs() as i64 - 1;
+        let fresh = key("requests", now);
+        let write = |request_id: &'static str| {
+            let store = &store;
+            let fresh = &fresh;
+            async move {
+                let bound = Bound {
+                    key: fresh,
+                    limit: None,
+                    retain_until: Some(now + 60),
+                };
+                store
+                    .apply(&reserve("requests", request_id), &[bound], 1)
+                    .await
+                    .expect("apply");
+            }
+        };
+        write("r1").await;
+        // Within the interval a write sweeps only its own pair.
+        assert_eq!(store.lock().expect("lock").ledger.len(), 2);
+        assert_eq!(store.get(&stale).await.expect("get"), 4);
+        store.auto_compact.expire();
+        write("r2").await;
+        let state = store.lock().expect("lock");
+        assert!(!state.ledger.contains_key(&old), "aged entry dropped");
+        assert_eq!(state.ledger.len(), 2);
+        assert!(
+            !state.counts["alice"].contains_key("tokens"),
+            "another pair's expired window swept"
+        );
     }
 }

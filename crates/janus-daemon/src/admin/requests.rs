@@ -11,9 +11,11 @@
 //! event. The stream ends when the daemon shuts down.
 
 use std::convert::Infallible;
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::sse::{Event, Sse};
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -31,6 +33,9 @@ use crate::store::{RequestFilter, RequestQuery};
 pub const PING_INTERVAL: Duration = Duration::from_secs(10);
 /// Events buffered for a slow SSE client before the tail waits for it.
 const SSE_BUFFER: usize = 64;
+/// Live tails open at once, across every listener; one more is refused with
+/// `503 too_many_streams` until one closes.
+pub const MAX_TAILS: usize = 64;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -119,8 +124,18 @@ pub(crate) async fn stream(
     filter.validate()?;
     let (tx, rx) = mpsc::channel(SSE_BUFFER);
     if state.deps.requests.enabled() {
+        let permit = Arc::clone(&state.tails).try_acquire_owned().map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "too_many_streams",
+                format!("{MAX_TAILS} live tails are already open; close one and retry"),
+            )
+        })?;
         let records = state.deps.requests.subscribe();
-        tokio::spawn(tail(records, filter, tx, state.cancel.clone()));
+        tokio::spawn(async move {
+            tail(records, filter, tx, state.cancel.clone()).await;
+            drop(permit);
+        });
     } else {
         // Capacity is at least one, so this cannot fail.
         let _ = tx.try_send(Ok(Event::default()
@@ -132,7 +147,7 @@ pub(crate) async fn stream(
 
 /// Feed one SSE client until it goes away or the daemon stops.
 async fn tail(
-    mut records: broadcast::Receiver<std::sync::Arc<RequestRecord>>,
+    mut records: broadcast::Receiver<Arc<RequestRecord>>,
     filter: RequestFilter,
     tx: mpsc::Sender<Result<Event, Infallible>>,
     cancel: tokio_util::sync::CancellationToken,
@@ -159,8 +174,11 @@ async fn tail(
                 Err(broadcast::error::RecvError::Closed) => return,
             },
         };
-        if tx.send(Ok(event)).await.is_err() {
-            return;
+        // A client that stops reading stalls only its own tail, and only
+        // until it goes away or the daemon stops.
+        tokio::select! {
+            () = cancel.cancelled() => return,
+            sent = tx.send(Ok(event)) => if sent.is_err() { return },
         }
     }
 }

@@ -8,17 +8,81 @@
 //! failures, classified at the point they happen, in a [`TransportLog`]. A
 //! call that fails consults the log for failures recorded while it was in
 //! flight; a failure with none recorded is an RPC error from a plugin that
-//! was reached (`plugin_error`).
+//! was reached (`plugin_error`). Each channel has its own log, so the
+//! `Notify` connection closing cannot reclassify a `ResolveRoute` failure.
+//!
+//! Establishing a connection is bounded by [`CONNECT_TIMEOUT`], and an
+//! established one is watched by HTTP/2 keepalive: a plugin whose address
+//! vanished without a reset (a rescheduled pod, an expired NAT entry) is
+//! detected within [`KEEPALIVE_INTERVAL`] + [`KEEPALIVE_TIMEOUT`], the
+//! connection is dropped and the next call dials afresh.
 
 use std::collections::VecDeque;
+use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use janus_core::contract::plugin::{PluginError, PluginFailureClass};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::{TcpStream, ToSocketAddrs};
+
+/// How long establishing one connection may take: the connect, and on the
+/// network transport the TLS handshake. Applies to the channel's dials and
+/// to every `plugin check` probe.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+/// How long a connection may go without receiving anything before the
+/// client sends an HTTP/2 PING, busy or idle.
+pub const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(5);
+/// How long an unanswered PING waits before the connection is dropped.
+pub const KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// `step` bounded by [`CONNECT_TIMEOUT`]; overrunning it fails as `class`.
+pub(crate) async fn within<T>(
+    class: PluginFailureClass,
+    what: String,
+    step: impl Future<Output = Result<T, PluginError>>,
+) -> Result<T, PluginError> {
+    tokio::time::timeout(CONNECT_TIMEOUT, step)
+        .await
+        .unwrap_or_else(|_| {
+            Err(PluginError::new(
+                class,
+                format!(
+                    "{what} did not complete within {} ms",
+                    CONNECT_TIMEOUT.as_millis()
+                ),
+            ))
+        })
+}
+
+/// A TCP connection to the plugin at `addr` (named `authority`), bounded
+/// by [`CONNECT_TIMEOUT`].
+pub(crate) async fn connect_tcp(
+    addr: impl ToSocketAddrs,
+    authority: &str,
+) -> Result<TcpStream, PluginError> {
+    let connect = async {
+        TcpStream::connect(addr).await.map_err(|e| {
+            PluginError::new(
+                PluginFailureClass::Unreachable,
+                format!("cannot connect to plugin at {authority}: {e}"),
+            )
+        })
+    };
+    let stream = within(
+        PluginFailureClass::Unreachable,
+        format!("connecting to plugin at {authority}"),
+        connect,
+    )
+    .await?;
+    // Nagle only adds latency to small gRPC frames.
+    let _ = stream.set_nodelay(true);
+    Ok(stream)
+}
 
 /// How many recent failures the log keeps; more than any one call spans.
 const LOG_DEPTH: usize = 16;

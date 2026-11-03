@@ -10,9 +10,11 @@ use axum::extract::{FromRequest, FromRequestParts, Request};
 use axum::http::request::Parts;
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
+use http_body_util::BodyExt;
 use janus_core::contract::credential::PoolError;
 use serde::de::DeserializeOwned;
 
+use super::api::MAX_BODY_BYTES;
 use crate::store::StoreError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,18 +125,68 @@ impl From<tokio::task::JoinError> for ApiError {
     }
 }
 
-/// A JSON body.
+/// How much of an oversized body is still read, and discarded, before the
+/// `413`. A client is typically still sending when the limit is crossed;
+/// answering and closing at once leaves unread bytes behind, the kernel
+/// resets the connection, and the client sees the reset instead of the
+/// `413`. Past this much the connection is given up on (and closed).
+const DRAIN_LIMIT: usize = 16 * MAX_BODY_BYTES;
+
+/// A JSON body of at most [`MAX_BODY_BYTES`].
 pub(crate) struct Body<T>(pub T);
 
 impl<S: Send + Sync, T: DeserializeOwned> FromRequest<S> for Body<T> {
     type Rejection = ApiError;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, ApiError> {
+        let (parts, body) = req.into_parts();
+        let bytes = read_limited(&parts, body).await?;
+        let req = Request::from_parts(parts, axum::body::Body::from(bytes));
         axum::Json::<T>::from_request(req, state)
             .await
             .map(|axum::Json(v)| Body(v))
             .map_err(|e| ApiError::rejected(e.status(), e.body_text()))
     }
+}
+
+/// The body, if it is at most [`MAX_BODY_BYTES`]; otherwise `413`, after
+/// draining up to [`DRAIN_LIMIT`] so the client gets to read the answer.
+async fn read_limited(parts: &Parts, mut body: axum::body::Body) -> Result<Vec<u8>, ApiError> {
+    let too_large = || {
+        ApiError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "payload_too_large",
+            format!("the request body is larger than {MAX_BODY_BYTES} bytes"),
+        )
+    };
+    let declared = parts
+        .headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
+    if declared.is_some_and(|n| n > DRAIN_LIMIT as u64) {
+        return Err(too_large());
+    }
+    let mut kept = Vec::new();
+    let mut seen = 0usize;
+    while let Some(frame) = body.frame().await {
+        let frame = frame
+            .map_err(|e| ApiError::bad_request(format!("cannot read the request body: {e}")))?;
+        let Ok(data) = frame.into_data() else {
+            continue;
+        };
+        seen = seen.saturating_add(data.len());
+        if seen > DRAIN_LIMIT {
+            break;
+        }
+        if seen <= MAX_BODY_BYTES {
+            kept.extend_from_slice(&data);
+        }
+    }
+    if seen > MAX_BODY_BYTES {
+        return Err(too_large());
+    }
+    Ok(kept)
 }
 
 /// A query string.

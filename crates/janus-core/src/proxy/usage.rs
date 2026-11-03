@@ -15,7 +15,10 @@
 //! The observer only reads copies of the relayed chunks. A streamed body is
 //! parsed event by event (only an unfinished event is held); a JSON body is
 //! held up to [`JSON_BODY_LIMIT`] to be parsed at the end, and a larger one
-//! goes unobserved rather than held.
+//! goes unobserved rather than held; so does a single event larger than
+//! [`SSE_EVENT_LIMIT`]. Either is logged as a warning when it leaves the
+//! response with no observation, so a `usage: null` from size is visible to
+//! the operator rather than silent.
 
 use http::{header, HeaderMap, StatusCode};
 use serde_json::{Map, Value};
@@ -25,8 +28,11 @@ use crate::contract::upstream::UsageObserver;
 /// The largest JSON response body kept for observation.
 pub(crate) const JSON_BODY_LIMIT: usize = 4 * 1024 * 1024;
 
-/// The largest single server-sent event kept for observation.
-const SSE_EVENT_LIMIT: usize = 1024 * 1024;
+/// The largest single server-sent event (or line of one) kept for
+/// observation. The same as a JSON body's: OpenAI's `response.completed`
+/// event carries the whole response object, exactly what a non-streamed
+/// call returns as its body.
+const SSE_EVENT_LIMIT: usize = JSON_BODY_LIMIT;
 
 /// Where one upstream reports consumption, as JSON paths into a response
 /// body or an event's data.
@@ -114,6 +120,7 @@ impl UsageObserver for ShapeObserver {
             Mode::Ignore | Mode::Overflowed => {}
             Mode::Json(buf) => {
                 if buf.len() + chunk.len() > JSON_BODY_LIMIT {
+                    // Released now, not at the end of the body.
                     self.mode = Mode::Overflowed;
                 } else {
                     buf.extend_from_slice(chunk);
@@ -138,12 +145,24 @@ impl UsageObserver for ShapeObserver {
     }
 
     fn finish(mut self: Box<Self>) -> Value {
-        if let Mode::Json(buf) = std::mem::replace(&mut self.mode, Mode::Ignore) {
-            if let Ok(doc) = serde_json::from_slice::<Value>(&buf) {
-                self.absorb(&doc);
+        let oversized = match std::mem::replace(&mut self.mode, Mode::Ignore) {
+            Mode::Json(buf) => {
+                if let Ok(doc) = serde_json::from_slice::<Value>(&buf) {
+                    self.absorb(&doc);
+                }
+                false
             }
-        }
+            Mode::Overflowed => true,
+            Mode::Sse(parser) => parser.dropped,
+            Mode::Ignore => false,
+        };
         if self.usage.is_empty() {
+            if oversized {
+                tracing::warn!(
+                    limit = JSON_BODY_LIMIT,
+                    "response too large to observe: its usage is not reported"
+                );
+            }
             return Value::Null;
         }
         let mut out = Map::new();
@@ -163,7 +182,8 @@ fn mentions_usage(data: &[u8]) -> bool {
 }
 
 /// Incremental server-sent-events framing: `data:` lines accumulated into
-/// one event until a blank line, across chunk boundaries.
+/// one event until a blank line, across chunk boundaries. A line ends at
+/// LF, CR or CRLF, as the event-stream format allows.
 #[derive(Default)]
 struct SseParser {
     line: Vec<u8>,
@@ -171,48 +191,53 @@ struct SseParser {
     has_data: bool,
     /// The current line or event outgrew [`SSE_EVENT_LIMIT`]; drop it.
     skipping: bool,
+    /// The previous byte was a CR, so an LF now is the rest of a CRLF.
+    after_cr: bool,
+    /// Some event was dropped for its size.
+    dropped: bool,
 }
 
 impl SseParser {
     fn feed(&mut self, chunk: &[u8], mut on_event: impl FnMut(&[u8])) {
         for &byte in chunk {
-            if byte != b'\n' {
-                if self.line.len() < SSE_EVENT_LIMIT {
-                    self.line.push(byte);
-                } else {
-                    self.skipping = true;
-                }
-                continue;
+            let after_cr = std::mem::replace(&mut self.after_cr, byte == b'\r');
+            match byte {
+                b'\n' if after_cr => {}
+                b'\n' | b'\r' => self.end_line(&mut on_event),
+                _ if self.line.len() < SSE_EVENT_LIMIT => self.line.push(byte),
+                _ => self.skipping = true,
             }
-            let mut line = std::mem::take(&mut self.line);
-            if line.last() == Some(&b'\r') {
-                line.pop();
-            }
-            if line.is_empty() {
-                if self.has_data && !self.skipping {
-                    let data = std::mem::take(&mut self.data);
-                    if data != b"[DONE]" {
-                        on_event(&data);
-                    }
-                }
-                self.data.clear();
-                self.has_data = false;
-                self.skipping = false;
-            } else if let Some(value) = line.strip_prefix(b"data:") {
-                let value = value.strip_prefix(b" ").unwrap_or(value);
-                if self.has_data {
-                    self.data.push(b'\n');
-                }
-                if self.data.len() + value.len() > SSE_EVENT_LIMIT {
-                    self.skipping = true;
-                } else {
-                    self.data.extend_from_slice(value);
-                }
-                self.has_data = true;
-            }
-            self.line = line;
-            self.line.clear();
         }
+    }
+
+    fn end_line(&mut self, on_event: &mut impl FnMut(&[u8])) {
+        let line = std::mem::take(&mut self.line);
+        if line.is_empty() {
+            if self.has_data && !self.skipping {
+                let data = std::mem::take(&mut self.data);
+                if data != b"[DONE]" {
+                    on_event(&data);
+                }
+            }
+            self.dropped |= self.skipping;
+            self.data.clear();
+            self.has_data = false;
+            self.skipping = false;
+        } else if let Some(value) = line.strip_prefix(b"data:") {
+            let value = value.strip_prefix(b" ").unwrap_or(value);
+            if self.has_data {
+                self.data.push(b'\n');
+            }
+            if self.data.len() + value.len() > SSE_EVENT_LIMIT {
+                self.skipping = true;
+            } else {
+                self.data.extend_from_slice(value);
+            }
+            self.has_data = true;
+        }
+        // The line's allocation is reused for the next one.
+        self.line = line;
+        self.line.clear();
     }
 }
 
@@ -254,6 +279,59 @@ mod tests {
         }
         let bytewise: Vec<&[u8]> = stream.chunks(1).collect();
         assert_eq!(observe(200, "text/event-stream", &bytewise), whole);
+    }
+
+    #[test]
+    fn cr_only_line_endings_are_lines() {
+        let stream: &[u8] =
+            b"event: x\rdata: {\"model\":\"m\",\rdata: \"usage\":{\"a\":1}}\r\rdata: {\"usage\":{\"b\":2}}\r\r";
+        let whole = observe(200, "text/event-stream", &[stream]);
+        assert_eq!(
+            whole,
+            serde_json::json!({"model": "m", "usage": {"a": 1, "b": 2}})
+        );
+        let bytewise: Vec<&[u8]> = stream.chunks(1).collect();
+        assert_eq!(observe(200, "text/event-stream", &bytewise), whole);
+    }
+
+    #[test]
+    fn sse_memory_stays_within_the_event_limit() {
+        // One endless line, fed in chunks: never held beyond the limit.
+        let mut parser = SseParser::default();
+        let mut events = 0;
+        parser.feed(b"data: ", |_| events += 1);
+        let block = vec![b'x'; 256 * 1024];
+        for _ in 0..(3 * SSE_EVENT_LIMIT / block.len()) {
+            parser.feed(&block, |_| events += 1);
+            assert!(
+                parser.line.len() <= SSE_EVENT_LIMIT,
+                "{}",
+                parser.line.len()
+            );
+        }
+        parser.feed(b"\n\n", |_| events += 1);
+        assert_eq!(events, 0, "the oversized event is dropped, not delivered");
+        assert!(parser.dropped);
+
+        // Many lines of one event, each under the limit: the event's data
+        // is never held beyond it either.
+        let mut parser = SseParser::default();
+        let line = [
+            b"data: ".as_slice(),
+            &vec![b'y'; SSE_EVENT_LIMIT / 4],
+            b"\n",
+        ]
+        .concat();
+        for _ in 0..12 {
+            parser.feed(&line, |_| events += 1);
+            assert!(
+                parser.data.len() <= SSE_EVENT_LIMIT,
+                "{}",
+                parser.data.len()
+            );
+        }
+        parser.feed(b"\ndata: {\"usage\":{}}\n\n", |_| events += 1);
+        assert_eq!(events, 1, "only the event after the oversized one");
     }
 
     #[test]

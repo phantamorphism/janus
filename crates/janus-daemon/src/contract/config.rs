@@ -28,9 +28,13 @@
 //! - upstream routing: a request belongs to the upstream whose
 //!   `path_prefix` is a whole-segment prefix of its path. `/` and nested
 //!   prefixes are refused, so at most one upstream matches. A route `path`
-//!   is a literal path, matched exactly against the request path with the
-//!   prefix stripped; the docs call it a pattern without defining a syntax,
-//!   so wildcard characters are refused rather than given a meaning.
+//!   is a literal path, matched against the request path with the prefix
+//!   stripped, both in canonical form (`janus_core::identity`'s route
+//!   matching: repeated and trailing `/` and percent-encoded unreserved
+//!   characters do not change which binding applies); the docs call it a
+//!   pattern without defining a syntax, so wildcard characters are refused
+//!   rather than given a meaning, and a path not written canonically is a
+//!   startup error.
 //!
 //! Sections:
 //!
@@ -336,9 +340,9 @@ impl PluginConfig {
     /// or `http://` with `allow_plaintext = true`; no other scheme. Also
     /// refused: `timeout_ms = 0` (every call would fail closed), and
     /// `allow_plaintext` or `[plugin.tls]` where they have no effect —
-    /// `allow_plaintext` anywhere but next to `http://`, `[plugin.tls]` on a
-    /// linked or `http://` plugin. `[plugin.tls]` beside a `unix://`
-    /// endpoint is accepted, because the documented example combines them.
+    /// `allow_plaintext` anywhere but next to `http://`, and `[plugin.tls]`
+    /// anywhere but next to `https://` (a `unix://`, `http://` or linked
+    /// plugin) — the docs' "`[plugin.tls]` belongs to `https://` only".
     pub fn transport(&self) -> Result<PluginTransport, ConfigError> {
         if self.timeout_ms == 0 {
             return Err(invalid(
@@ -353,15 +357,10 @@ impl PluginConfig {
                 "applies only to an http:// endpoint",
             ));
         }
-        if self.tls.is_some()
-            && matches!(
-                transport,
-                PluginTransport::Linked | PluginTransport::Plaintext { .. }
-            )
-        {
+        if self.tls.is_some() && !matches!(transport, PluginTransport::Tls { .. }) {
             return Err(invalid(
                 "plugin.tls",
-                "[plugin.tls] has no effect on a linked or http:// plugin",
+                "[plugin.tls] belongs to an https:// endpoint only; remove it for a unix://, http:// or linked plugin",
             ));
         }
         Ok(transport)
@@ -894,12 +893,19 @@ base_url   = "https://api.openai.com"
 "#;
 
     /// docs/plugin-contract#plugin-config, verbatim (first example).
-    const DOC_PLUGIN_EXAMPLE: &str = r#"
+    const DOC_UNIX_PLUGIN_EXAMPLE: &str = r#"
+# A plugin on a local socket.
 [plugin]
-endpoint   = "unix:///run/janus/policy.sock"   # or "https://policy.internal:7443"
+endpoint   = "unix:///run/janus/policy.sock"
 timeout_ms = 250                               # ResolveRoute deadline; default
+"#;
 
-  # Required when the endpoint scheme is https://. See "Securing the channel".
+    /// docs/plugin-contract#plugin-config, verbatim (second example).
+    const DOC_HTTPS_PLUGIN_EXAMPLE: &str = r#"
+# A plugin across the network, over mutual TLS. See "Securing the channel".
+[plugin]
+endpoint = "https://policy.internal:7443"
+
   [plugin.tls]
   ca_file     = "/etc/janus/plugin-ca.pem"     # exactly one of ca_file / pinned_cert
   client_cert = "/etc/janus/daemon.pem"
@@ -908,7 +914,7 @@ timeout_ms = 250                               # ResolveRoute deadline; default
   # expected_san = "spiffe://example.org/policy"  # replaces the hostname check
 "#;
 
-    /// docs/plugin-contract#plugin-config, verbatim (second example).
+    /// docs/plugin-contract#plugin-config, verbatim (third example).
     const DOC_LINKED_EXAMPLE: &str = r#"
 # A custom build with a linked plugin says so, and names no endpoint.
 [plugin]
@@ -979,7 +985,7 @@ linked = true
 
     #[test]
     fn documented_plugin_examples_parse_to_their_transports() {
-        let unix = with_base(DOC_PLUGIN_EXAMPLE).expect("documented unix example");
+        let unix = with_base(DOC_UNIX_PLUGIN_EXAMPLE).expect("documented unix example");
         let plugin = unix.plugin.as_ref().expect("plugin block");
         assert_eq!(plugin.timeout(), Duration::from_millis(250));
         assert_eq!(
@@ -989,12 +995,7 @@ linked = true
             }
         );
 
-        // The alternative the example's comment names.
-        let https = with_base(&DOC_PLUGIN_EXAMPLE.replace(
-            "\"unix:///run/janus/policy.sock\"",
-            "\"https://policy.internal:7443\"",
-        ))
-        .expect("documented https alternative");
+        let https = with_base(DOC_HTTPS_PLUGIN_EXAMPLE).expect("documented https example");
         match https
             .plugin
             .as_ref()
@@ -1067,6 +1068,21 @@ linked = true
     }
 
     #[test]
+    fn plugin_tls_beside_a_unix_endpoint_is_a_startup_refusal() {
+        // The pre-split doc example: a unix:// endpoint with [plugin.tls].
+        let combined = DOC_HTTPS_PLUGIN_EXAMPLE.replace(
+            "\"https://policy.internal:7443\"",
+            "\"unix:///run/janus/policy.sock\"",
+        );
+        assert!(combined.contains("unix:///run/janus/policy.sock"));
+        let err = with_base(&combined).expect_err("[plugin.tls] beside unix:// is refused");
+        assert_eq!(err.at(), Some("plugin.tls"));
+        let message = err.to_string();
+        assert!(message.contains("plugin.tls"), "{message}");
+        assert!(message.contains("https:// endpoint only"), "{message}");
+    }
+
+    #[test]
     fn plugin_settings_without_effect_are_refused() {
         let tls = "[plugin.tls]\nca_file = \"/ca.pem\"\nclient_cert = \"/c.pem\"\nclient_key = \"/k.pem\"\n";
         let cases = [
@@ -1089,6 +1105,10 @@ linked = true
                 "plugin.allow_plaintext",
             ),
             (format!("[plugin]\nlinked = true\n{tls}"), "plugin.tls"),
+            (
+                format!("[plugin]\nendpoint = \"unix:///run/p.sock\"\n{tls}"),
+                "plugin.tls",
+            ),
             (
                 format!(
                     "[plugin]\nendpoint = \"http://policy:8080\"\nallow_plaintext = true\n{tls}"

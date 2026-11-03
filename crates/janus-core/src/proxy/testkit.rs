@@ -19,9 +19,15 @@ use hyper_util::server::conn::auto;
 use tokio::net::TcpListener;
 use url::Url;
 
-use crate::contract::credential::{CredentialKind, CredentialMaterial, Secret};
+use base64::Engine;
+
+use crate::contract::credential::{
+    CredentialKind, CredentialMaterial, MaterialDocument, Secret, UpstreamFeedback,
+};
 use crate::contract::identity::{PresentedAt, RequestHead};
-use crate::contract::upstream::{UpstreamImpl, UpstreamKind};
+use crate::contract::upstream::{
+    DecodedMaterial, UpstreamError, UpstreamImpl, UpstreamKind, UsageObserver,
+};
 use crate::proxy::{build_outbound, Forwarder, RelayOutcome, Substitution};
 
 /// One request as the fake upstream received it.
@@ -307,6 +313,100 @@ where
         status,
         body,
         outcome,
+    }
+}
+
+/// An unsigned JWT carrying `claims`, as a vendor access token looks to
+/// code that only reads it.
+pub(crate) fn jwt(claims: serde_json::Value) -> String {
+    let b64 = |v: &serde_json::Value| {
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(v).unwrap())
+    };
+    format!(
+        "{}.{}.sig",
+        b64(&serde_json::json!({"alg": "RS256"})),
+        b64(&claims)
+    )
+}
+
+/// A deliberately misbehaving upstream for the guards' tests: `inner` in
+/// every respect except the overrides set.
+pub(crate) struct Probe {
+    pub inner: Arc<dyn UpstreamImpl>,
+    /// Replaces the forwarding allowlist (the D6 misconfiguration when it
+    /// names an identity-bearing header).
+    pub forwarded: Option<Vec<HeaderName>>,
+    /// Appended to `rest` before the target rewrite: an upstream rewrite
+    /// that re-adds a query parameter.
+    pub query_suffix: Option<&'static str>,
+    /// After `inner`'s auth, copy the value of the first header onto the
+    /// second: an auth step that carries caller-supplied bytes.
+    pub auth_copies: Option<(HeaderName, HeaderName)>,
+    /// The length of every body prefix `classify` was shown.
+    pub classified: Mutex<Vec<usize>>,
+}
+
+impl Probe {
+    pub fn new(inner: Arc<dyn UpstreamImpl>) -> Probe {
+        Probe {
+            inner,
+            forwarded: None,
+            query_suffix: None,
+            auth_copies: None,
+            classified: Mutex::default(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl UpstreamImpl for Probe {
+    fn kind(&self) -> UpstreamKind {
+        self.inner.kind()
+    }
+    fn forwarded_headers(&self) -> &[HeaderName] {
+        self.forwarded
+            .as_deref()
+            .unwrap_or_else(|| self.inner.forwarded_headers())
+    }
+    fn outbound_url(
+        &self,
+        base_url: &Url,
+        rest: &str,
+        kind: CredentialKind,
+    ) -> Result<Url, UpstreamError> {
+        let rest = format!("{rest}{}", self.query_suffix.unwrap_or(""));
+        self.inner.outbound_url(base_url, &rest, kind)
+    }
+    fn apply_auth(
+        &self,
+        request: &mut http::request::Parts,
+        material: &CredentialMaterial,
+    ) -> Result<(), UpstreamError> {
+        self.inner.apply_auth(request, material)?;
+        if let Some((from, to)) = &self.auth_copies {
+            if let Some(value) = request.headers.get(from).cloned() {
+                request.headers.insert(to.clone(), value);
+            }
+        }
+        Ok(())
+    }
+    fn decode_material(&self, doc: &MaterialDocument) -> Result<DecodedMaterial, UpstreamError> {
+        self.inner.decode_material(doc)
+    }
+    async fn refresh(&self, doc: &MaterialDocument) -> Result<MaterialDocument, UpstreamError> {
+        self.inner.refresh(doc).await
+    }
+    fn usage_observer(&self) -> Box<dyn UsageObserver> {
+        self.inner.usage_observer()
+    }
+    fn classify(
+        &self,
+        status: StatusCode,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Option<UpstreamFeedback> {
+        self.classified.lock().unwrap().push(body.len());
+        self.inner.classify(status, headers, body)
     }
 }
 

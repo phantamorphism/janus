@@ -13,9 +13,12 @@
 //!   into the same document, every other field kept.
 //! - Usage: `usage` of a message, or of `message_start` then
 //!   `message_delta` in a stream.
-//! - Feedback: 401/403 reject the credential; 402 or a `billing_error`
-//!   (and the "credit balance is too low" refusal) blame the account; 429
-//!   throttles it.
+//! - Feedback (the rule is in `feedback`): only a 401
+//!   `authentication_error` that is not about an expired OAuth token
+//!   rejects the credential; a 403 (`permission_error`: the key or the
+//!   organisation may not do this request) is relayed without a verdict.
+//!   402 or a `billing_error` (and the "credit balance is too low" refusal)
+//!   blame the account; 429 throttles it.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -26,7 +29,6 @@ use url::Url;
 
 use super::feedback::{retry_after, ErrorBody};
 use super::material::{ensure_for, plain_api_key, refresh_grant, secret_value, string_field};
-use super::outbound::join_base;
 use super::usage::{ShapeObserver, UsageShape};
 use super::{http_client, ClientInitError};
 use crate::contract::credential::{
@@ -116,18 +118,7 @@ impl UpstreamImpl for AnthropicUpstream {
         UpstreamKind::Anthropic
     }
 
-    fn forwarded_headers(&self) -> &[HeaderName] {
-        &FORWARDED
-    }
-
-    fn outbound_url(
-        &self,
-        base_url: &Url,
-        rest: &str,
-        _kind: CredentialKind,
-    ) -> Result<Url, UpstreamError> {
-        join_base(base_url, rest)
-    }
+    upstream_forwarding!(FORWARDED, target = base_url);
 
     fn apply_auth(
         &self,
@@ -235,11 +226,14 @@ impl UpstreamImpl for AnthropicUpstream {
             .as_deref()
             .is_some_and(|m| m.to_ascii_lowercase().contains("credit balance"));
         match status {
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            StatusCode::UNAUTHORIZED
+                if error.is("authentication_error") && !error.says_expired() =>
+            {
                 Some(UpstreamFeedback::CredentialInvalid {
                     reason: error.reason(status),
                 })
             }
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => None,
             StatusCode::TOO_MANY_REQUESTS => Some(UpstreamFeedback::RateLimited {
                 until: retry_after(headers, Utc::now()),
             }),
@@ -456,9 +450,43 @@ mod tests {
             })
         );
         assert!(matches!(
-            classify(403, err("permission_error", "OAuth token has been revoked")),
+            classify(
+                401,
+                err("authentication_error", "OAuth token has been revoked.")
+            ),
             Some(UpstreamFeedback::CredentialInvalid { .. })
         ));
+        // No verdict on what the request (not the credential) provoked, nor
+        // on a 401 that is not Anthropic's authentication error.
+        for (status, body) in [
+            (
+                403,
+                err(
+                    "permission_error",
+                    "Your API key does not have permission to use the specified resource.",
+                ),
+            ),
+            (403, json!({})),
+            (401, json!({})),
+            (401, err("invalid_request_error", "x")),
+            (
+                401,
+                err(
+                    "authentication_error",
+                    "OAuth token has expired. Please obtain a new token or refresh your existing token.",
+                ),
+            ),
+        ] {
+            assert_eq!(classify(status, body.clone()), None, "{status} {body}");
+        }
+        assert_eq!(
+            upstream().classify(
+                StatusCode::FORBIDDEN,
+                &HeaderMap::new(),
+                b"<html><title>Just a moment...</title></html>"
+            ),
+            None
+        );
         assert!(matches!(
             classify(
                 400,

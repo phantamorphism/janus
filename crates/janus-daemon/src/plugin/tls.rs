@@ -44,10 +44,13 @@ use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
 use url::{Host, Url};
 
+use super::transport::{connect_tcp, within};
 use crate::contract::config::{invalid, ConfigError, TrustAnchor};
 
 /// A certificate within this long of expiry is warned about.
 pub const EXPIRY_WARNING: chrono::TimeDelta = chrono::TimeDelta::days(30);
+/// How often a certificate inside [`EXPIRY_WARNING`] is warned about again.
+pub const EXPIRY_REWARN: chrono::TimeDelta = chrono::TimeDelta::days(1);
 
 /// The crypto provider for every plugin TLS connection.
 pub(crate) fn provider() -> Arc<CryptoProvider> {
@@ -190,15 +193,52 @@ fn check_current(der: &[u8], path: &Path, at: &str) -> Result<DateTime<Utc>, Con
     Ok(until)
 }
 
-pub(crate) fn warn_if_expiring(which: &str, until: DateTime<Utc>) {
-    let left = until - Utc::now();
-    if left < EXPIRY_WARNING {
-        tracing::warn!(
-            certificate = which,
-            expires_at = %until,
-            "plugin TLS certificate expires in {} days",
-            left.num_days()
-        );
+/// When each certificate was last warned about, keyed by which one and
+/// its expiry (a replaced certificate is a new one).
+#[derive(Debug, Default)]
+struct ExpiryWarnings {
+    last: Mutex<Vec<Warned>>,
+}
+
+/// One certificate's last warning.
+#[derive(Debug, Clone, Copy)]
+struct Warned {
+    which: &'static str,
+    until: DateTime<Utc>,
+    at: DateTime<Utc>,
+}
+
+impl ExpiryWarnings {
+    /// Of `certs` (`which`, expiry), those due a warning at `now`: inside
+    /// [`EXPIRY_WARNING`] and not warned about in the last
+    /// [`EXPIRY_REWARN`]. Marks them warned.
+    fn due(
+        &self,
+        now: DateTime<Utc>,
+        certs: &[(&'static str, Option<DateTime<Utc>>)],
+    ) -> Vec<(&'static str, DateTime<Utc>)> {
+        let mut last = self.last.lock().unwrap_or_else(|p| p.into_inner());
+        let mut due = Vec::new();
+        for &(which, until) in certs {
+            let Some(until) = until else { continue };
+            if until - now >= EXPIRY_WARNING {
+                continue;
+            }
+            let recent = last
+                .iter()
+                .any(|w| w.which == which && w.until == until && now - w.at < EXPIRY_REWARN);
+            if recent {
+                continue;
+            }
+            last.retain(|w| w.which != which);
+            last.push(Warned {
+                which,
+                until,
+                at: now,
+            });
+            due.push((which, until));
+        }
+        due
     }
 }
 
@@ -274,7 +314,6 @@ impl Material {
                 Anchor::Pinned(cert)
             }
         };
-        warn_if_expiring("client", client_not_after);
         Ok(Material {
             key: Arc::new(key),
             client_not_after,
@@ -356,14 +395,10 @@ impl ServerCertVerifier for PluginVerifier {
                 }
             }
         }
-        let mut seen = self
+        *self
             .server_not_after
             .lock()
-            .unwrap_or_else(|p| p.into_inner());
-        if *seen != Some(until) {
-            warn_if_expiring("server", until);
-            *seen = Some(until);
-        }
+            .unwrap_or_else(|p| p.into_inner()) = Some(until);
         Ok(ServerCertVerified::assertion())
     }
 
@@ -481,6 +516,7 @@ pub struct TlsDialer {
     identity: PeerIdentity,
     material: RwLock<Arc<Material>>,
     server_not_after: Arc<Mutex<Option<DateTime<Utc>>>>,
+    warned: ExpiryWarnings,
 }
 
 fn server_name(name: &str, at: &str) -> Result<ServerName<'static>, ConfigError> {
@@ -523,6 +559,7 @@ impl TlsDialer {
             identity,
             material: RwLock::new(Arc::new(material)),
             server_not_after: Arc::new(Mutex::new(None)),
+            warned: ExpiryWarnings::default(),
         })
     }
 
@@ -565,6 +602,39 @@ impl TlsDialer {
             .unwrap_or_else(|p| p.into_inner())
     }
 
+    /// The certificates due an expiry warning at `now` (see
+    /// [`ExpiryWarnings::due`]), marked warned.
+    fn expiry_warnings_due(&self, now: DateTime<Utc>) -> Vec<(&'static str, DateTime<Utc>)> {
+        let certs = [
+            ("client", Some(self.client_cert_expires_at())),
+            ("server", self.server_cert_expires_at()),
+        ];
+        self.warned.due(now, &certs)
+    }
+
+    /// Which certificates have been warned about.
+    #[cfg(test)]
+    pub(crate) fn warned(&self) -> Vec<&'static str> {
+        let last = self.warned.last.lock().unwrap_or_else(|p| p.into_inner());
+        last.iter().map(|w| w.which).collect()
+    }
+
+    /// Log a warning for each certificate within [`EXPIRY_WARNING`] of
+    /// expiry, at most once per [`EXPIRY_REWARN`] each. Called on every
+    /// material poll, so a certificate entering the window is warned about
+    /// while the daemon runs, not only when material is loaded.
+    pub(crate) fn warn_expiring(&self) {
+        let now = Utc::now();
+        for (which, until) in self.expiry_warnings_due(now) {
+            tracing::warn!(
+                certificate = which,
+                expires_at = %until,
+                "plugin TLS certificate expires in {} days",
+                (until - now).num_days()
+            );
+        }
+    }
+
     fn client_config(
         &self,
         material: &Material,
@@ -592,24 +662,16 @@ impl TlsDialer {
         Ok(config)
     }
 
-    /// TCP connect and a full TLS 1.3 handshake presenting `presented`.
-    /// Fails as `plugin_unreachable` (TCP) or `plugin_tls_error`
-    /// (handshake). Whether the plugin asked for a client certificate is
+    /// TCP connect and a full TLS 1.3 handshake presenting `presented`,
+    /// each bounded by `CONNECT_TIMEOUT`. Fails as `plugin_unreachable`
+    /// (TCP) or `plugin_tls_error` (handshake). Whether the plugin asked for a client certificate is
     /// reported, not enforced: [`TlsDialer::connect`] enforces it.
     pub(crate) async fn handshake(
         &self,
         presented: &ClientIdentity,
     ) -> Result<Handshake, PluginError> {
-        let tcp = TcpStream::connect((self.host.as_str(), self.port))
-            .await
-            .map_err(|e| {
-                PluginError::new(
-                    PluginFailureClass::Unreachable,
-                    format!("cannot connect to plugin at {}: {e}", self.authority()),
-                )
-            })?;
-        // Nagle only adds latency to small gRPC frames.
-        let _ = tcp.set_nodelay(true);
+        let authority = self.authority();
+        let tcp = connect_tcp((self.host.as_str(), self.port), &authority).await?;
         let requested = Arc::new(AtomicBool::new(false));
         let material = self.current();
         let config = self
@@ -620,22 +682,27 @@ impl TlsDialer {
                     format!("TLS configuration: {e}"),
                 )
             })?;
-        let stream = TlsConnector::from(Arc::new(config))
-            .connect(self.sni.clone(), tcp)
-            .await
-            .map_err(|e| {
-                let detail = match rustls_error(&e) {
-                    Some(tls) => tls.to_string(),
-                    None => e.to_string(),
-                };
-                PluginError::new(
-                    PluginFailureClass::TlsError,
-                    format!(
-                        "TLS handshake with plugin at {} failed: {detail}",
-                        self.authority()
-                    ),
-                )
-            })?;
+        let handshake = async {
+            TlsConnector::from(Arc::new(config))
+                .connect(self.sni.clone(), tcp)
+                .await
+                .map_err(|e| {
+                    let detail = match rustls_error(&e) {
+                        Some(tls) => tls.to_string(),
+                        None => e.to_string(),
+                    };
+                    PluginError::new(
+                        PluginFailureClass::TlsError,
+                        format!("TLS handshake with plugin at {authority} failed: {detail}"),
+                    )
+                })
+        };
+        let stream = within(
+            PluginFailureClass::TlsError,
+            format!("the TLS handshake with plugin at {authority}"),
+            handshake,
+        )
+        .await?;
         Ok(Handshake {
             stream,
             client_auth_requested: requested.load(Ordering::SeqCst),
@@ -669,8 +736,8 @@ mod tests {
     use super::*;
     use crate::plugin::grpc::GrpcPluginClient;
     use crate::plugin::testutil::{
-        client_files, request, serve_tls, tls_transport, write, Ca, ClientAuth, FakePlugin, Issued,
-        Leaf, TlsFixture, TlsServer,
+        client_files, request, serve_tls, tls_transport, write, ymd, Ca, ClientAuth, ClientFiles,
+        FakePlugin, Issued, Leaf, TlsFixture, TlsServer,
     };
     use crate::plugin::{tls_init, SetupError, TlsInitOptions};
 
@@ -690,6 +757,147 @@ mod tests {
         transport: &crate::contract::config::PluginTransport,
     ) -> Result<GrpcPluginClient, SetupError> {
         GrpcPluginClient::new(transport, T)
+    }
+
+    fn dialer(addr: std::net::SocketAddr, files: &ClientFiles, pinned: bool) -> TlsDialer {
+        let crate::contract::config::PluginTransport::Tls {
+            endpoint,
+            trust,
+            client_cert,
+            client_key,
+            server_name,
+            expected_san,
+        } = tls_transport(addr, files, pinned, None, None)
+        else {
+            unreachable!("tls_transport builds a TLS transport")
+        };
+        TlsDialer::new(TlsSettings {
+            endpoint,
+            trust,
+            client_cert,
+            client_key,
+            server_name,
+            expected_san,
+        })
+        .expect("dialer")
+    }
+
+    /// Serve `plugin` presenting `identity` to a client pinning `pin`, with
+    /// the fixture's CA verifying the daemon.
+    async fn pinned_call(identity: Issued, pin: &Issued) -> Result<RouteOutcome, PluginError> {
+        let fx = TlsFixture::new();
+        let plugin = FakePlugin::credential("pinned");
+        let server = TlsServer {
+            identity,
+            client_auth: fx.strict(),
+            tls12_only: false,
+        };
+        let (_server, addr) = serve_tls(&plugin, server).await;
+        let files = client_files(fx.dir.path(), &pin.cert_pem, &fx.client);
+        let client = build(&tls_transport(addr, &files, true, None, None)).expect("client");
+        let result = call(&client).await;
+        if result.is_err() {
+            assert_eq!(
+                plugin.request_count(),
+                0,
+                "nothing sent to an unverified plugin"
+            );
+        }
+        result
+    }
+
+    #[tokio::test]
+    async fn pinned_cert_must_match_byte_for_byte() {
+        let presented = Leaf::server("127.0.0.1").self_signed();
+        assert_eq!(
+            pinned_call(presented.clone(), &presented).await,
+            Ok(RouteOutcome::Credential("pinned".into()))
+        );
+        // Another certificate naming the same host, from the same kind of
+        // self-signing: only the bytes tell them apart.
+        let other = Leaf::server("127.0.0.1").self_signed();
+        let err = pinned_call(presented, &other)
+            .await
+            .expect_err("not the pin");
+        assert_eq!(err.class, PluginFailureClass::TlsError, "{err:?}");
+        assert!(err.message.contains("not the pinned_cert"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn pinned_cert_outside_its_validity_is_refused() {
+        for (window, expect) in [
+            (((2020, 1, 1), (2021, 1, 1)), "Expired"),
+            (((2090, 1, 1), (2100, 1, 1)), "NotValidYet"),
+        ] {
+            let presented = Leaf {
+                window: Some(window),
+                ..Leaf::server("127.0.0.1")
+            }
+            .self_signed();
+            let err = pinned_call(presented.clone(), &presented)
+                .await
+                .expect_err("outside validity");
+            assert_eq!(err.class, PluginFailureClass::TlsError, "{err:?}");
+            assert!(err.message.contains(expect), "{expect}: {err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn every_handshake_is_full_and_sees_the_certificate_request() {
+        // The test server issues session tickets; a resumed TLS 1.3
+        // handshake carries no CertificateRequest and would read as
+        // `plugin_no_client_auth`.
+        let fx = TlsFixture::new();
+        let plugin = FakePlugin::credential("c");
+        let (_server, addr) = fx.serve(&plugin, fx.strict()).await;
+        let dialer = dialer(addr, &fx.files, false);
+        for n in 0..3 {
+            let hs = dialer
+                .handshake(&ClientIdentity::Configured)
+                .await
+                .expect("handshake");
+            assert!(hs.client_auth_requested, "handshake {n} was resumed");
+            assert!(dialer.connect().await.is_ok(), "connect {n}");
+        }
+    }
+
+    #[tokio::test]
+    async fn expiry_is_warned_on_entering_the_window_and_daily_after() {
+        let fx = TlsFixture::new();
+        let now = Utc::now();
+        let expiring = fx.ca.issue(&Leaf {
+            window: Some((
+                ymd(now - chrono::TimeDelta::days(1)),
+                ymd(now + chrono::TimeDelta::days(60)),
+            )),
+            ..Leaf::client()
+        });
+        let files = client_files(fx.dir.path(), &fx.ca.pem(), &expiring);
+        let addr: std::net::SocketAddr = "127.0.0.1:9".parse().expect("addr");
+        let dialer = dialer(addr, &files, false);
+        let until = dialer.client_cert_expires_at();
+        // Loaded 60 days out: nothing to warn about yet.
+        assert!(dialer.expiry_warnings_due(now).is_empty());
+        // The same running daemon, once the certificate is 20 days out.
+        let inside = until - chrono::TimeDelta::days(20);
+        assert_eq!(dialer.expiry_warnings_due(inside), vec![("client", until)]);
+        assert!(
+            dialer
+                .expiry_warnings_due(inside + chrono::TimeDelta::hours(1))
+                .is_empty(),
+            "not on every poll"
+        );
+        assert_eq!(
+            dialer.expiry_warnings_due(inside + EXPIRY_REWARN),
+            vec![("client", until)],
+            "again a day later"
+        );
+        // The plugin's certificate counts once a handshake has seen it.
+        *dialer.server_not_after.lock().expect("lock") = Some(until);
+        assert_eq!(
+            dialer.expiry_warnings_due(inside + EXPIRY_REWARN),
+            vec![("server", until)]
+        );
     }
 
     #[tokio::test]
@@ -920,6 +1128,14 @@ mod tests {
             ..Leaf::client()
         });
         assert!(refused(&client_files(dir, &fx.ca.pem(), &expired), false).contains("expired"));
+
+        let future = fx.ca.issue(&Leaf {
+            window: Some(((2090, 1, 1), (2100, 1, 1))),
+            ..Leaf::client()
+        });
+        assert!(
+            refused(&client_files(dir, &fx.ca.pem(), &future), false).contains("not valid until")
+        );
 
         let two = format!("{}{}", fx.ca.pem(), fx.client.cert_pem);
         assert!(refused(&client_files(dir, &two, &fx.client), true).contains("exactly"));

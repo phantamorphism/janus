@@ -23,6 +23,8 @@ use http_body_util::BodyDataStream;
 use tokio::sync::oneshot;
 use url::Url;
 
+#[cfg(test)]
+use super::http_client_with;
 use super::outbound::strip_hop_by_hop;
 use super::{http_client, ClientInitError};
 use crate::contract::credential::UpstreamFeedback;
@@ -98,6 +100,15 @@ impl Forwarder {
         Ok(Forwarder {
             client: http_client()?,
         })
+    }
+
+    /// A forwarder whose idle bound is `read_idle_timeout`, so a test can
+    /// see a stall end without waiting the real one out.
+    #[cfg(test)]
+    fn with_read_idle_timeout(read_idle_timeout: std::time::Duration) -> Self {
+        Forwarder {
+            client: http_client_with(read_idle_timeout).unwrap(),
+        }
     }
 
     /// Send `outbound` (from [`super::build_outbound`]) with `body` — the
@@ -593,11 +604,43 @@ mod tests {
 
     #[tokio::test]
     async fn redirects_are_relayed_not_followed() {
+        // Every redirect status, including the ones a client follows even
+        // for a POST with a streamed body (301/302/303 turn it into a GET),
+        // pointing at a second live server that must never hear of it.
+        for status in [301u16, 302, 303, 307, 308] {
+            let elsewhere = testkit::spawn(|_req| Reply::bytes(200, &[], b"stolen".to_vec())).await;
+            let location = elsewhere.url.join("steal").unwrap().to_string();
+            let sent = location.clone();
+            let upstream = testkit::spawn(move |_req| {
+                Reply::bytes(status, &[("location", sent.as_str())], Vec::new())
+            })
+            .await;
+            let parts = outbound(&upstream.url, Method::POST, "/v1/x", &[]);
+            let relayed = Forwarder::new()
+                .unwrap()
+                .forward(openrouter(), parts, Full::new(Bytes::from_static(b"{}")))
+                .await
+                .unwrap();
+            assert_eq!(relayed.response.status(), status);
+            assert_eq!(relayed.response.headers()["location"], location.as_str());
+            assert_eq!(upstream.received().len(), 1);
+            assert!(elsewhere.received().is_empty(), "{status} was followed");
+        }
+    }
+
+    #[tokio::test]
+    async fn hop_by_hop_headers_stripped_from_the_forwarded_response() {
+        // A streamed (chunked) upstream response: its framing headers are
+        // the upstream connection's, not the caller's.
         let upstream = testkit::spawn(|_req| {
-            Reply::bytes(
-                307,
-                &[("location", "https://elsewhere.example/steal")],
-                Vec::new(),
+            Reply::stream(
+                200,
+                &[
+                    ("content-type", "text/event-stream"),
+                    ("keep-alive", "timeout=5"),
+                    ("x-kept", "1"),
+                ],
+                futures::stream::iter([Bytes::from_static(b"data: {}\n\n")]),
             )
         })
         .await;
@@ -607,12 +650,133 @@ mod tests {
             .forward(openrouter(), parts, Full::new(Bytes::from_static(b"{}")))
             .await
             .unwrap();
-        assert_eq!(relayed.response.status(), 307);
-        assert_eq!(
-            relayed.response.headers()["location"],
-            "https://elsewhere.example/steal"
+        let headers = relayed.response.headers();
+        assert!(headers.get("transfer-encoding").is_none(), "{headers:?}");
+        assert!(headers.get("keep-alive").is_none(), "{headers:?}");
+        assert_eq!(headers["x-kept"], "1");
+        assert_eq!(headers["content-type"], "text/event-stream");
+    }
+
+    #[tokio::test]
+    async fn an_empty_request_body_is_sent_with_no_body_framing() {
+        // Any method: a POST with an empty body is not turned into a
+        // chunked one.
+        let upstream = testkit::spawn(|_req| Reply::bytes(200, &[], Vec::new())).await;
+        let parts = outbound(&upstream.url, Method::POST, "/v1/x", &[]);
+        Forwarder::new()
+            .unwrap()
+            .forward(openrouter(), parts, Full::new(Bytes::new()))
+            .await
+            .unwrap();
+        let req = &upstream.received()[0];
+        assert!(
+            req.headers.get("transfer-encoding").is_none(),
+            "{:?}",
+            req.headers
         );
-        assert_eq!(upstream.received().len(), 1);
+        assert!(req.body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn classify_sees_at_most_the_prefix_limit() {
+        // A long error body is relayed whole, but only its first
+        // CLASSIFY_PREFIX_LIMIT bytes are held for the verdict.
+        let probe = Arc::new(testkit::Probe::new(openrouter()));
+        let chunks = futures::stream::iter(
+            (0..10).map(|_| Ok::<_, BoxError>(Bytes::from(vec![b'x'; 5000]))),
+        );
+        let (tx, rx) = oneshot::channel();
+        let body = RelayBody::new(
+            Box::pin(chunks),
+            probe.clone(),
+            StatusCode::UNAUTHORIZED,
+            &HeaderMap::new(),
+            None,
+            tx,
+        );
+        let relayed = body.collect().await.unwrap().to_bytes();
+        assert_eq!(relayed.len(), 50_000);
+        assert_eq!(rx.await.unwrap().end, RelayEnd::Complete);
+        assert_eq!(*probe.classified.lock().unwrap(), [CLASSIFY_PREFIX_LIMIT]);
+    }
+
+    #[tokio::test]
+    async fn a_body_dropped_after_its_promised_length_is_complete() {
+        // A server stops polling once content-length bytes are written: a
+        // complete relay. One byte short is a disconnect.
+        for (relay_chunks, want) in [(2, RelayEnd::Complete), (1, RelayEnd::CallerDisconnected)] {
+            let chunks = futures::stream::iter(
+                [b"hello ".as_slice(), b"world"].map(|c| Ok::<_, BoxError>(Bytes::from_static(c))),
+            )
+            .chain(futures::stream::pending());
+            let (tx, rx) = oneshot::channel();
+            let mut body = RelayBody::new(
+                Box::pin(chunks),
+                openrouter(),
+                StatusCode::OK,
+                &HeaderMap::new(),
+                Some(11),
+                tx,
+            );
+            for _ in 0..relay_chunks {
+                body.frame().await.unwrap().unwrap();
+            }
+            drop(body);
+            assert_eq!(rx.await.unwrap().end, want);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_upstream_silent_before_its_response_head_times_out() {
+        // Accepts the connection, reads the request, never answers.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let silent = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut sink = Vec::new();
+            let _ = tokio::io::AsyncReadExt::read_to_end(&mut socket, &mut sink).await;
+        });
+        let parts = outbound(&base, Method::POST, "/v1/x", &[]);
+        let forwarded = tokio::time::timeout(
+            Duration::from_secs(5),
+            Forwarder::with_read_idle_timeout(Duration::from_millis(200)).forward(
+                openrouter(),
+                parts,
+                Full::new(Bytes::from_static(b"{}")),
+            ),
+        )
+        .await
+        .expect("a stalled upstream ends the call");
+        assert!(matches!(forwarded, Err(ForwardError::Upstream(_))));
+        silent.abort();
+    }
+
+    #[tokio::test]
+    async fn an_upstream_that_stalls_mid_body_times_out() {
+        let upstream = testkit::spawn(|_req| {
+            Reply::stream(
+                200,
+                &[("content-type", "text/event-stream")],
+                futures::stream::once(async { Bytes::from_static(b"data: {}\n\n") })
+                    .chain(futures::stream::pending()),
+            )
+        })
+        .await;
+        let parts = outbound(&upstream.url, Method::POST, "/v1/x", &[]);
+        let relayed = Forwarder::with_read_idle_timeout(Duration::from_millis(200))
+            .forward(openrouter(), parts, Full::new(Bytes::from_static(b"{}")))
+            .await
+            .unwrap();
+        let mut body = relayed.response.into_body();
+        body.frame().await.unwrap().unwrap();
+        let next = tokio::time::timeout(Duration::from_secs(5), body.frame())
+            .await
+            .expect("a stalled body ends");
+        assert!(matches!(next, Some(Err(_))), "{next:?}");
+        assert!(matches!(
+            relayed.outcome.await.unwrap().end,
+            RelayEnd::UpstreamFailed(_)
+        ));
     }
 
     #[tokio::test]

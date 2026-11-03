@@ -3,7 +3,8 @@
 //! request-log SSE stream. See `docs/admin-surface` and
 //! `docs/architecture#admin-surface`.
 //!
-//! [`start`] is the one entry point the lifecycle calls. It refuses to start
+//! [`start`] is the one entry point the lifecycle calls to serve
+//! ([`check_config`] is its `check-config` counterpart). It refuses to start
 //! (returning [`AdminError`]) before anything listens when a listener rule is
 //! broken, then:
 //!
@@ -41,7 +42,15 @@
 //! - the UI's assets come from `ui.assets_dir`, else from the `ui/dist`
 //!   directory of the source tree this daemon was built from; a directory
 //!   without `index.html` is a startup refusal. Unknown non-API paths get
-//!   `index.html` (the single-page app routes them);
+//!   `index.html` (the single-page app routes them); every path under `/v1`
+//!   is the API's, token-gated, and never answered with `index.html`;
+//! - resource bounds: request bodies over [`MAX_BODY_BYTES`] are `413
+//!   payload_too_large`; at most [`MAX_TAILS`] live tails are open at once
+//!   (one more is `503 too_many_streams`); each listener serves at most
+//!   [`MAX_CONNECTIONS`] connections and closes further ones unanswered; an
+//!   HTTP/1 client gets 10 seconds to send a request's headers;
+//! - [`check_config`] runs every refusal [`start`] makes before binding,
+//!   without binding or creating anything;
 //! - an `admin-token` file that already exists must be a regular file owned
 //!   by the daemon's user with no group or other permission bits, and hold
 //!   at least [`token::MIN_TOKEN_LEN`] characters; otherwise the daemon
@@ -72,7 +81,9 @@ use crate::contract::DaemonConfig;
 use crate::plugin::PluginHandle;
 use crate::store;
 
-pub use requests::PING_INTERVAL;
+pub use api::MAX_BODY_BYTES;
+pub use listen::MAX_CONNECTIONS;
+pub use requests::{MAX_TAILS, PING_INTERVAL};
 pub use token::MIN_TOKEN_LEN;
 
 /// What the admin surface serves from. Built by the lifecycle once the pool,
@@ -89,6 +100,9 @@ pub struct AdminDeps {
     /// [`PluginHandle::from_config`] answers with `None`.
     pub plugin: Option<Arc<PluginHandle>>,
     pub started_at: SystemTime,
+    /// The address the data plane actually bound (resolving port `0`), as
+    /// `/v1/status` reports it.
+    pub data_plane_addr: SocketAddr,
 }
 
 /// Why the admin surface refused to start. Nothing is left listening when
@@ -188,31 +202,37 @@ impl AdminHandle {
     }
 }
 
-/// Start the admin surface: bind every admin listener and serve until
-/// `cancel` fires.
-pub async fn start(deps: AdminDeps, cancel: CancellationToken) -> Result<AdminHandle, AdminError> {
+/// What [`validate`] established: everything [`start`] needs before its
+/// first bind.
+struct Validated {
+    upstreams: Vec<status::UpstreamSummary>,
+    admin_tls: Option<tokio_rustls::TlsAcceptor>,
+    /// `ui.bind`, its TLS, and the assets directory, when `[ui]` exists.
+    ui: Option<(SocketAddr, Option<tokio_rustls::TlsAcceptor>, PathBuf)>,
+}
+
+/// Every check the admin surface makes before it binds anything: the
+/// config's listener rules, the bindings `/v1/status` reports, the data
+/// directory, the socket path's length, listener TLS material and the UI's
+/// assets. Reads files; creates and binds nothing.
+fn validate(config: &DaemonConfig, data_dir: &Path) -> Result<Validated, AdminError> {
     // The listener rules are part of the config's static validation; run it
-    // again here so no caller can start a listener the docs forbid, and so
-    // the refusal happens before anything is bound.
-    deps.config.validate()?;
-    let upstreams = status::upstream_summaries(&deps.config)?;
-    let meta = std::fs::metadata(&deps.data_dir).map_err(|source| AdminError::DataDir {
-        path: deps.data_dir.clone(),
+    // again here so no caller can start a listener the docs forbid.
+    config.validate()?;
+    let upstreams = status::upstream_summaries(config)?;
+    let meta = std::fs::metadata(data_dir).map_err(|source| AdminError::DataDir {
+        path: data_dir.to_path_buf(),
         source,
     })?;
     if !meta.is_dir() {
         return Err(AdminError::DataDir {
-            path: deps.data_dir.clone(),
+            path: data_dir.to_path_buf(),
             source: std::io::Error::new(std::io::ErrorKind::NotADirectory, "not a directory"),
         });
     }
-
-    let token_path = paths::admin_token_path(&deps.data_dir);
-    let admin_token = Arc::new(token::AdminToken::load_or_create(&token_path)?);
-
-    // Everything that can fail is checked before the first bind.
-    let admin_tls = load_tls("admin", deps.config.admin.tls.as_ref())?;
-    let ui_setup = match &deps.config.ui {
+    listen::check_socket_path(&paths::admin_socket_path(data_dir))?;
+    let admin_tls = load_tls("admin", config.admin.tls.as_ref())?;
+    let ui = match &config.ui {
         Some(ui_config) => Some((
             ui_config.bind,
             load_tls("UI", ui_config.tls.as_ref())?,
@@ -220,6 +240,36 @@ pub async fn start(deps: AdminDeps, cancel: CancellationToken) -> Result<AdminHa
         )),
         None => None,
     };
+    Ok(Validated {
+        upstreams,
+        admin_tls,
+        ui,
+    })
+}
+
+/// `check-config`'s share of the admin surface: every refusal [`start`]
+/// can make from `config` and the state of `data_dir` (which must exist) —
+/// listener rules, listener TLS material, UI assets, an existing
+/// `admin-token` file's ownership, mode and length — without binding a
+/// listener or creating any file. A missing `admin-token` passes: [`start`]
+/// generates it. What only binding can show (an address in use, another
+/// daemon on the admin socket) is not checked.
+pub fn check_config(config: &DaemonConfig, data_dir: &Path) -> Result<(), AdminError> {
+    validate(config, data_dir)?;
+    token::AdminToken::check(&paths::admin_token_path(data_dir))
+}
+
+/// Start the admin surface: bind every admin listener and serve until
+/// `cancel` fires.
+pub async fn start(deps: AdminDeps, cancel: CancellationToken) -> Result<AdminHandle, AdminError> {
+    // Everything that can fail is checked before the first bind.
+    let Validated {
+        upstreams,
+        admin_tls,
+        ui: ui_setup,
+    } = validate(&deps.config, &deps.data_dir)?;
+    let token_path = paths::admin_token_path(&deps.data_dir);
+    let admin_token = Arc::new(token::AdminToken::load_or_create(&token_path)?);
 
     let admin_tcp = match deps.config.admin.bind {
         Some(addr) => Some(listen::bind_tcp("admin", addr).await?),
@@ -247,7 +297,7 @@ pub async fn start(deps: AdminDeps, cancel: CancellationToken) -> Result<AdminHa
             tls: ui_tls,
             url: listen::url_of(address, ui_tls),
         }),
-        data_plane: deps.config.data_plane.bind,
+        data_plane: deps.data_plane_addr,
     };
     let state = api::AdminState::new(deps, listeners, upstreams, cancel.clone());
 

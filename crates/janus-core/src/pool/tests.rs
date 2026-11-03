@@ -22,13 +22,15 @@ use crate::contract::upstream::UsageObserver;
 // ---------------------------------------------------------------- fakes
 
 /// An upstream that understands three document shapes: a plain key
-/// (`{"api_key"}`), a Claude CLI `.credentials.json` (`claudeAiOauth`), and
+/// (`{"api_key"}`, or a bare JSON string, as the real upstreams accept), a Claude CLI `.credentials.json` (`claudeAiOauth`), and
 /// a Codex `auth.json` (`tokens`, with an `expires_at` for the test).
 struct FakeUpstream {
     kind: UpstreamKind,
     refreshes: AtomicUsize,
     refresh_delay: Duration,
     fail_refresh: AtomicBool,
+    /// Refresh to a token that is already within `REFRESH_MARGIN`.
+    stale_refresh: AtomicBool,
 }
 
 impl FakeUpstream {
@@ -42,6 +44,7 @@ impl FakeUpstream {
             refreshes: AtomicUsize::new(0),
             refresh_delay,
             fail_refresh: AtomicBool::new(false),
+            stale_refresh: AtomicBool::new(false),
         })
     }
 
@@ -95,7 +98,7 @@ impl UpstreamImpl for FakeUpstream {
 
     fn decode_material(&self, doc: &MaterialDocument) -> Result<DecodedMaterial, UpstreamError> {
         let v = doc.expose();
-        if let Some(key) = v.get("api_key") {
+        if let Some(key) = v.get("api_key").or(v.is_string().then_some(v)) {
             let key = key
                 .as_str()
                 .filter(|k| !k.is_empty())
@@ -142,7 +145,11 @@ impl UpstreamImpl for FakeUpstream {
         if self.fail_refresh.load(Ordering::SeqCst) {
             return Err(UpstreamError::RefreshFailed("invalid_grant".into()));
         }
-        let later = Utc::now() + chrono::Duration::hours(1);
+        let later = if self.stale_refresh.load(Ordering::SeqCst) {
+            Utc::now() + REFRESH_MARGIN / 2
+        } else {
+            Utc::now() + chrono::Duration::hours(1)
+        };
         let mut v = doc.expose().clone();
         if let Some(oauth) = v.get_mut("claudeAiOauth") {
             let old = oauth["accessToken"].as_str().unwrap_or_default().to_owned();
@@ -296,6 +303,55 @@ fn refs(list: &[CredentialMetadata]) -> Vec<&str> {
     list.iter().map(|m| m.credential_ref.as_str()).collect()
 }
 
+/// `n` default-chain Anthropic resolves released together.
+async fn resolve_all_at_once(
+    pool: &Arc<FilePool>,
+    n: usize,
+) -> Vec<Result<CredentialMaterial, PoolError>> {
+    let barrier = Arc::new(tokio::sync::Barrier::new(n));
+    let tasks: Vec<_> = (0..n)
+        .map(|_| {
+            let pool = pool.clone();
+            let barrier = barrier.clone();
+            tokio::spawn(async move {
+                barrier.wait().await;
+                pool.resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+                    .await
+            })
+        })
+        .collect();
+    let mut results = Vec::new();
+    for task in tasks {
+        results.push(task.await.expect("join"));
+    }
+    results
+}
+
+/// A pool whose Anthropic refreshes take 300ms, holding `a` (expired, first
+/// in the chain) and `b` (healthy).
+async fn slow_refresh_pool_a_expired_b_healthy() -> (Fixture, Arc<FilePool>) {
+    let fx = Fixture::with_anthropic(FakeUpstream::with_delay(
+        UpstreamKind::Anthropic,
+        Duration::from_millis(300),
+    ));
+    let pool = Arc::new(fx.open());
+    for (r, token, expires) in [("a", "at-a", hours(-1)), ("b", "at-b", hours(5))] {
+        let doc = MaterialDocument::new(claude_json(token, expires));
+        pool.add(new_cred(UpstreamKind::Anthropic, Some(r), doc))
+            .await
+            .expect("add");
+    }
+    (fx, pool)
+}
+
+/// End a credential's refresh-failure back-off, as if it had run out.
+fn end_refresh_backoff(pool: &FilePool, credential_ref: &str) {
+    let entry = pool.get(credential_ref).expect("entry");
+    let mut st = entry.lock();
+    let failure = st.refresh_failure.as_mut().expect("a refresh failed");
+    failure.retry_at = Utc::now() - chrono::Duration::seconds(1);
+}
+
 // ------------------------------------------------------------ detection
 
 #[tokio::test]
@@ -368,6 +424,7 @@ async fn recorded_upstream_wins_over_file_name_detection() {
         invalid: None,
         rate_limited_until: None,
         last_error: None,
+        material_file: None,
     };
     slot::write_state(&dir, &state).expect("slot.json");
     let pool = fx.open();
@@ -469,14 +526,18 @@ async fn refresh_failure_is_request_failure_not_fallback() {
     assert_eq!(healthy.request_count, 0, "no other credential was used");
     let failed = pool.show("a-expired").await.expect("show");
     assert_eq!(failed.request_count, 0);
-    assert_eq!(failed.error_count, 2);
+    // The second request was answered by the first's failure (back-off).
+    assert_eq!(fx.anthropic.refreshes(), 1);
+    assert_eq!(failed.error_count, 1);
     assert!(failed
         .last_error
         .as_deref()
         .is_some_and(|e| e.contains("refresh failed") && e.contains("invalid_grant")));
 
-    // Once refresh works again, the same credential is used.
+    // Once refresh works again (and the back-off is over), the same
+    // credential is used.
     fx.anthropic.fail_refresh.store(false, Ordering::SeqCst);
+    end_refresh_backoff(&pool, "a-expired");
     let m = pool
         .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
         .await
@@ -493,20 +554,8 @@ async fn concurrent_refresh_single_flight() {
     let body = serde_json::to_vec(&claude_json("at-0", hours(-1))).expect("json");
     fx.hand_slot("shared", ".credentials.json", &body);
     let pool = Arc::new(fx.open());
-    let barrier = Arc::new(tokio::sync::Barrier::new(16));
-    let tasks: Vec<_> = (0..16)
-        .map(|_| {
-            let pool = pool.clone();
-            let barrier = barrier.clone();
-            tokio::spawn(async move {
-                barrier.wait().await;
-                pool.resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
-                    .await
-            })
-        })
-        .collect();
-    for task in tasks {
-        let m = task.await.expect("join").expect("resolve");
+    for result in resolve_all_at_once(&pool, 16).await {
+        let m = result.expect("resolve");
         assert_eq!(secret_of(&m), "at-0+r1", "everyone got the one refresh");
     }
     assert_eq!(fx.anthropic.refreshes(), 1, "exactly one refresh ran");
@@ -558,6 +607,7 @@ async fn default_chain_order() {
             invalid: None,
             rate_limited_until: None,
             last_error: None,
+            material_file: None,
         };
         slot::write_state(&dir, &state).expect("slot.json");
     }
@@ -1364,6 +1414,363 @@ async fn pool_directory_is_created_and_kept_private() {
     assert_eq!(mode(&fx.pool_dir()), 0o700);
 }
 
+// ----------------------------------------------- refresh failure handling
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_refresh_failure_is_single_flight_and_backs_off() {
+    let fx = Fixture::with_anthropic(FakeUpstream::with_delay(
+        UpstreamKind::Anthropic,
+        Duration::from_millis(200),
+    ));
+    fx.anthropic.fail_refresh.store(true, Ordering::SeqCst);
+    let body = serde_json::to_vec(&claude_json("at-0", hours(-1))).expect("json");
+    fx.hand_slot("spent", ".credentials.json", &body);
+    let pool = Arc::new(fx.open());
+    for result in resolve_all_at_once(&pool, 16).await {
+        let err = result.expect_err("refresh fails");
+        assert!(
+            matches!(&err, PoolError::RefreshFailed { credential_ref, reason }
+                if credential_ref == "spent" && reason.contains("invalid_grant")),
+            "{err:?}"
+        );
+    }
+    assert_eq!(
+        fx.anthropic.refreshes(),
+        1,
+        "waiters share the one failed refresh"
+    );
+    assert_eq!(pool.show("spent").await.expect("show").error_count, 1);
+
+    // Within the back-off, a new request does not call the endpoint either.
+    let again = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await;
+    assert!(
+        matches!(&again, Err(PoolError::RefreshFailed { reason, .. }) if reason.contains("not retried before")),
+        "{again:?}"
+    );
+    assert_eq!(fx.anthropic.refreshes(), 1);
+
+    // After it, one request tries again.
+    end_refresh_backoff(&pool, "spent");
+    let retried = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await;
+    assert!(matches!(retried, Err(PoolError::RefreshFailed { .. })));
+    assert_eq!(fx.anthropic.refreshes(), 2);
+
+    // An operator's forced refresh is not held back, and new material ends
+    // the back-off.
+    pool.refresh("spent")
+        .await
+        .expect_err("forced, still failing");
+    assert_eq!(fx.anthropic.refreshes(), 3);
+    fx.anthropic.fail_refresh.store(false, Ordering::SeqCst);
+    pool.replace_material(
+        "spent",
+        MaterialDocument::new(claude_json("at-new", hours(-1))),
+    )
+    .await
+    .expect("rotate");
+    let m = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await
+        .expect("new material refreshes at once");
+    assert_eq!(secret_of(&m), "at-new+r4");
+}
+
+#[tokio::test]
+async fn refreshed_token_that_is_already_expiring_is_refused() {
+    let fx = Fixture::new();
+    fx.anthropic.stale_refresh.store(true, Ordering::SeqCst);
+    let body = serde_json::to_vec(&claude_json("at-old", hours(-1))).expect("json");
+    let dir = fx.hand_slot("claude", ".credentials.json", &body);
+    let pool = fx.open();
+    let err = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await
+        .expect_err("stale refresh");
+    assert!(
+        matches!(&err, PoolError::RefreshFailed { reason, .. } if reason.contains("already expiring")),
+        "{err:?}"
+    );
+    assert_eq!(fx.anthropic.refreshes(), 1);
+    // Neither memory nor disk took the unusable document.
+    let meta = pool.show("claude").await.expect("show");
+    assert!(meta.expires_at.is_some_and(|t| t < Utc::now()));
+    let on_disk: Value =
+        serde_json::from_slice(&fs::read(dir.join(".credentials.json")).expect("read"))
+            .expect("json");
+    assert_eq!(on_disk["claudeAiOauth"]["accessToken"], "at-old");
+}
+
+#[tokio::test]
+async fn status_is_checked_again_after_waiting_on_a_refresh() {
+    let (_fx, pool) = slow_refresh_pool_a_expired_b_healthy().await;
+    let step = || tokio::time::sleep(Duration::from_millis(60));
+    let resolve = |choice: CredentialChoice| {
+        let pool = pool.clone();
+        tokio::spawn(async move { pool.resolve(UpstreamKind::Anthropic, &choice).await })
+    };
+
+    // The first request refreshes `a` (holding it for 300ms); the operator
+    // disables `a` meanwhile; two more requests queue behind the disable.
+    let first = resolve(CredentialChoice::Ref("a".into()));
+    step().await;
+    let disable = {
+        let pool = pool.clone();
+        tokio::spawn(async move { pool.disable("a").await })
+    };
+    step().await;
+    let named = resolve(CredentialChoice::Ref("a".into()));
+    let default = resolve(CredentialChoice::Default);
+    assert_eq!(
+        first
+            .await
+            .expect("join")
+            .expect("before the disable")
+            .credential_ref,
+        "a"
+    );
+    disable.await.expect("join").expect("disable");
+    let named = named.await.expect("join");
+    assert!(
+        matches!(
+            named,
+            Err(PoolError::Unavailable {
+                status: CredentialStatus::Disabled,
+                ..
+            })
+        ),
+        "{named:?}"
+    );
+    let default = default.await.expect("join").expect("default");
+    assert_eq!(default.credential_ref, "b", "the chain picked again");
+    assert_eq!(pool.show("a").await.expect("show").request_count, 1);
+}
+
+#[tokio::test]
+async fn default_pick_removed_while_waiting_moves_to_the_next() {
+    let (_fx, pool) = slow_refresh_pool_a_expired_b_healthy().await;
+    let resolve = |choice: CredentialChoice| {
+        let pool = pool.clone();
+        tokio::spawn(async move { pool.resolve(UpstreamKind::Anthropic, &choice).await })
+    };
+    let first = resolve(CredentialChoice::Default);
+    tokio::time::sleep(Duration::from_millis(60)).await;
+    let delete = {
+        let pool = pool.clone();
+        tokio::spawn(async move { pool.delete("a").await })
+    };
+    tokio::time::sleep(Duration::from_millis(60)).await;
+    let named = resolve(CredentialChoice::Ref("a".into()));
+    let default = resolve(CredentialChoice::Default);
+    first.await.expect("join").expect("first");
+    delete.await.expect("join").expect("delete");
+    let named = named.await.expect("join");
+    assert!(matches!(named, Err(PoolError::NotFound(_))), "{named:?}");
+    let default = default.await.expect("join").expect("default");
+    assert_eq!(default.credential_ref, "b");
+}
+
+// ------------------------------------------------------ material documents
+
+#[tokio::test]
+async fn bare_string_keys_are_stored_canonically_and_survive_a_restart() {
+    let fx = Fixture::new();
+    let pool = fx.open();
+    for (r, upstream, material) in [
+        ("or", UpstreamKind::OpenRouter, json!("sk-or-v1-x")),
+        ("ant", UpstreamKind::Anthropic, json!("  sk-ant-y\n")),
+        // A key that cannot be a bare key file is stored as JSON.
+        (
+            "spaced",
+            UpstreamKind::OpenRouter,
+            json!({"api_key": "a b"}),
+        ),
+    ] {
+        let meta = pool
+            .add(new_cred(upstream, Some(r), MaterialDocument::new(material)))
+            .await
+            .expect("add");
+        assert_eq!(meta.kind, CredentialKind::ApiKey);
+    }
+    // Rotation accepts the string form too.
+    pool.add(new_cred(
+        UpstreamKind::OpenAi,
+        Some("oai"),
+        MaterialDocument::new(codex_json("at", hours(3))),
+    ))
+    .await
+    .expect("add oai");
+    pool.replace_material("oai", MaterialDocument::new(json!("sk-proj-z")))
+        .await
+        .expect("rotate");
+    assert_eq!(
+        names(&fx.pool_dir().join("or")),
+        vec!["api_key", "slot.json"]
+    );
+    assert_eq!(
+        fs::read(fx.pool_dir().join("ant").join("api_key")).expect("read"),
+        b"sk-ant-y\n"
+    );
+    assert_eq!(
+        names(&fx.pool_dir().join("spaced")),
+        vec!["material.json", "slot.json"]
+    );
+    assert_eq!(
+        names(&fx.pool_dir().join("oai")),
+        vec!["api_key", "slot.json"]
+    );
+    drop(pool);
+
+    let pool = fx.try_open(Vec::new()).expect("restart");
+    for (r, upstream, key) in [
+        ("or", UpstreamKind::OpenRouter, "sk-or-v1-x"),
+        ("ant", UpstreamKind::Anthropic, "sk-ant-y"),
+        ("spaced", UpstreamKind::OpenRouter, "a b"),
+        ("oai", UpstreamKind::OpenAi, "sk-proj-z"),
+    ] {
+        let m = pool
+            .resolve(upstream, &CredentialChoice::Ref(r.into()))
+            .await
+            .expect("resolve");
+        assert_eq!(secret_of(&m), key, "{r}");
+    }
+}
+
+#[tokio::test]
+async fn slots_holding_a_key_as_a_json_string_open() {
+    // What an earlier pool wrote for a bare-string key.
+    let fx = Fixture::new();
+    let dir = fx.hand_slot("legacy", "material.json", b"\"sk-legacy\"\n");
+    let state = SlotState {
+        upstream: UpstreamKind::OpenRouter,
+        label: None,
+        created_at: Utc::now(),
+        disabled: false,
+        invalid: None,
+        rate_limited_until: None,
+        last_error: None,
+        material_file: None,
+    };
+    slot::write_state(&dir, &state).expect("slot.json");
+    fx.hand_slot("legacy-ant", ".credentials.json", b"\"sk-ant-legacy\"");
+    let pool = fx.try_open(Vec::new()).expect("open");
+    let m = pool
+        .resolve(
+            UpstreamKind::OpenRouter,
+            &CredentialChoice::Ref("legacy".into()),
+        )
+        .await
+        .expect("resolve");
+    assert_eq!(secret_of(&m), "sk-legacy");
+    let m = pool
+        .resolve(
+            UpstreamKind::Anthropic,
+            &CredentialChoice::Ref("legacy-ant".into()),
+        )
+        .await
+        .expect("resolve");
+    assert_eq!(secret_of(&m), "sk-ant-legacy");
+}
+
+#[tokio::test]
+async fn half_written_config_file_is_an_error_not_a_key() {
+    let fx = Fixture::new();
+    let auth = fx.outside().join("auth.json");
+    let full = serde_json::to_vec(&codex_json("at-1", hours(2))).expect("json");
+    fs::write(&auth, &full).expect("write");
+    let configured = vec![ConfiguredCredential {
+        credential_ref: "codex".into(),
+        upstream: UpstreamKind::OpenAi,
+        label: None,
+        source: ConfiguredSource::File(auth.clone()),
+    }];
+    let pool = fx.try_open(configured.clone()).expect("open");
+    // The vendor CLI is caught mid-rewrite.
+    fs::write(
+        &auth,
+        b"{\"tokens\":{\"access_token\":\"at-2\",\"refresh_token\":\"rt-SECRET\"",
+    )
+    .expect("truncate");
+    let err = pool
+        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .await
+        .expect_err("half-written file");
+    assert!(matches!(err, PoolError::InvalidMaterial { .. }), "{err:?}");
+    assert!(!format!("{err} {err:?}").contains("SECRET"));
+    let meta = pool.show("codex").await.expect("show");
+    assert_eq!(meta.kind, CredentialKind::Oauth, "not taken for a key");
+    // The rewrite completes: the next request reads it.
+    let done = serde_json::to_vec(&codex_json("at-2", hours(2))).expect("json");
+    fs::write(&auth, &done).expect("finish");
+    let m = pool
+        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .await
+        .expect("resolve");
+    assert_eq!(secret_of(&m), "at-2");
+    drop(pool);
+    // At startup, too, a half-written file refuses rather than guesses.
+    fs::write(&auth, &done[..done.len() - 1]).expect("truncate");
+    assert!(matches!(
+        fx.try_open(configured),
+        Err(OpenError::Configured { .. })
+    ));
+}
+
+#[tokio::test]
+async fn interrupted_rotation_opens_with_the_recorded_material() {
+    let fx = Fixture::new();
+    let pool = fx.open();
+    pool.add(new_cred(
+        UpstreamKind::Anthropic,
+        Some("rot"),
+        key_doc("sk-ant-old"),
+    ))
+    .await
+    .expect("add");
+    drop(pool);
+    let dir = fx.pool_dir().join("rot");
+    let oauth = serde_json::to_vec(&claude_json("at-new", hours(4))).expect("json");
+    let read_state = || -> SlotState {
+        serde_json::from_slice(&fs::read(dir.join(slot::SLOT_STATE_FILE)).expect("read"))
+            .expect("parse")
+    };
+    assert_eq!(read_state().material_file, Some(MaterialFile::ApiKey));
+
+    // Crash after writing the new file, before recording it.
+    fs::write(dir.join(".credentials.json"), &oauth).expect("write");
+    let pool = fx.try_open(Vec::new()).expect("open");
+    let m = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await
+        .expect("resolve");
+    assert_eq!(secret_of(&m), "sk-ant-old");
+    assert_eq!(names(&dir), vec!["api_key", "slot.json"]);
+    drop(pool);
+
+    // Crash after recording it, before removing the old file.
+    fs::write(dir.join(".credentials.json"), &oauth).expect("write");
+    let mut state = read_state();
+    state.material_file = Some(MaterialFile::ClaudeCredentials);
+    slot::write_state(&dir, &state).expect("slot.json");
+    let pool = fx.try_open(Vec::new()).expect("open");
+    let m = pool
+        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .await
+        .expect("resolve");
+    assert_eq!(secret_of(&m), "at-new");
+    assert_eq!(names(&dir), vec![".credentials.json", "slot.json"]);
+
+    // A completed rotation records its file.
+    pool.replace_material("rot", key_doc("sk-ant-3"))
+        .await
+        .expect("rotate");
+    assert_eq!(read_state().material_file, Some(MaterialFile::ApiKey));
+    assert_eq!(names(&dir), vec!["api_key", "slot.json"]);
+}
+
 // ----------------------------------------------------------------- leakage
 
 /// Every log event and span field, as text.
@@ -1458,6 +1865,7 @@ async fn material_never_in_debug_output() {
         .expect_err("refresh fails");
     seen.push(format!("{failed} {failed:?}"));
     fx.anthropic.fail_refresh.store(false, Ordering::SeqCst);
+    end_refresh_backoff(&pool, "claude");
     let material = pool
         .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
         .await

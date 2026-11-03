@@ -50,6 +50,7 @@ pub enum SetupError {
 pub struct PluginHandle {
     client: Arc<dyn PluginClient>,
     grpc: Option<Arc<GrpcPluginClient>>,
+    linked: Option<Arc<LinkedPluginClient<Arc<dyn JanusPlugin>>>>,
     status: Mutex<PluginStatus>,
 }
 
@@ -84,10 +85,11 @@ impl PluginHandle {
         let handle =
             match (transport, linked) {
                 (PluginTransport::Linked, Some(plugin)) => {
-                    let client = LinkedPluginClient::new(plugin, config.timeout())?;
+                    let linked = Arc::new(LinkedPluginClient::new(plugin, config.timeout())?);
                     PluginHandle {
-                        client: Arc::new(client),
+                        client: Arc::clone(&linked) as Arc<dyn PluginClient>,
                         grpc: None,
+                        linked: Some(linked),
                         status: Mutex::new(PluginStatus::new(PluginMode::Linked, None)),
                     }
                 }
@@ -109,6 +111,7 @@ impl PluginHandle {
                     PluginHandle {
                         client: Arc::clone(&grpc) as Arc<dyn PluginClient>,
                         grpc: Some(grpc),
+                        linked: None,
                         status: Mutex::new(status),
                     }
                 }
@@ -147,6 +150,10 @@ impl PluginHandle {
         if let Some(grpc) = &self.grpc {
             status.client_cert_expires_at = grpc.client_cert_expires_at();
             status.server_cert_expires_at = grpc.server_cert_expires_at();
+            status.dropped_events = grpc.dropped_events();
+        }
+        if let Some(linked) = &self.linked {
+            status.dropped_events = linked.dropped_events();
         }
         status
     }
@@ -174,7 +181,7 @@ mod tests {
     use janus_core::contract::plugin::{PluginFailureClass, PluginHealth};
 
     use super::*;
-    use crate::plugin::testutil::{request, serve_unix, socket_dir, FakePlugin};
+    use crate::plugin::testutil::{event, request, serve_unix, socket_dir, FakePlugin};
 
     struct Allow;
 
@@ -221,6 +228,50 @@ mod tests {
         assert_eq!(status.client_cert_expires_at, None);
         handle.notify(crate::plugin::testutil::event("call_completed"));
         handle.reload_tls().expect("no-op off TLS");
+    }
+
+    #[tokio::test]
+    async fn status_reports_dropped_notify_events_for_every_client() {
+        const TOTAL: u64 = 20_000;
+        async fn flood(handle: &PluginHandle) {
+            assert_eq!(handle.status().dropped_events, 0);
+            for n in 0..TOTAL {
+                handle.notify(event(&format!("event-{n}-{}", "x".repeat(200))));
+            }
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+            while handle.status().dropped_events == 0 && tokio::time::Instant::now() < deadline {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            let dropped = handle.status().dropped_events;
+            assert!(dropped > 0, "a stalled plugin's full queue drops");
+            assert!(dropped < TOTAL, "{dropped}: some events were queued");
+        }
+
+        struct Stalls;
+        #[async_trait]
+        impl JanusPlugin for Stalls {
+            async fn resolve_route(&self, _req: ResolveRoute) -> Result<RouteOutcome, PluginError> {
+                Ok(RouteOutcome::UseDefault)
+            }
+
+            async fn notify(&self, _event: NotifyEvent) {
+                std::future::pending::<()>().await;
+            }
+        }
+        let linked: Arc<dyn JanusPlugin> = Arc::new(Stalls);
+        let handle = PluginHandle::from_config(Some(&config("linked = true")), Some(linked))
+            .expect("built")
+            .expect("configured");
+        flood(&handle).await;
+
+        let (_dir, path) = socket_dir();
+        let plugin = FakePlugin::stalling_notify();
+        let _server = serve_unix(&plugin, &path);
+        let cfg = config(&format!("endpoint = \"unix://{}\"", path.display()));
+        let handle = PluginHandle::from_config(Some(&cfg), None)
+            .expect("built")
+            .expect("configured");
+        flood(&handle).await;
     }
 
     #[tokio::test]

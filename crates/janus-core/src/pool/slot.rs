@@ -17,9 +17,28 @@
 //!
 //! Every write is atomic: a temporary file in the same directory, `fsync`,
 //! `rename` over the target, `fsync` of the directory. A slot appears or
-//! disappears as a whole by renaming its directory. Slot files are opened
-//! with `O_NOFOLLOW`, so a symlink planted in a slot is refused rather than
+//! disappears as a whole by renaming its directory. Rotating to a material
+//! file of a different name is three atomic steps — write the new file,
+//! record it in `slot.json`, remove the old one — so a crash between them
+//! leaves two material files of which `slot.json` names the current one,
+//! and the next open removes the other. Slot files are opened with
+//! `O_NOFOLLOW`, so a symlink planted in a slot is refused rather than
 //! followed out of the pool.
+//!
+//! # Material documents
+//!
+//! A plain API key reaches the pool in either form the upstream
+//! implementations accept: a JSON string (`"sk-..."`) or `{"api_key":
+//! "sk-..."}`. The pool holds and stores only the object form
+//! ([`canonical_document`]), and reads either form back from any JSON
+//! material file, so a key the admin surface accepted always survives a
+//! restart. A plain-key document whose key can be an `api_key` file's whole
+//! content ([`bare_key`]) is stored there; any other document as JSON.
+//!
+//! Text that is not JSON is a bare key only when it is unambiguous: one
+//! non-empty token with no whitespace that does not begin with `{`, `[` or
+//! `"`. Text beginning with one of those must be a complete JSON document;
+//! a truncated or half-written vendor file is an error, never a key.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
@@ -29,6 +48,7 @@ use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::contract::credential::{validate_credential_ref, MaterialDocument};
 use crate::contract::upstream::UpstreamKind;
@@ -62,16 +82,21 @@ pub fn pool_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(POOL_DIR_NAME)
 }
 
-/// Which material file a slot holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Which material file a slot holds. Serialized (in `slot.json`) as its
+/// file name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MaterialFile {
     /// `.credentials.json`, the Claude CLI's credential file.
+    #[serde(rename = ".credentials.json")]
     ClaudeCredentials,
     /// `auth.json`, the Codex CLI's credential file.
+    #[serde(rename = "auth.json")]
     CodexAuth,
     /// `api_key`, a bare key as text.
+    #[serde(rename = "api_key")]
     ApiKey,
     /// `material.json`, any other JSON material document.
+    #[serde(rename = "material.json")]
     Generic,
 }
 
@@ -101,11 +126,12 @@ impl MaterialFile {
             .map(|(_, upstream)| *upstream)
     }
 
-    /// The file a document for `upstream` is stored in: a plain-key document
-    /// as `api_key`; any other document under the vendor file name that
-    /// identifies `upstream`, or `material.json` when none does.
+    /// The file a (canonical) document for `upstream` is stored in: a
+    /// plain-key document whose key reads back unchanged from a bare key
+    /// file as `api_key`; any other document under the vendor file name
+    /// that identifies `upstream`, or `material.json` when none does.
     pub fn for_document(upstream: UpstreamKind, doc: &MaterialDocument) -> MaterialFile {
-        if plain_api_key(doc).is_some() {
+        if plain_api_key(doc).is_some_and(|key| bare_key(key) == Ok(key)) {
             return MaterialFile::ApiKey;
         }
         DETECTED_UPSTREAMS
@@ -128,6 +154,9 @@ impl MaterialFile {
             MaterialFile::ApiKey => {
                 let key = plain_api_key(doc)
                     .ok_or("an api_key file holds only an {\"api_key\": ...} document")?;
+                if bare_key(key) != Ok(key) {
+                    return Err("this key cannot be stored as a bare key file".into());
+                }
                 let mut bytes = key.as_bytes().to_vec();
                 bytes.push(b'\n');
                 Ok(bytes)
@@ -151,38 +180,81 @@ pub fn plain_api_key(doc: &MaterialDocument) -> Option<&str> {
     obj.get("api_key")?.as_str()
 }
 
+/// The plain-key document of `key`, without surrounding whitespace.
+fn key_document(key: &str) -> MaterialDocument {
+    MaterialDocument::new(serde_json::json!({ "api_key": key.trim() }))
+}
+
+/// The form the pool holds and stores a document in: a bare key given as a
+/// JSON string, and a plain-key document, become `{"api_key": "<key>"}`
+/// without surrounding whitespace; any other document is unchanged.
+pub fn canonical_document(doc: MaterialDocument) -> MaterialDocument {
+    match doc.expose() {
+        Value::String(key) => key_document(key),
+        _ => match plain_api_key(&doc) {
+            Some(key) if key.trim() != key => key_document(key),
+            _ => doc,
+        },
+    }
+}
+
+/// The text of a file or variable, without surrounding whitespace or a
+/// leading byte-order mark.
+fn document_text(bytes: &[u8]) -> Result<&str, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "not UTF-8".to_owned())?;
+    Ok(text.trim().trim_start_matches('\u{feff}').trim_start())
+}
+
+/// Whether text begins as a JSON document (an object, an array or a string)
+/// would, and so is never taken for a bare key.
+fn looks_like_json(text: &str) -> bool {
+    text.starts_with(['{', '[', '"'])
+}
+
+/// `text` (already trimmed) as a bare key: one non-empty token, no
+/// whitespace, not the start of a JSON document.
+pub fn bare_key(text: &str) -> Result<&str, &'static str> {
+    if text.is_empty() {
+        Err("the API key is empty")
+    } else if text.contains(char::is_whitespace) {
+        Err("a plain API key file holds one key and nothing else")
+    } else if looks_like_json(text) {
+        Err("the text begins like a JSON document but is not a plain key; a JSON material file must be complete, well-formed JSON")
+    } else {
+        Ok(text)
+    }
+}
+
 /// A bare key read from a file or the environment, as the plain-key
 /// document `{"api_key": "<key>"}`. Surrounding whitespace (the trailing
 /// newline of `echo key > file`) is not part of the key.
 pub fn plain_key_document(bytes: &[u8]) -> Result<MaterialDocument, String> {
-    let text = std::str::from_utf8(bytes).map_err(|_| "the API key is not UTF-8".to_owned())?;
-    let key = text.trim();
-    if key.is_empty() {
-        return Err("the API key is empty".into());
-    }
-    if key.contains(char::is_whitespace) {
-        return Err("a plain API key file holds one key and nothing else".into());
-    }
-    Ok(MaterialDocument::new(serde_json::json!({ "api_key": key })))
+    let text = document_text(bytes).map_err(|e| format!("the API key is {e}"))?;
+    Ok(key_document(bare_key(text)?))
 }
 
-/// A JSON material document read from a file. The parser's message names a
-/// position, never the content.
+/// A JSON material document read from a file: an object, or a bare key as
+/// a JSON string (held as its plain-key document). The parser's message
+/// names a position, never the content.
 pub fn json_document(bytes: &[u8]) -> Result<MaterialDocument, String> {
-    let value: serde_json::Value =
-        serde_json::from_slice(bytes).map_err(|e| format!("not valid JSON: {e}"))?;
-    if !value.is_object() {
-        return Err("a JSON material document must be an object".into());
+    let text = document_text(bytes).map_err(|e| format!("the material is {e}"))?;
+    let value: Value = serde_json::from_str(text).map_err(|e| format!("not valid JSON: {e}"))?;
+    match value {
+        Value::Object(_) => Ok(MaterialDocument::new(value)),
+        Value::String(key) => Ok(key_document(&key)),
+        _ => Err("a JSON material document must be an object or a key string".into()),
     }
-    Ok(MaterialDocument::new(value))
 }
 
-/// A config `file` credential's contents: a JSON object is a vendor
-/// credential file, anything else a bare key.
+/// A config `file` credential's contents: text that begins like JSON must
+/// be a complete JSON document (a vendor credential file, or a key as a
+/// JSON string); anything else must be one bare key. A file caught
+/// half-written is an error, so it is never sent upstream as a key.
 pub fn sniff_document(bytes: &[u8]) -> Result<MaterialDocument, String> {
-    match serde_json::from_slice::<serde_json::Value>(bytes) {
-        Ok(value) if value.is_object() => Ok(MaterialDocument::new(value)),
-        _ => plain_key_document(bytes),
+    if document_text(bytes).is_ok_and(looks_like_json) {
+        json_document(bytes)
+    } else {
+        plain_key_document(bytes)
     }
 }
 
@@ -206,6 +278,10 @@ pub struct SlotState {
     pub rate_limited_until: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// Which material file is current. Absent in a slot written by an older
+    /// pool or by hand; then the slot must hold exactly one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material_file: Option<MaterialFile>,
 }
 
 /// Identity of a material file's contents on disk, to notice a file that
@@ -238,6 +314,9 @@ pub struct SlotOnDisk {
     pub stamp: FileStamp,
     /// `None` when the slot was made by hand and has no `slot.json` yet.
     pub state: Option<SlotState>,
+    /// Material files other than the current one: what an interrupted
+    /// rotation left behind, to be removed ([`remove_leftovers`]).
+    pub leftovers: Vec<MaterialFile>,
     /// When the slot directory was last modified: the creation time given to
     /// a hand-made slot.
     pub dir_modified: DateTime<Utc>,
@@ -283,34 +362,6 @@ pub fn read_slot(dir: &Path) -> Result<SlotOnDisk, SlotError> {
             "is not a directory (symlinks are not followed)".into(),
         ));
     }
-    let present: Vec<MaterialFile> = MaterialFile::ALL
-        .into_iter()
-        .filter(|f| fs::symlink_metadata(dir.join(f.file_name())).is_ok())
-        .collect();
-    let material_file = match present.as_slice() {
-        [one] => *one,
-        [] => {
-            return Err(SlotError::Invalid(format!(
-                "holds no material file (expected one of {})",
-                MaterialFile::ALL.map(MaterialFile::file_name).join(", ")
-            )))
-        }
-        many => {
-            return Err(SlotError::Invalid(format!(
-                "holds more than one material file ({}); keep exactly one",
-                many.iter()
-                    .map(|f| f.file_name())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )))
-        }
-    };
-    let (bytes, stamp) = read_no_follow(&dir.join(material_file.file_name())).map_err(|e| {
-        SlotError::Invalid(format!("cannot read {}: {e}", material_file.file_name()))
-    })?;
-    let doc = material_file
-        .decode(&bytes)
-        .map_err(|e| SlotError::Invalid(format!("{}: {e}", material_file.file_name())))?;
     let state = match read_no_follow(&dir.join(SLOT_STATE_FILE)) {
         Ok((bytes, _)) => Some(
             serde_json::from_slice::<SlotState>(&bytes)
@@ -323,11 +374,50 @@ pub fn read_slot(dir: &Path) -> Result<SlotOnDisk, SlotError> {
             )))
         }
     };
+    let present: Vec<MaterialFile> = MaterialFile::ALL
+        .into_iter()
+        .filter(|f| fs::symlink_metadata(dir.join(f.file_name())).is_ok())
+        .collect();
+    let recorded = state
+        .as_ref()
+        .and_then(|s| s.material_file)
+        .filter(|f| present.contains(f));
+    let material_file = match (present.as_slice(), recorded) {
+        ([one], _) => *one,
+        ([], _) => {
+            return Err(SlotError::Invalid(format!(
+                "holds no material file (expected one of {})",
+                MaterialFile::ALL.map(MaterialFile::file_name).join(", ")
+            )))
+        }
+        // An interrupted rotation: `slot.json` names the current file.
+        (_, Some(current)) => current,
+        (many, None) => {
+            return Err(SlotError::Invalid(format!(
+                "holds more than one material file ({}); keep exactly one",
+                many.iter()
+                    .map(|f| f.file_name())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )))
+        }
+    };
+    let leftovers = present
+        .into_iter()
+        .filter(|f| *f != material_file)
+        .collect();
+    let (bytes, stamp) = read_no_follow(&dir.join(material_file.file_name())).map_err(|e| {
+        SlotError::Invalid(format!("cannot read {}: {e}", material_file.file_name()))
+    })?;
+    let doc = material_file
+        .decode(&bytes)
+        .map_err(|e| SlotError::Invalid(format!("{}: {e}", material_file.file_name())))?;
     Ok(SlotOnDisk {
         material_file,
         doc,
         stamp,
         state,
+        leftovers,
         dir_modified: dir_meta
             .modified()
             .map(DateTime::<Utc>::from)
@@ -487,20 +577,37 @@ pub fn create_slot(
     result
 }
 
-/// Replace a slot's material, removing the previous material file when the
-/// new document is stored under a different name.
+/// Replace a slot's material and its `slot.json` (`state`, which must name
+/// `new`), removing the previous material file when the new document is
+/// stored under a different name. Each step is atomic and `slot.json` is
+/// written between them, so a crash at any point leaves a slot that opens:
+/// before `slot.json` names `new`, the old material is current and `new`
+/// a leftover; after, the reverse.
 pub fn replace_material(
     slot_dir: &Path,
     old: MaterialFile,
     new: MaterialFile,
     bytes: &[u8],
+    state: &SlotState,
 ) -> io::Result<FileStamp> {
+    debug_assert_eq!(state.material_file, Some(new));
     let stamp = write_atomic(slot_dir, new.file_name(), bytes, FILE_MODE)?;
+    write_state(slot_dir, state)?;
     if old != new {
-        fs::remove_file(slot_dir.join(old.file_name()))?;
-        sync_dir(slot_dir)?;
+        remove_leftovers(slot_dir, &[old])?;
     }
     Ok(stamp)
+}
+
+/// Remove material files that are not the slot's current one.
+pub fn remove_leftovers(slot_dir: &Path, leftovers: &[MaterialFile]) -> io::Result<()> {
+    for file in leftovers {
+        match fs::remove_file(slot_dir.join(file.file_name())) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
+            _ => {}
+        }
+    }
+    sync_dir(slot_dir)
 }
 
 /// Remove a slot: it disappears at once (renamed to a scratch name), then
@@ -593,6 +700,58 @@ mod tests {
             plain_api_key(&sniff_document(b"sk-x\n").expect("key")),
             Some("sk-x")
         );
+    }
+
+    #[test]
+    fn text_that_begins_like_json_is_never_a_bare_key() {
+        let key = |doc: Result<MaterialDocument, String>| {
+            plain_api_key(&doc.expect("document")).map(str::to_owned)
+        };
+        // Truncated or malformed JSON, minified (no whitespace to give it
+        // away) or not, is an error from every reader of bare keys.
+        for junk in [
+            &b"{\"tokens\":{\"access_token\":\"at\",\"refresh_token\":\"rt\""[..],
+            b"{",
+            b"[\"a\"",
+            b"\"sk-unterminated",
+            b"\xef\xbb\xbf{\"a\":",
+        ] {
+            assert!(sniff_document(junk).is_err(), "{junk:?}");
+            assert!(plain_key_document(junk).is_err(), "{junk:?}");
+        }
+        // Complete JSON that is not an object or a key string is refused.
+        assert!(sniff_document(b"[1]").is_err());
+        // A key as a JSON string is a plain-key document, from any reader.
+        assert_eq!(key(sniff_document(b"\"sk-q\"\n")).as_deref(), Some("sk-q"));
+        assert_eq!(key(json_document(b" \" sk-q \" ")).as_deref(), Some("sk-q"));
+        // A byte-order mark does not hide a vendor file.
+        let doc = sniff_document(b"\xef\xbb\xbf{\"tokens\":{}}").expect("json");
+        assert!(doc.expose().get("tokens").is_some());
+        // Bare keys that are not JSON-shaped stay keys, digits included.
+        assert_eq!(key(sniff_document(b"123456\n")).as_deref(), Some("123456"));
+        assert_eq!(key(sniff_document(b"sk-a{b}")).as_deref(), Some("sk-a{b}"));
+    }
+
+    #[test]
+    fn every_stored_document_reads_back_as_itself() {
+        let docs = [
+            serde_json::json!({"api_key": "sk-plain"}),
+            serde_json::json!({"api_key": "with space"}),
+            serde_json::json!({"api_key": "{looks-like-json"}),
+            serde_json::json!({"api_key": "k", "org": "o"}),
+            serde_json::json!({"claudeAiOauth": {"accessToken": "a"}}),
+        ];
+        for value in docs {
+            let doc = canonical_document(MaterialDocument::new(value.clone()));
+            for up in UpstreamKind::ALL {
+                let file = MaterialFile::for_document(up, &doc);
+                let bytes = file.encode(&doc).expect("encode");
+                let back = file.decode(&bytes).expect("decode");
+                assert_eq!(back.expose(), &value, "{file:?}");
+            }
+        }
+        let canonical = canonical_document(MaterialDocument::new(serde_json::json!(" sk-s\n")));
+        assert_eq!(canonical.expose(), &serde_json::json!({"api_key": "sk-s"}));
     }
 
     #[test]

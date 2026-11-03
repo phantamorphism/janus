@@ -1717,3 +1717,354 @@ async fn mutations_are_audited_with_principal_and_resource() {
     assert!(!text.contains(&token), "admin token logged");
     assert!(!text.contains("sk-or-audit-1"), "material logged");
 }
+
+// ---- hardening: the listener-facing failure classes ----------------------
+
+/// A `GET` for `path` with `Connection: close`, optionally with the token.
+fn get_request(path: &str, token: Option<&str>) -> String {
+    let auth = token.map_or_else(String::new, |t| format!("authorization: Bearer {t}\r\n"));
+    format!("GET {path} HTTP/1.1\r\nhost: localhost\r\n{auth}connection: close\r\n\r\n")
+}
+
+fn status_of(reply: &str) -> u16 {
+    reply
+        .split(' ')
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| panic!("not an HTTP reply: {reply:?}"))
+}
+
+#[tokio::test]
+async fn ui_assets_never_escape_the_assets_directory() {
+    let b = Builder::new(UI);
+    write_assets(b.dir());
+    // Siblings of the assets directory a traversal would reach.
+    write_file(&b.dir().join("secret.txt"), "TOP-SECRET-SIBLING", 0o600);
+    let d = b.start().await;
+    let addr = d.handle().ui_addr().expect("ui bound");
+    let token = d.token();
+    let paths = [
+        "/../secret.txt",
+        "/../admin-token",
+        "/assets/../../secret.txt",
+        "/%2e%2e/secret.txt",
+        "/%2E%2E/admin-token",
+        "/assets/..%2f..%2fsecret.txt",
+        "/assets/%2e%2e%2f%2e%2e%2fadmin-token",
+        "/..%5csecret.txt",
+        "/%2f..%2fsecret.txt",
+        "//../secret.txt",
+        &format!("/{}", b_dir_absolute(&d)),
+        &format!("/%2f{}", b_dir_absolute(&d).trim_start_matches('/')),
+    ];
+    for path in paths {
+        let reply = support::raw(addr, &get_request(path, None))
+            .await
+            .unwrap_or_default();
+        assert!(
+            !reply.contains("TOP-SECRET-SIBLING") && !reply.contains(&token),
+            "{path} escaped the assets directory: {reply}"
+        );
+        if !reply.is_empty() && status_of(&reply) == 200 {
+            assert!(
+                reply.contains("janus ui"),
+                "{path}: 200 but not index.html: {reply}"
+            );
+        }
+    }
+}
+
+/// `<data_dir>/secret.txt` as an absolute path, for absolute-path probes.
+fn b_dir_absolute(d: &support::Daemon) -> String {
+    d.data_dir().join("secret.txt").display().to_string()
+}
+
+#[tokio::test]
+async fn every_api_path_needs_the_token_and_the_spa_never_answers_one() {
+    let b = Builder::new(&format!("{ADMIN_TCP}{UI}"));
+    write_assets(b.dir());
+    let d = b.start().await;
+    let token = d.token();
+    let api_paths = [
+        "/v1",
+        "/v1/",
+        "/v1/status/",
+        "/v1//status",
+        "/v1/requests/stream",
+        "/v1/requests/some-id",
+        "/v1/credentials/x/material",
+        "/v1/identities?include_revoked=true",
+        "/v1/no-such-endpoint",
+    ];
+    for (name, addr) in [
+        ("admin", d.handle().admin_addr().expect("bound")),
+        ("UI", d.handle().ui_addr().expect("bound")),
+    ] {
+        for path in api_paths {
+            let reply = support::raw(addr, &get_request(path, None))
+                .await
+                .expect("an answer");
+            assert_eq!(status_of(&reply), 401, "{name} {path}: {reply}");
+            assert!(reply.contains("\"unauthorized\""), "{name} {path}: {reply}");
+            if path == "/v1/requests/stream" {
+                // Authorised, it never closes; the SSE tests cover it.
+                continue;
+            }
+            let authed = support::raw(addr, &get_request(path, Some(&token)))
+                .await
+                .expect("an answer");
+            assert!(
+                !authed.contains("janus ui"),
+                "{name} {path}: the SPA answered an API path: {authed}"
+            );
+            assert!(
+                authed.contains("application/json"),
+                "{name} {path}: not an API answer: {authed}"
+            );
+        }
+        for method in ["DELETE", "PUT", "PATCH", "OPTIONS"] {
+            let reply = support::raw(
+                addr,
+                &format!(
+                    "{method} /v1/status HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                ),
+            )
+            .await
+            .expect("an answer");
+            assert_eq!(
+                status_of(&reply),
+                401,
+                "{name} {method} /v1/status: {reply}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn oversized_request_bodies_are_refused() {
+    use janus_daemon::admin::MAX_BODY_BYTES;
+    let d = Builder::new(ADMIN_TCP).start().await;
+    let material = "k".repeat(MAX_BODY_BYTES);
+    let body = json!({ "upstream": "openrouter", "material": { "api_key": material } });
+    for client in [d.socket(), d.tcp(Some(&d.token()))] {
+        let reply = client.post("/v1/credentials", Some(body.clone())).await;
+        assert_eq!(reply.status, 413, "{}", reply.text());
+        assert_eq!(reply.error_code(), "payload_too_large");
+    }
+    // Far past the limit, the client is still sending when the server has
+    // decided; it still gets to read the 413 (the rest is drained).
+    let huge = json!({ "upstream": "openrouter", "material": { "api_key": "k".repeat(4 * MAX_BODY_BYTES) } });
+    for client in [d.socket(), d.tcp(Some(&d.token()))] {
+        let reply = client.post("/v1/credentials", Some(huge.clone())).await;
+        assert_eq!(reply.status, 413, "{}", reply.text());
+    }
+    let listed = d.socket().get("/v1/credentials").await.json();
+    assert_eq!(listed["credentials"], json!([]), "nothing was added");
+    // Without the token the body is never read. A client that waits for
+    // `100 Continue` before sending it gets the 401 instead: the token is
+    // checked before anything asks for the body. (A stranger's body is not
+    // drained either, so a client that sends one regardless may see the
+    // connection close under it.)
+    let addr = d.handle().admin_addr().expect("bound");
+    let reply = support::raw(
+        addr,
+        &format!(
+            "POST /v1/credentials HTTP/1.1\r\nhost: localhost\r\ncontent-type: application/json\r\ncontent-length: {}\r\nexpect: 100-continue\r\nconnection: close\r\n\r\n",
+            body.to_string().len()
+        ),
+    )
+    .await
+    .expect("an answer");
+    assert!(reply.starts_with("HTTP/1.1 401 "), "{reply}");
+}
+
+#[tokio::test]
+async fn live_tails_are_capped_and_a_closed_one_frees_its_slot() {
+    use janus_daemon::admin::MAX_TAILS;
+    let d = Builder::new(ADMIN_TCP).start().await;
+    let token = d.token();
+    let mut open = Vec::new();
+    for _ in 0..MAX_TAILS {
+        // A client each: one connection per tail.
+        let mut tail = d.tcp(Some(&token)).sse("/v1/requests/stream").await;
+        assert_eq!(tail.status, 200);
+        assert_eq!(tail.next(WAIT).await.expect("ping").event, "ping");
+        open.push(tail);
+    }
+    let refused = d.tcp(Some(&token)).get("/v1/requests/stream").await;
+    assert_eq!(refused.status, 503, "{}", refused.text());
+    assert_eq!(refused.error_code(), "too_many_streams");
+
+    drop(open.pop());
+    let deadline = std::time::Instant::now() + WAIT;
+    loop {
+        let mut tail = d.tcp(Some(&token)).sse("/v1/requests/stream").await;
+        if tail.status == 200 {
+            assert_eq!(tail.next(WAIT).await.expect("ping").event, "ping");
+            break;
+        }
+        assert_eq!(tail.status, 503);
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the slot was never freed"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+#[tokio::test]
+async fn connections_beyond_the_limit_are_closed_unanswered() {
+    use janus_daemon::admin::MAX_CONNECTIONS;
+    let d = Builder::new(ADMIN_TCP).start().await;
+    let addr = d.handle().admin_addr().expect("bound");
+    let token = d.token();
+    // Idle connections that never send a request, up to the limit.
+    let mut idle = Vec::new();
+    for _ in 0..MAX_CONNECTIONS {
+        idle.push(tokio::net::TcpStream::connect(addr).await.expect("connect"));
+    }
+    let deadline = std::time::Instant::now() + WAIT;
+    loop {
+        // Once every idle connection is accepted, a new one is closed.
+        if support::raw(addr, &get_request("/v1/status", Some(&token)))
+            .await
+            .is_none()
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the limit never applied"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    idle.clear();
+    let deadline = std::time::Instant::now() + WAIT;
+    loop {
+        if let Some(reply) = support::raw(addr, &get_request("/v1/status", Some(&token))).await {
+            assert_eq!(status_of(&reply), 200, "{reply}");
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline, "slots never freed");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+#[tokio::test]
+async fn a_client_that_never_finishes_its_headers_is_disconnected() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let d = Builder::new(ADMIN_TCP).start().await;
+    let addr = d.handle().admin_addr().expect("bound");
+    let mut stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+    stream
+        .write_all(b"GET /v1/status HTTP/1.1\r\nhost: localhost\r\n")
+        .await
+        .expect("write");
+    let started = std::time::Instant::now();
+    let mut rest = Vec::new();
+    let closed = tokio::time::timeout(Duration::from_secs(20), stream.read_to_end(&mut rest)).await;
+    assert!(
+        closed.is_ok(),
+        "a half-sent request held its connection open"
+    );
+    assert!(
+        started.elapsed() >= Duration::from_secs(5),
+        "closed too early: {:?}",
+        started.elapsed()
+    );
+}
+
+#[tokio::test]
+async fn status_reports_the_bound_data_plane_address() {
+    let bound: std::net::SocketAddr = "127.0.0.1:1".parse().expect("addr");
+    let b = Builder::new("");
+    assert_ne!(b.data_plane(), bound);
+    let d = b.data_plane_bound(bound).start().await;
+    let status = d.socket().get("/v1/status").await.json();
+    assert_eq!(status["listeners"]["data_plane"], bound.to_string());
+}
+
+/// Every entry of `dir`, recursively, for "nothing was created" checks.
+fn tree(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).expect("read_dir") {
+        let path = entry.expect("entry").path();
+        if path.is_dir() {
+            out.extend(tree(&path));
+        }
+        out.push(path);
+    }
+    out.sort();
+    out
+}
+
+/// A config, how to prepare its data directory, and the refusal expected.
+type Refusal = (&'static str, fn(&std::path::Path), fn(&AdminError) -> bool);
+
+#[tokio::test]
+async fn check_config_refuses_what_start_refuses_and_creates_nothing() {
+    use janus_daemon::admin::check_config;
+
+    // A good config passes, binds nothing and writes nothing.
+    let port = free_port();
+    let b = Builder::new(&format!("[admin]\nbind = \"127.0.0.1:{port}\"\n{UI}"));
+    write_assets(b.dir());
+    let before = tree(b.dir());
+    check_config(&b.config(), b.dir()).expect("valid");
+    assert_eq!(tree(b.dir()), before, "check_config created files");
+    assert!(!accepts(format!("127.0.0.1:{port}").parse().expect("addr")));
+
+    // A valid existing token file passes too.
+    write_file(&b.dir().join("admin-token"), &"t".repeat(40), 0o600);
+    check_config(&b.config(), b.dir()).expect("valid token");
+
+    let refusals: Vec<Refusal> = vec![
+        (
+            "[admin]\nbind = \"0.0.0.0:0\"\nallow_non_loopback = true\n",
+            |_| {},
+            |e| matches!(e, AdminError::Config(_)),
+        ),
+        (
+            "[admin]\nbind = \"127.0.0.1:0\"\ntls = { cert = \"{dir}/c.pem\", key = \"{dir}/k.pem\" }\n",
+            |_| {},
+            |e| matches!(e, AdminError::Tls { .. }),
+        ),
+        (
+            "[ui]\nbind = \"127.0.0.1:0\"\nassets_dir = \"{dir}/empty\"\n",
+            |dir| std::fs::create_dir(dir.join("empty")).expect("mkdir"),
+            |e| matches!(e, AdminError::UiAssets { .. }),
+        ),
+        (
+            ADMIN_TCP,
+            |dir| write_file(&dir.join("admin-token"), &"t".repeat(40), 0o644),
+            |e| matches!(e, AdminError::Token { .. }),
+        ),
+        (
+            ADMIN_TCP,
+            |dir| write_file(&dir.join("admin-token"), "short", 0o600),
+            |e| matches!(e, AdminError::Token { .. }),
+        ),
+    ];
+    for (config, setup, expected) in refusals {
+        let b = Builder::new(config);
+        setup(b.dir());
+        let before = tree(b.dir());
+        let err = check_config(&b.config(), b.dir()).expect_err(config);
+        assert!(expected(&err), "{config}: wrong refusal: {err}");
+        assert_eq!(
+            tree(b.dir()),
+            before,
+            "{config}: check_config created files"
+        );
+        // And start refuses the same way.
+        match b.try_start().await {
+            Err((e, _)) => assert!(expected(&e), "{config}: start refused differently: {e}"),
+            Ok(_) => panic!("{config}: start accepted what check_config refused"),
+        }
+    }
+
+    let gone = tempfile::tempdir().expect("tempdir").path().join("missing");
+    let err = check_config(&Builder::new("").config(), &gone).expect_err("no data dir");
+    assert!(matches!(err, AdminError::DataDir { .. }), "{err}");
+    assert!(!gone.exists(), "check_config created the data directory");
+}

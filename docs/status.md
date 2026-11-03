@@ -7,29 +7,41 @@ tags: [janus, status]
 
 # Status
 
-As of 2026-11-01, the design in this corpus is complete and the `janus` code
-repository is still scaffolding. This document is a plain statement of what's
-actually built, and of anything still genuinely undecided — not a place to
-invent answers to make the picture look more finished than it is.
+This document is a plain statement of what is built, what is not, and anything
+still genuinely undecided — not a place to invent answers to make the picture
+look more finished than it is.
 
 ## Current build status {#build-status}
 
-- `cargo check` passes on the `janus` workspace. `tsc` and `eslint` pass on the
-  UI.
-- Every binary is a stub: `janus-daemon` and `janus` (the CLI) each just print a
-  "not yet implemented" message. `janus-core` is a doc-comment stub with no
-  logic. The UI is a single placeholder page.
-- No proxying happens yet, and no credential has ever been substituted. The
-  forwarding path described in
-  <ref target="docs/architecture#request-lifecycle">the request lifecycle</ref>
-  is design, not running code. See <ref target="docs/scope#extractable">scope:
-  what carries over</ref> for what the first implementation work involves.
-- `proto/janus.proto` is the one exception: it's a worked design, not a stub.
-  See <ref target="docs/plugin-contract">the plugin contract</ref>.
-- This documentation corpus is the first deliverable beyond scaffolding. It
-  describes the intended design in full, deliberately, while the code is still a
-  scaffold — so read everything outside this section as design unless it says
-  otherwise.
+Built and running:
+
+- **`janus-core`** — the plugin contract (`janus.proto` and its generated client
+  and server), the `JanusPlugin` trait for linked plugins, the identity
+  extractors (`hmac`, `jwt`, `opaque`, `trusted_header`, plus `none` and custom
+  methods) and their bindings, the `peer::PeerUid` interceptor for socket
+  plugins, and the metering primitives with the in-memory and SQLite
+  `UsageStore`s and their conformance suite.
+- **`janus-daemon`** — the data plane for the Anthropic, OpenAI (including
+  ChatGPT-account OAuth credentials, served at the Codex backend) and OpenRouter
+  upstreams, through the full
+  <ref target="docs/architecture#request-lifecycle">request lifecycle</ref>; the
+  credential pool with config credentials, pool slots and refresh; the plugin
+  client over a unix socket, mutual TLS or opt-in plaintext, or linked; the
+  opaque-identity registry and request log in SQLite; the admin API on the unix
+  socket, the TCP admin listener and the UI listener; and
+  `janus-daemon check-config`. See <ref target="docs/configuration">daemon
+  configuration</ref>.
+- **The UI** — the Overview, Credentials, Identities, Requests (with live tail
+  and detail drawer) and Plugin views described in
+  <ref target="docs/admin-surface#ui">the UI</ref>, behind a token prompt.
+
+Not built:
+
+- **The `janus` CLI.** The binary is a stub that prints "not yet implemented".
+  Every command in <ref target="docs/admin-surface#cli">the janus CLI</ref> is
+  design; until it exists the admin API is reached with `curl` or the UI. The
+  key generation behind `janus plugin tls init` exists as a daemon library
+  module, but no command exposes it.
 
 ## Decided, and where the design lives {#decided}
 

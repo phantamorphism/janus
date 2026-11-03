@@ -88,8 +88,9 @@ impl<S: UsageStore> Meter<S> {
         self
     }
 
-    /// The store, for what `Meter` does not wrap — chiefly `compact`, which a
-    /// plugin calls on a timer of its choosing.
+    /// The store, for what `Meter` does not wrap — chiefly `compact`. The
+    /// shipped stores also compact themselves from their write path, so a
+    /// plugin's own timer is optional.
     pub fn store(&self) -> &S {
         &self.store
     }
@@ -526,16 +527,9 @@ mod tests {
         );
     }
 
-    fn meter_with_tight_minute() -> Meter<MemoryUsageStore> {
-        memory_meter(
-            &[("requests", total(50)), ("requests", per_minute(3))],
-            &clock(),
-        )
-    }
-
-    #[tokio::test]
-    async fn charge_exceeded_reports_the_quota_that_was_exceeded() {
-        let meter = meter_with_tight_minute();
+    /// Charging 3 `requests` fills the effective limit, so the next unit is
+    /// refused against a limit of 3.
+    async fn assert_three_fill_a_limit_of_three(meter: &Meter<MemoryUsageStore>) {
         meter
             .charge("r1", "alice", "requests", 3)
             .await
@@ -547,6 +541,19 @@ mod tests {
                 .expect("charge"),
             Charge::Exceeded { used: 3, limit: 3 }
         );
+    }
+
+    fn meter_with_tight_minute() -> Meter<MemoryUsageStore> {
+        memory_meter(
+            &[("requests", total(50)), ("requests", per_minute(3))],
+            &clock(),
+        )
+    }
+
+    #[tokio::test]
+    async fn charge_exceeded_reports_the_quota_that_was_exceeded() {
+        let meter = meter_with_tight_minute();
+        assert_three_fill_a_limit_of_three(&meter).await;
     }
 
     #[tokio::test]
@@ -841,17 +848,7 @@ mod tests {
             ],
             &clock(),
         );
-        meter
-            .charge("r1", "alice", "requests", 3)
-            .await
-            .expect("charge");
-        assert_eq!(
-            meter
-                .charge("r2", "alice", "requests", 1)
-                .await
-                .expect("charge"),
-            Charge::Exceeded { used: 3, limit: 3 }
-        );
+        assert_three_fill_a_limit_of_three(&meter).await;
     }
 
     /// The docs' example: a per-minute and a per-day limit on the same

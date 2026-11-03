@@ -39,10 +39,29 @@
 //! Refresh happens on use when the decoded `expires_at` is within
 //! [`REFRESH_MARGIN`], and on demand ([`CredentialPool::refresh`]). It is
 //! single-flight per credential: concurrent requests for an expiring
-//! credential wait for one refresh and all use its result. A refreshed
-//! document is written back where it came from (the slot, or a config
-//! `file`); a config `env` credential keeps it in memory. A refresh that
-//! fails fails the request, and never moves it to another credential.
+//! credential wait for one refresh and all use its result — success or
+//! failure. A failed refresh is not retried on use for
+//! [`REFRESH_FAILURE_BACKOFF`]: requests in that window fail at once with
+//! the same reason instead of each calling the token endpoint again. An
+//! operator's forced refresh, or new material (rotated, or changed on
+//! disk), ends the back-off. A refreshed document is written back where it
+//! came from (the slot, or a config `file`); a config `env` credential keeps
+//! it in memory. A refresh that fails fails the request, and never moves it
+//! to another credential.
+//!
+//! A request checks the credential's status again after waiting on a
+//! refresh: one disabled, marked invalid, rate-limited or removed meanwhile
+//! is not handed out. A named `ref` then fails; the default chain picks
+//! again.
+//!
+//! Material documents: a plain key arrives as `"<key>"` or `{"api_key":
+//! "<key>"}` and is held and stored as the latter; see the `slot` module for
+//! which file each document is stored in and what text is taken for a bare
+//! key (never a truncated JSON file).
+//!
+//! All filesystem work on the request and admin paths runs on the blocking
+//! pool, never on the async executor. [`FilePool::open`] is synchronous and
+//! runs before serving.
 //!
 //! Material never appears in `Debug` or `Display` output, in an error, or in
 //! a log event: [`Secret`](crate::contract::credential::Secret) and
@@ -79,6 +98,10 @@ pub const REFRESH_MARGIN: chrono::Duration = chrono::Duration::seconds(60);
 /// How long a credential is held out of the default chain after the
 /// upstream rate-limited it without saying until when.
 pub const DEFAULT_RATE_LIMIT_BACKOFF: chrono::Duration = chrono::Duration::seconds(60);
+
+/// How long a failed refresh is served to requests as their answer before
+/// the token endpoint is asked again.
+pub const REFRESH_FAILURE_BACKOFF: chrono::Duration = chrono::Duration::seconds(10);
 
 /// A `[[credential]]` entry of the daemon config.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,6 +244,17 @@ struct EntryState {
     last_error: Option<String>,
     /// Deleted while someone still held the entry.
     removed: bool,
+    /// The last refresh's failure, until a refresh succeeds or the material
+    /// is replaced. Its back-off is what makes requests that waited on the
+    /// failed refresh share its answer: they reach `io` within it.
+    refresh_failure: Option<RefreshFailure>,
+}
+
+/// A failed refresh, shared with the requests that waited on it and served
+/// to those that arrive before `retry_at`.
+struct RefreshFailure {
+    reason: String,
+    retry_at: DateTime<Utc>,
 }
 
 impl EntryState {
@@ -258,12 +292,12 @@ fn write_lock<T>(lock: &RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
 }
 
 /// Run blocking filesystem work off the async executor.
-async fn blocking<T: Send + 'static>(
-    f: impl FnOnce() -> io::Result<T> + Send + 'static,
-) -> io::Result<T> {
+async fn blocking<T: Send + 'static, E: From<io::Error> + Send + 'static>(
+    f: impl FnOnce() -> Result<T, E> + Send + 'static,
+) -> Result<T, E> {
     tokio::task::spawn_blocking(f)
         .await
-        .map_err(io::Error::other)?
+        .map_err(|e| E::from(io::Error::other(e)))?
 }
 
 fn invalid_material(upstream: UpstreamKind, e: impl fmt::Display) -> PoolError {
@@ -310,6 +344,7 @@ impl Entry {
             invalid: st.invalid.clone(),
             rate_limited_until: st.rate_limited_until,
             last_error: st.last_error.clone(),
+            material_file: st.material.file,
         }
     }
 
@@ -325,40 +360,74 @@ impl Entry {
         Ok(())
     }
 
-    /// How the backing file looks on disk now; `None` for `env`.
-    fn disk_stamp(&self) -> io::Result<Option<FileStamp>> {
+    /// The backing file, and whether a symlink at its final component is
+    /// followed (a config `file` may be linked into place; a slot file may
+    /// not); `None` for `env`.
+    fn backing_file(&self) -> Option<(PathBuf, bool)> {
         match &self.origin {
-            Origin::Env => Ok(None),
-            Origin::File { path } => Ok(Some(FileStamp::of(&std::fs::metadata(path)?))),
+            Origin::Env => None,
+            Origin::File { path } => Some((path.clone(), true)),
             Origin::Pool { dir } => {
-                let file = self.lock().material.file;
-                match file {
-                    Some(file) => slot::stamp_no_follow(&dir.join(file.file_name())).map(Some),
-                    None => Ok(None),
-                }
+                let file = self.lock().material.file?;
+                Some((dir.join(file.file_name()), false))
             }
         }
+    }
+
+    /// How the backing file looks on disk now; `None` for `env`.
+    async fn disk_stamp(&self) -> io::Result<Option<FileStamp>> {
+        let Some((path, follow)) = self.backing_file() else {
+            return Ok(None);
+        };
+        blocking(move || {
+            let meta = if follow {
+                std::fs::metadata(&path)?
+            } else {
+                std::fs::symlink_metadata(&path)?
+            };
+            Ok(Some(FileStamp::of(&meta)))
+        })
+        .await
     }
 
     /// Reread the backing file if it changed since it was read: a config
     /// `file` rewritten by its vendor CLI, a slot edited by hand. Callers
     /// hold `io`.
-    fn reload_if_changed(&self) -> Result<(), PoolError> {
-        let stamp = self.disk_stamp()?;
+    async fn reload_if_changed(&self) -> Result<(), PoolError> {
+        let stamp = self.disk_stamp().await?;
         if self.lock().material.stamp == stamp {
             return Ok(());
         }
+        let upstream = self.upstream.clone();
         let material = match &self.origin {
             Origin::Env => return Ok(()),
-            Origin::File { path } => read_file_source(self.upstream.as_ref(), path)?,
+            Origin::File { path } => {
+                let path = path.clone();
+                blocking(move || read_file_source(upstream.as_ref(), &path)).await?
+            }
             Origin::Pool { dir } => {
                 let file = self.lock().material.file.unwrap_or(MaterialFile::Generic);
-                read_slot_material(self.upstream.as_ref(), &dir.join(file.file_name()), file)?
+                let path = dir.join(file.file_name());
+                blocking(move || read_slot_material(upstream.as_ref(), &path, file)).await?
             }
         };
         tracing::info!(credential = %self.credential_ref, "credential material changed on disk; reloaded");
-        self.lock().material = material;
+        let mut st = self.lock();
+        st.material = material;
+        st.refresh_failure = None;
         Ok(())
+    }
+
+    /// The error a request gets for a refresh failure it did not run.
+    fn shared_failure(&self, failure: &RefreshFailure) -> PoolError {
+        PoolError::RefreshFailed {
+            credential_ref: self.credential_ref.clone(),
+            reason: format!(
+                "{} (not retried before {})",
+                failure.reason,
+                failure.retry_at.to_rfc3339()
+            ),
+        }
     }
 
     /// Make the material usable: reload it if its file changed, and refresh
@@ -366,7 +435,8 @@ impl Entry {
     async fn make_usable(&self, force: bool) -> Result<(), PoolError> {
         // The request path: nothing to do, so take no lock.
         if !force {
-            let current = matches!(self.disk_stamp(), Ok(s) if s == self.lock().material.stamp);
+            let on_disk = self.disk_stamp().await;
+            let current = matches!(on_disk, Ok(s) if s == self.lock().material.stamp);
             if current && !self.lock().needs_refresh(Utc::now()) {
                 return Ok(());
             }
@@ -375,14 +445,22 @@ impl Entry {
         if self.lock().removed {
             return Err(PoolError::NotFound(self.credential_ref.clone()));
         }
-        if let Err(e) = self.reload_if_changed() {
+        if let Err(e) = self.reload_if_changed().await {
             self.lock()
                 .record_error(format!("cannot reload material: {e}"));
             return Err(e);
         }
-        // Waiting on `io` may have been waiting on another refresh.
-        if !force && !self.lock().needs_refresh(Utc::now()) {
-            return Ok(());
+        if !force {
+            let now = Utc::now();
+            let st = self.lock();
+            // Waiting on `io` may have been waiting on another refresh.
+            if !st.needs_refresh(now) {
+                return Ok(());
+            }
+            // That refresh failed, or one failed recently: share its answer.
+            if let Some(failure) = st.refresh_failure.as_ref().filter(|f| f.retry_at > now) {
+                return Err(self.shared_failure(failure));
+            }
         }
         self.refresh_locked().await
     }
@@ -392,8 +470,12 @@ impl Entry {
         let doc = self.lock().material.doc.clone();
         let fail = |reason: String| {
             tracing::warn!(credential = %self.credential_ref, upstream = %self.kind(), %reason, "credential refresh failed");
-            self.lock()
-                .record_error(format!("refresh failed: {reason}"));
+            let mut st = self.lock();
+            st.record_error(format!("refresh failed: {reason}"));
+            st.refresh_failure = Some(RefreshFailure {
+                reason: reason.clone(),
+                retry_at: Utc::now() + REFRESH_FAILURE_BACKOFF,
+            });
             PoolError::RefreshFailed {
                 credential_ref: self.credential_ref.clone(),
                 reason,
@@ -429,6 +511,7 @@ impl Entry {
             let mut st = self.lock();
             st.material.doc = new_doc.clone();
             st.material.decoded = decoded;
+            st.refresh_failure = None;
         }
         let written = match &self.origin {
             Origin::Env => Ok(None),
@@ -633,6 +716,10 @@ impl FilePool {
         };
         validate_credential_ref(name).map_err(|e| err(format!("not a valid slot name: {e}")))?;
         let disk = slot::read_slot(path).map_err(|e| err(e.to_string()))?;
+        if !disk.leftovers.is_empty() {
+            tracing::warn!(credential = %name, current = disk.material_file.file_name(), "removing material left by an interrupted rotation");
+            slot::remove_leftovers(path, &disk.leftovers).map_err(|e| err(e.to_string()))?;
+        }
         slot::make_private(path, disk.material_file).map_err(|e| err(e.to_string()))?;
         let upstream_kind = match &disk.state {
             Some(state) => state.upstream,
@@ -670,6 +757,7 @@ impl FilePool {
                     invalid: None,
                     rate_limited_until: None,
                     last_error: None,
+                    material_file: Some(disk.material_file),
                 };
                 slot::write_state(path, &state).map_err(|e| err(e.to_string()))?;
                 tracing::info!(credential = %name, upstream = %upstream_kind, "adopted hand-made credential pool slot");
@@ -758,11 +846,14 @@ impl FilePool {
         Ok(entry.metadata())
     }
 
+    /// A ref no credential has. A directory made by hand since open may
+    /// still hold the name; [`slot::create_slot`] refuses it and `add`
+    /// picks again.
     fn generate_ref(&self, upstream: UpstreamKind) -> String {
         let entries = read_lock(&self.entries);
         loop {
             let candidate = format!("{upstream}-{:08x}", rand::random::<u32>());
-            if !entries.contains_key(&candidate) && !self.dir.join(&candidate).exists() {
+            if !entries.contains_key(&candidate) {
                 return candidate;
             }
         }
@@ -782,6 +873,7 @@ impl EntryState {
             error_count: 0,
             last_error: None,
             removed: false,
+            refresh_failure: None,
         }
     }
 }
@@ -793,42 +885,61 @@ impl CredentialPool for FilePool {
         upstream: UpstreamKind,
         choice: &CredentialChoice,
     ) -> Result<CredentialMaterial, PoolError> {
-        let entry = match choice {
-            CredentialChoice::Ref(r) => {
-                let entry = self.get(r)?;
-                if entry.kind() != upstream {
-                    return Err(PoolError::WrongUpstream {
-                        credential_ref: r.clone(),
-                        expected: upstream,
-                        actual: entry.kind(),
-                    });
-                }
-                let status = entry.lock().status(Utc::now());
-                if status != CredentialStatus::Active {
-                    return Err(PoolError::Unavailable {
-                        credential_ref: r.clone(),
-                        status,
-                    });
-                }
-                entry
-            }
-            CredentialChoice::Default => self.default_entry(upstream)?,
+        let unavailable = |r: &str, status| PoolError::Unavailable {
+            credential_ref: r.to_owned(),
+            status,
         };
-        entry.make_usable(false).await?;
-        let mut st = entry.lock();
-        if st.removed {
-            return Err(PoolError::NotFound(entry.credential_ref.clone()));
+        loop {
+            let entry = match choice {
+                CredentialChoice::Ref(r) => {
+                    let entry = self.get(r)?;
+                    if entry.kind() != upstream {
+                        return Err(PoolError::WrongUpstream {
+                            credential_ref: r.clone(),
+                            expected: upstream,
+                            actual: entry.kind(),
+                        });
+                    }
+                    let status = entry.lock().status(Utc::now());
+                    if status != CredentialStatus::Active {
+                        return Err(unavailable(r, status));
+                    }
+                    entry
+                }
+                CredentialChoice::Default => self.default_entry(upstream)?,
+            };
+            let usable = entry.make_usable(false).await;
+            let default = matches!(choice, CredentialChoice::Default);
+            match usable {
+                // Removed while this request waited: the chain picks again.
+                Err(PoolError::NotFound(_)) if default => continue,
+                other => other?,
+            }
+            // Waiting on a refresh, the credential may have been removed,
+            // disabled, or marked invalid or rate-limited.
+            let mut st = entry.lock();
+            let status = st.status(Utc::now());
+            if st.removed || status != CredentialStatus::Active {
+                if default {
+                    continue;
+                }
+                return Err(if st.removed {
+                    PoolError::NotFound(entry.credential_ref.clone())
+                } else {
+                    unavailable(&entry.credential_ref, status)
+                });
+            }
+            st.request_count += 1;
+            st.last_used_at = Some(Utc::now());
+            let decoded = &st.material.decoded;
+            return Ok(CredentialMaterial {
+                credential_ref: entry.credential_ref.clone(),
+                upstream,
+                kind: decoded.kind,
+                secret: decoded.secret.clone(),
+                account_id: decoded.account_id.clone(),
+            });
         }
-        st.request_count += 1;
-        st.last_used_at = Some(Utc::now());
-        let decoded = &st.material.decoded;
-        Ok(CredentialMaterial {
-            credential_ref: entry.credential_ref.clone(),
-            upstream,
-            kind: decoded.kind,
-            secret: decoded.secret.clone(),
-            account_id: decoded.account_id.clone(),
-        })
     }
 
     async fn report(
@@ -883,6 +994,7 @@ impl CredentialPool for FilePool {
             label,
             material: doc,
         } = new;
+        let doc = slot::canonical_document(doc);
         if let Some(r) = &credential_ref {
             validate_credential_ref(r)?;
         }
@@ -894,13 +1006,6 @@ impl CredentialPool for FilePool {
         let bytes = file.encode(&doc).map_err(|e| invalid_material(kind, e))?;
 
         let _membership = self.membership.lock().await;
-        let credential_ref = match credential_ref {
-            Some(r) => r,
-            None => self.generate_ref(kind),
-        };
-        if read_lock(&self.entries).contains_key(&credential_ref) {
-            return Err(PoolError::AlreadyExists(credential_ref));
-        }
         let created_at = Utc::now();
         let state = SlotState {
             upstream: kind,
@@ -910,15 +1015,30 @@ impl CredentialPool for FilePool {
             invalid: None,
             rate_limited_until: None,
             last_error: None,
+            material_file: Some(file),
         };
-        let pool = self.dir.clone();
-        let r = credential_ref.clone();
-        let stamp = blocking(move || slot::create_slot(&pool, &r, file, &bytes, &state))
-            .await
-            .map_err(|e| match e.kind() {
-                io::ErrorKind::AlreadyExists => PoolError::AlreadyExists(credential_ref.clone()),
-                _ => PoolError::Io(e),
-            })?;
+        let (credential_ref, stamp) = loop {
+            let r = match &credential_ref {
+                Some(r) => r.clone(),
+                None => self.generate_ref(kind),
+            };
+            if read_lock(&self.entries).contains_key(&r) {
+                return Err(PoolError::AlreadyExists(r));
+            }
+            let (pool, name, bytes, state) =
+                (self.dir.clone(), r.clone(), bytes.clone(), state.clone());
+            match blocking(move || slot::create_slot(&pool, &name, file, &bytes, &state)).await {
+                Ok(stamp) => break (r, stamp),
+                // A generated name taken by a directory made by hand.
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists && credential_ref.is_none() => {
+                    continue
+                }
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                    return Err(PoolError::AlreadyExists(r))
+                }
+                Err(e) => return Err(PoolError::Io(e)),
+            }
+        };
         let material = Material {
             doc,
             decoded,
@@ -947,6 +1067,7 @@ impl CredentialPool for FilePool {
         doc: MaterialDocument,
     ) -> Result<CredentialMetadata, PoolError> {
         let (entry, dir) = self.pool_slot(credential_ref)?;
+        let doc = slot::canonical_document(doc);
         let kind = entry.kind();
         let decoded = entry
             .upstream
@@ -961,9 +1082,16 @@ impl CredentialPool for FilePool {
         if entry.lock().removed {
             return Err(PoolError::NotFound(credential_ref.to_owned()));
         }
-        let old_file = entry.lock().material.file.unwrap_or(new_file);
+        let (old_file, state) = {
+            let st = entry.lock();
+            let mut state = entry.slot_state(&st);
+            state.invalid = None;
+            state.material_file = Some(new_file);
+            (st.material.file.unwrap_or(new_file), state)
+        };
         let stamp =
-            blocking(move || slot::replace_material(&dir, old_file, new_file, &bytes)).await?;
+            blocking(move || slot::replace_material(&dir, old_file, new_file, &bytes, &state))
+                .await?;
         {
             let mut st = entry.lock();
             st.material = Material {
@@ -973,8 +1101,8 @@ impl CredentialPool for FilePool {
                 stamp: Some(stamp),
             };
             st.invalid = None;
+            st.refresh_failure = None;
         }
-        entry.persist_state().await?;
         tracing::info!(credential = %credential_ref, upstream = %kind, "credential material replaced");
         Ok(entry.metadata())
     }

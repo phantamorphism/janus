@@ -13,8 +13,7 @@ request takes through them. For what the system is *for* — callers, identities
 and why the substitution exists at all — see
 <ref target="docs/credential-substitution">credential substitution and policy
 enforcement</ref>. See <ref target="docs/status#build-status">status</ref> for
-how much of this is actually implemented today (as of 2026-11-01: scaffolding
-only).
+which parts are built; all are except the `janus` CLI.
 
 ## Crate split {#crates}
 
@@ -105,12 +104,11 @@ It exposes three distinct surfaces:
 With no plugin endpoint configured, `janus-daemon` makes zero calls defined in
 `proto/janus.proto` and behaves as a plain credential-substituting pass-through
 proxy. This is an explicit design requirement (see
-<ref target="docs/index#goals">standalone by default</ref>), not an accident of
-the current stub state. A plugin is configured in the daemon's config file and
-the channel to it is secured per transport — see
-<ref target="docs/plugin-contract#plugin-config">configuring the plugin</ref>
-and <ref target="docs/plugin-contract#channel-security">securing the
-channel</ref>.
+<ref target="docs/index#goals">standalone by default</ref>). A plugin is
+configured in the daemon's config file and the channel to it is secured per
+transport — see <ref target="docs/plugin-contract#plugin-config">configuring the
+plugin</ref> and <ref target="docs/plugin-contract#channel-security">securing
+the channel</ref>.
 
 ### janus-cli {#janus-cli}
 
@@ -172,7 +170,7 @@ So they don't share a listener:
   `admin.allow_plaintext = true` says, explicitly, that something outside Janus
   is encrypting the hop; the daemon refuses to start rather than quietly
   exposing credential management in the clear.
-- **The UI listener** (`ui.bind`, loopback by default) serves the UI's static
+- **The UI listener** (`ui.bind`, an explicit address) serves the UI's static
   assets, and — because a browser cannot speak a unix socket — the same admin
   API alongside them. It is a third listener, distinct from the data plane; the
   admin socket stays available either way. Not enabling the UI means that
@@ -318,11 +316,11 @@ for. Each of these can be added later as a new extension point without
 redesigning anything above, which is precisely why it is safe to leave them out
 now instead of guessing at them.
 
-## What's real vs. scaffolded {#reality-check}
+## What is built {#reality-check}
 
-`proto/janus.proto` is a working design — see
-<ref target="docs/plugin-contract">the plugin contract</ref> for the two RPCs it
-defines and the reasoning behind their shapes. Everything else described above
-(the crates, the lifecycle, the UI) is design plus scaffolding: each binary
-currently just prints a "not yet implemented" message, `janus-core` has no
-logic, and the UI is a placeholder page. No proxying happens yet.
+`janus-core`, `janus-daemon` and the UI implement what this document describes:
+the daemon proxies the three LLM upstreams through the full request lifecycle,
+with the plugin client, credential pool, request log and admin surface behind
+it. The `janus` CLI is the exception — its binary is a stub, and the admin API
+is reached with `curl` or the UI until it exists. The detail is in
+<ref target="docs/status#build-status">status</ref>.
