@@ -11,3 +11,23 @@ name = "janus"
 path = "src/main.rs"
 
 [dependencies]
+janus-core.workspace = true
+tokio.workspace = true
+futures.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+bytes.workspace = true
+reqwest.workspace = true
+url.workspace = true
+rcgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+humantime.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

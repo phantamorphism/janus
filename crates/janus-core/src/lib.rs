@@ -17,4 +17,16 @@
 //! call is allowed at all) is reached only through the plugin contract in
 //! `proto/`, never by depending on a specific host app's types.
 //!
-//! Not yet implemented — this crate is currently a scaffold.
+//! Layout:
+//!
+//! - [`contract`] — the types and traits every other module (and the daemon,
+//!   and plugins) codes against: identity extraction, binding config, the
+//!   plugin contract in Rust and wire form, metering signatures, credential
+//!   metadata, upstream names and data-directory layout.
+//! - [`identity`], [`pool`], [`metering`], [`proxy`] — the implementations.
+
+pub mod contract;
+pub mod identity;
+pub mod metering;
+pub mod pool;
+pub mod proxy;

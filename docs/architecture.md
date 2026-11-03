@@ -291,10 +291,10 @@ is the mechanism the whole system exists to provide.
 Janus does not transform responses, and does not define an API for doing so.
 This is a scope boundary, not an unanswered question.
 
-The reasoning is that there is nothing concrete to design against. Both launch
-upstreams are HTTP APIs that stream, and for both of them every behavior Janus
-needs — substitute the credential, decide whether the call is allowed, report
-what it cost — is satisfied on the request side plus
+The reasoning is that there is nothing concrete to design against. All three
+launch upstreams are HTTP APIs that stream, and for both of them every behavior
+Janus needs — substitute the credential, decide whether the call is allowed,
+report what it cost — is satisfied on the request side plus
 <ref target="docs/plugin-contract#notify">Notify</ref>. No second use case
 exists yet that a transform API would serve, and a transform API invented
 without one would be the worst of both: speculative surface area on the hot
@@ -311,7 +311,7 @@ Specifically out of scope until a concrete use case demands it:
   headers or edit a caller's body. `ResolveRoute` answers *which credential*; it
   does not get to reshape the call.
 - **Non-HTTP transports.** gRPC passthrough and other protocols are not
-  supported. Both launch upstreams are HTTP.
+  supported. All three launch upstreams are HTTP.
 
 This is what the <ref target="docs/plugin-contract">plugin contract</ref> is
 for. Each of these can be added later as a new extension point without

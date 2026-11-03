@@ -108,14 +108,18 @@ Four ship in `janus-core`, each constructed from config with no code:
 
 - **`hmac`** — the material is a signed claims blob Janus can verify locally
   with a shared secret: claims JSON, hex-encoded, with an HMAC-SHA256 signature
-  over the encoding. Verification checks the signature, that the claims have not
-  expired, and that the claim set's **namespace** matches the one this binding
-  expects. The namespace check is not decoration: it is what stops a token
-  minted for one purpose being replayed against another, and the gateway this
-  generalizes relies on it to keep its proxy, host-RPC, and CLI tokens from
-  being interchangeable. A Janus binding declares its namespace, and a token
-  from any other namespace fails to verify even though the signature is good.
-  This is the method a host that already mints its own tokens uses.
+  over the encoding. On the wire the material is `<claims-hex>.<signature-hex>`,
+  where `signature-hex` is the lowercase-hex HMAC-SHA256, keyed with the shared
+  secret, of the ASCII bytes of `claims-hex`. The claims object carries `ns`
+  (the namespace, a string), `exp` (expiry, Unix seconds), and the claim the
+  binding's `identity_claim` names. Verification checks the signature, that the
+  claims have not expired, and that the claim set's **namespace** matches the
+  one this binding expects. The namespace check is not decoration: it is what
+  stops a token minted for one purpose being replayed against another, and the
+  gateway this generalizes relies on it to keep its proxy, host-RPC, and CLI
+  tokens from being interchangeable. A Janus binding declares its namespace, and
+  a token from any other namespace fails to verify even though the signature is
+  good. This is the method a host that already mints its own tokens uses.
 - **`jwt`** — the material is a JWT from an external issuer, verified against a
   JWKS endpoint or a configured public key, with issuer and audience checked.
   The method for deployments where an existing identity provider is already the
