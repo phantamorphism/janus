@@ -217,9 +217,10 @@ without changing anything already built:
 - The request log does not capture bodies, because Janus does not inspect
   responses beyond the `usage` observation, and body capture is a
   privacy-sensitive feature that would need its own design if a user asks.
-- The request log cannot be disabled, only shortened, because attribution of a
-  call to the identity that made it is the purpose of the proxy; a switch to
-  turn it off is a flag a user can ask for.
+- The request log is on by default and can be turned off with
+  `request_log.enabled = false`, because attribution of a call to the identity
+  that made it is the purpose of the proxy but not every operator wants a record
+  kept.
 
 ## Embedded callers of the prior gateway {#embedded-callers}
 
