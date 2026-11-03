@@ -169,9 +169,12 @@ or response bodies. Fields:
 Storage is a `requests` table in the daemon's database (see
 <ref target="docs/admin-surface#storage">storage</ref>), written after the
 response has been relayed so the write is never on the caller's critical path.
-Retention is a single setting, `request_log.retain` (a duration, default
-`"30d"`); a periodic job deletes older rows. The log cannot be disabled —
-attribution is the point of the proxy — but it can be kept short.
+Two settings control it: `request_log.enabled` (default `true`) and
+`request_log.retain` (a duration, default `"30d"`); a periodic job deletes older
+rows. With `enabled = false` the daemon writes no records, and the
+`/v1/requests` endpoints return an empty result with a `disabled` marker. The
+default is on because attribution of a call to the identity that made it is the
+point of the proxy; an operator who does not want a record can turn it off.
 
 ## The janus CLI {#cli}
 
