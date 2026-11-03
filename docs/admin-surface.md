@@ -314,10 +314,17 @@ described with it in
 Connection: `--admin <address>` or `JANUS_ADMIN`, where the address is
 `unix://<path>` or `http(s)://host:port`; the default is the daemon's admin
 socket, `<data_dir>/admin.sock`, resolving `data_dir` the same way the daemon
-does. For a TCP address the admin token comes from `--token-file <path>`,
-`JANUS_ADMIN_TOKEN`, or — when the CLI runs on the daemon's host —
-`<data_dir>/admin-token`; for the same process-list reason as credential
-material, it is never taken as an argument.
+does. For a TCP address the admin token comes from `--token-file <path>` (or
+`JANUS_TOKEN_FILE`), `JANUS_ADMIN_TOKEN`, or — when the CLI runs on the daemon's
+host — `<data_dir>/admin-token`; for the same process-list reason as credential
+material, it is never taken as an argument. For an `https` address
+`--ca-file <path>` names the only certificate(s) to trust — a private CA or the
+listener's own self-signed certificate — and system roots apply otherwise.
+
+### Exit codes {#cli-exit-codes}
+
+`0` success; `1` the operation failed (the daemon answered with an error); `2`
+usage error; `3` the daemon could not be reached.
 
 Config validation is the daemon's job, not the CLI's, because only the daemon
 links the extractors and upstream implementations that a config has to be

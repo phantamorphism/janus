@@ -35,13 +35,12 @@ Built and running:
   and detail drawer) and Plugin views described in
   <ref target="docs/admin-surface#ui">the UI</ref>, behind a token prompt.
 
-Not built:
-
-- **The `janus` CLI.** The binary is a stub that prints "not yet implemented".
-  Every command in <ref target="docs/admin-surface#cli">the janus CLI</ref> is
-  design; until it exists the admin API is reached with `curl` or the UI. The
-  key generation behind `janus plugin tls init` exists as a daemon library
-  module, but no command exposes it.
+- **The `janus` CLI** — status, credentials, identities, request-log query and
+  tail, plugin status, channel check and TLS key generation, and `check-config`,
+  as described in <ref target="docs/admin-surface#cli">the janus CLI</ref>. It
+  connects over the admin unix socket by default, or over TCP with a token
+  (`--token-file`, `JANUS_TOKEN_FILE`) and an optional `--ca-file`. See
+  <ref target="docs/admin-surface#cli-exit-codes">exit codes</ref>.
 
 ## Decided, and where the design lives {#decided}
 
