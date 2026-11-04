@@ -45,6 +45,11 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+    ignore:
+      # The ref is the Rust toolchain version, not an action release: the MSRV
+      # job pins @1.89.0 on purpose (it must match rust-version in Cargo.toml),
+      # and a bump would silently raise the floor.
+      - dependency-name: "dtolnay/rust-toolchain"
 
   - package-ecosystem: docker
     directory: /
