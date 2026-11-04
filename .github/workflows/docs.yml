@@ -37,7 +37,7 @@ jobs:
       # then degrades to the deterministic rules.
       TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # sch compares main..HEAD
 
@@ -47,7 +47,7 @@ jobs:
 
       - name: Cache sch binary
         id: sch-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.local/bin/sch
           key: sch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/install-sch.sh') }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Sticky PR comment (same-repo PRs only)
         if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           REPORT: ${{ runner.temp }}/sch/report.md
         with:
@@ -86,7 +86,7 @@ jobs:
             if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sch-report
