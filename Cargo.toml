@@ -78,7 +78,7 @@ hex = "0.4"
 base64 = "0.22"
 subtle = "2"
 rand = "0.9"
-jsonwebtoken = { version = "10", default-features = false, features = ["use_pem", "rust_crypto"] }
+jsonwebtoken = { version = "11", default-features = false, features = ["use_pem", "rust_crypto"] }
 
 # Storage (daemon's janus.db, SqliteUsageStore).
 rusqlite = { version = "0.37", features = ["bundled"] }
