@@ -1,0 +1,132 @@
+[
+  {
+    "name": "traffic with opaque token forwarded",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "exactly two tables: identities, requests",
+    "ok": true,
+    "detail": "identities,requests"
+  },
+  {
+    "name": "identities.id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.token_hash",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.identity",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.claims",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.label",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.created_at",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.expires_at",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.revoked_at",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identities.last_seen_at",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests has index on received_at",
+    "ok": true,
+    "detail": "[{\"name\":\"requests_request_id\",\"cols\":[\"request_id\"]},{\"name\":\"requests_identity_received_at\",\"cols\":[\"caller_identity\",\"received_at\"]},{\"name\":\"requests_received_at\",\"cols\":[\"received_at\"]}]"
+  },
+  {
+    "name": "requests has index on (caller_identity, received_at)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests has index on request_id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests.request_id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests.received_at",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests.caller_identity",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no raw identity token in database",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token_hash present and is not the token (sha256 hex/base64 of token)",
+    "ok": true,
+    "detail": "c809393eff1001187ee9132aedef27db555abd009bff3dcdb913d3ad747daa2c"
+  },
+  {
+    "name": "claims stored as JSON",
+    "ok": true,
+    "detail": "{\"tenant\":\"acme\"}"
+  },
+  {
+    "name": "no credential material in database",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "last_seen_at flushed after use",
+    "ok": true,
+    "detail": "2026-11-04T10:20:50.629916000Z"
+  },
+  {
+    "name": "revocation immediately visible (401)",
+    "ok": true,
+    "detail": "0 401"
+  },
+  {
+    "name": "opaque token verifies after restart",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "revoked token still revoked after restart",
+    "ok": true,
+    "detail": "401"
+  },
+  {
+    "name": "request log persisted across restart",
+    "ok": true,
+    "detail": "2"
+  }
+]

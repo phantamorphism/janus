@@ -1,0 +1,36 @@
+{
+  "clientStatus": 503,
+  "ms": 254,
+  "charged": [
+    "01a1a612-4371-758d-89d0-e9ac69b1c309"
+  ],
+  "notifies": [
+    {
+      "t": 1793787577455,
+      "ev": {
+        "event_type": "call_abandoned",
+        "request_id": "01a1a612-4371-758d-89d0-e9ac69b1c309",
+        "payload_json": "{\"caller_identity\":\"u40\",\"stage\":\"resolve\",\"reason\":\"plugin_timeout: plugin did not answer ResolveRoute within 250 ms\"}"
+      }
+    }
+  ],
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u40",
+    "claimed_identity": null,
+    "class": "plugin_timeout",
+    "correlation_id": null,
+    "credential_ref": null,
+    "duration_ms": 253,
+    "error": "plugin_timeout: plugin did not answer ResolveRoute within 250 ms",
+    "method": "POST",
+    "outcome": "plugin_failed",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:37.201877Z",
+    "request_id": "01a1a612-4371-758d-89d0-e9ac69b1c309",
+    "route": null,
+    "status": null,
+    "upstream": "anthropic",
+    "usage": null
+  }
+}

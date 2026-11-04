@@ -1,0 +1,13 @@
+[package]
+name = "cd-linked"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+janus-daemon = { path = "../../../../crates/janus-daemon" }
+janus-core = { path = "../../../../crates/janus-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+async-trait = "0.1"

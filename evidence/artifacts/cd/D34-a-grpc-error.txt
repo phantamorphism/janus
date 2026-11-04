@@ -1,0 +1,31 @@
+{
+  "status": 503,
+  "body": "{\"error\":{\"code\":\"plugin_error\",\"message\":\"the policy plugin could not be consulted (plugin_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u34a",
+    "claimed_identity": null,
+    "class": "plugin_error",
+    "correlation_id": null,
+    "credential_ref": null,
+    "duration_ms": 0,
+    "error": "plugin_error: plugin returned gRPC status Internal: plugin internal error",
+    "method": "POST",
+    "outcome": "plugin_failed",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:38.974338Z",
+    "request_id": "01a1a612-4a5e-71a5-831c-81df00efb7ca",
+    "route": null,
+    "status": null,
+    "upstream": "anthropic",
+    "usage": null
+  },
+  "pluginStatus": {
+    "dropped_events": 0,
+    "endpoint": "unix:///Users/michaelhancock/hancock_industries/apps/janus/evidence/.run-cd/a.sock",
+    "health": "error",
+    "last_error": "plugin returned gRPC status Internal: plugin internal error",
+    "last_ok_at": "2026-11-04T10:19:37.200753Z",
+    "mode": "unix"
+  }
+}

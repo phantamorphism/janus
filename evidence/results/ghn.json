@@ -1,0 +1,204 @@
+[
+  {
+    "id": "D59",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D59-credential-list.json",
+      "evidence/artifacts/ghn/D59-pool-layout.txt",
+      "evidence/artifacts/ghn/D59-janus-db-secret-grep.txt",
+      "evidence/artifacts/ghn/D59-checks.json"
+    ],
+    "note": "39 checks passed"
+  },
+  {
+    "id": "D60",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D60-observation-retry-after-failed-refresh.json",
+      "evidence/artifacts/ghn/D60-anthropic.json",
+      "evidence/artifacts/ghn/D60-openai.json",
+      "evidence/artifacts/ghn/D60-openai-note.txt",
+      "evidence/artifacts/ghn/D60-checks.json"
+    ],
+    "note": "9 checks passed; Anthropic: full path verified (expired token + valid refresh token -> mock token_url called, request 200, expires_at moved forward, upstream got the new token, caller never saw it, refresh-failure path -> 503 not forwarded). OpenAI/Codex: only the refresh itself is observable (token endpoint called, expires_at moved) because the Codex backend host is fixed and not redirected by base_url, so the forwarded request cannot be observed."
+  },
+  {
+    "id": "D61",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D61-cases.json",
+      "evidence/artifacts/ghn/D61-refresh-failure-note.txt",
+      "evidence/artifacts/ghn/D61-checks.json"
+    ],
+    "note": "22 checks passed"
+  },
+  {
+    "id": "D62",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D62-default-chain.json",
+      "evidence/artifacts/ghn/D62-all-disabled.json",
+      "evidence/artifacts/ghn/D62-checks.json"
+    ],
+    "note": "10 checks passed"
+  },
+  {
+    "id": "D63",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D63-before-after.json",
+      "evidence/artifacts/ghn/D63-observation-generic-401-body.json",
+      "evidence/artifacts/ghn/D63-rotate-output.txt",
+      "evidence/artifacts/ghn/D63-checks.json"
+    ],
+    "note": "16 checks passed"
+  },
+  {
+    "id": "D64",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D64-add-response.txt",
+      "evidence/artifacts/ghn/D64-leak-sweep.txt",
+      "evidence/artifacts/ghn/D64-ui-overview.png",
+      "evidence/artifacts/ghn/D64-ui-credentials.png",
+      "evidence/artifacts/ghn/D64-ui-identities.png",
+      "evidence/artifacts/ghn/D64-ui-requests.png",
+      "evidence/artifacts/ghn/D64-ui-plugin.png",
+      "evidence/artifacts/ghn/D64-ui-views-text.txt",
+      "evidence/artifacts/ghn/D64-checks.json"
+    ],
+    "note": "11 checks passed"
+  },
+  {
+    "id": "D65",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D65-build.txt",
+      "evidence/artifacts/ghn/D65-output.txt",
+      "evidence/artifacts/ghn/D65-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D66",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D66-output.txt",
+      "evidence/artifacts/ghn/D66-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D67",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D67-output.txt",
+      "evidence/artifacts/ghn/D67-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D68",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D68-output.txt",
+      "evidence/artifacts/ghn/D68-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D69",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D69-output.txt",
+      "evidence/artifacts/ghn/D69-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D70",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D70-output.txt",
+      "evidence/artifacts/ghn/D70-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D71",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D71-output.txt",
+      "evidence/artifacts/ghn/D71-checks.json"
+    ],
+    "note": "4 checks passed"
+  },
+  {
+    "id": "D72",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D72-output.txt",
+      "evidence/artifacts/ghn/D72-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D73",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D73-output.txt",
+      "evidence/artifacts/ghn/D73-checks.json"
+    ],
+    "note": "2 checks passed"
+  },
+  {
+    "id": "D74",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D74-output.txt",
+      "evidence/artifacts/ghn/D74-checks.json"
+    ],
+    "note": "1 checks passed"
+  },
+  {
+    "id": "D75",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D75-output.txt",
+      "evidence/artifacts/ghn/D75-sigkill-durability.txt",
+      "evidence/artifacts/ghn/D75-checks.json"
+    ],
+    "note": "7 checks passed; VERIFIED: durability()==Durable; count survives restart; second-process open refused with a lock error and succeeds once the holder dies; journal_mode==wal (read by sqlite3 after clean close); acknowledged commits survive SIGKILL of the writer. NOT VERIFIED: synchronous=FULL and BEGIN IMMEDIATE/single-writer-thread are per-connection/internal settings that cannot be observed from outside; the SIGKILL test only shows process-crash durability (the OS page cache survives a process kill), not power-loss durability that synchronous=FULL guards."
+  },
+  {
+    "id": "D76",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D76-conformance-scratch.txt",
+      "evidence/artifacts/ghn/D76-janus-core-tests.txt",
+      "evidence/artifacts/ghn/D76-checks.json"
+    ],
+    "note": "4 checks passed"
+  },
+  {
+    "id": "D77",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D77-plugin-meter-sequence.json",
+      "evidence/artifacts/ghn/D77-no-metering-endpoints.json",
+      "evidence/artifacts/ghn/D77-no-plugin-60-requests.txt",
+      "evidence/artifacts/ghn/D77-checks.json"
+    ],
+    "note": "6 checks passed; Metering is exercised in Section H (library); the daemon-level checks use a node plugin that counts call_completed payloads."
+  },
+  {
+    "id": "D110",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ghn/D110-schema.json",
+      "evidence/artifacts/ghn/D110-restart.txt",
+      "evidence/artifacts/ghn/D110-checks.json"
+    ],
+    "note": "26 checks passed"
+  }
+]

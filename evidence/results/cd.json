@@ -1,0 +1,182 @@
+[
+  {
+    "id": "D27",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D27-responses.txt",
+      "evidence/artifacts/cd/D27-status.txt",
+      "evidence/artifacts/cd/D27-listener-connections.txt",
+      "evidence/artifacts/cd/D27-plugin-status-cli.txt"
+    ],
+    "note": "3/3 checks passed."
+  },
+  {
+    "id": "D28",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D28-resolve-requests.txt",
+      "evidence/artifacts/cd/D28-responses.txt",
+      "evidence/artifacts/cd/D28-notify-events.txt"
+    ],
+    "note": "8/8 checks passed."
+  },
+  {
+    "id": "D29",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D29-evidence.txt"
+    ],
+    "note": "3/3 checks passed."
+  },
+  {
+    "id": "D30",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D30-evidence.txt"
+    ],
+    "note": "5/5 checks passed."
+  },
+  {
+    "id": "D31",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D31-evidence.txt"
+    ],
+    "note": "4/4 checks passed. NOTES: denial HTTP status observed: 403"
+  },
+  {
+    "id": "D32",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D32-check-config.txt",
+      "evidence/artifacts/cd/D32-evidence.txt"
+    ],
+    "note": "3/3 checks passed."
+  },
+  {
+    "id": "D33",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D33-b-default-sleep1000.txt",
+      "evidence/artifacts/cd/D33-b-raw-v1-plugin.txt",
+      "evidence/artifacts/cd/D33-c-default-sleep100.txt",
+      "evidence/artifacts/cd/D33-a-timeout1000-sleep2000.txt"
+    ],
+    "note": "7/7 checks passed."
+  },
+  {
+    "id": "D34",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D34-a-grpc-error.txt",
+      "evidence/artifacts/cd/D34-b-empty-response.txt"
+    ],
+    "note": "5/5 checks passed. NOTES: (b) observed log: {\"binding\":\"hmac\",\"caller_identity\":\"u34b\",\"claimed_identity\":null,\"class\":\"plugin_error\",\"correlation_id\":null,\"credential_ref\":null,\"duration_ms\":0,\"error\":\"plugin_error: ResolveRouteResponse has no outcome set\",\"method\":\"POST\",\"outcome\":\"plugin_failed\",\"path\":\"/anthropic/v1/messages\",\"received_at\":\"2026-11-04T10:19:38.990676Z\",\"request_id\":\"01a1a612-4a6e-7193-99ca-48e167bfb1bb\",\"route\":null,\"status\":null,\"upstream\":\"anthropic\",\"usage\":null}"
+  },
+  {
+    "id": "D35",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D35-tls-init.txt",
+      "evidence/artifacts/cd/D35-check-config-sane.txt",
+      "evidence/artifacts/cd/D35-evidence.txt"
+    ],
+    "note": "11/11 checks passed."
+  },
+  {
+    "id": "D36",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D36-linked-run.txt"
+    ],
+    "note": "4/4 checks passed. NOTES: log outcome/class for crash (spec leaves open): {\"outcome\":\"plugin_failed\",\"class\":\"plugin_error\"}"
+  },
+  {
+    "id": "D37",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D37-resolve-identities.txt"
+    ],
+    "note": "2/2 checks passed."
+  },
+  {
+    "id": "D38",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D38-evidence.txt"
+    ],
+    "note": "4/4 checks passed."
+  },
+  {
+    "id": "D39",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D39-disabled-credential-events.txt",
+      "evidence/artifacts/cd/D39-unknown-ref-events.txt",
+      "evidence/artifacts/cd/D39-denied-events.txt",
+      "evidence/artifacts/cd/D39-disabled-credential-response.txt"
+    ],
+    "note": "4/4 checks passed. NOTES: denied request -> call_abandoned stage=resolve; unknown ref stage=credential"
+  },
+  {
+    "id": "D40",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D40-evidence.txt"
+    ],
+    "note": "5/5 checks passed."
+  },
+  {
+    "id": "D41",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D41-status-codes.txt",
+      "evidence/artifacts/cd/D41-settlement-per-resolved-request.txt",
+      "evidence/artifacts/cd/D41-unresolved-requests-events.txt",
+      "evidence/artifacts/cd/D41-request-log-new.txt"
+    ],
+    "note": "5/5 checks passed."
+  },
+  {
+    "id": "D42",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D42-evidence.txt"
+    ],
+    "note": "3/3 checks passed."
+  },
+  {
+    "id": "D43",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D43-evidence.txt"
+    ],
+    "note": "3/3 checks passed."
+  },
+  {
+    "id": "D44",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D44-evidence.txt"
+    ],
+    "note": "4/4 checks passed."
+  },
+  {
+    "id": "D45",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D45-evidence.txt",
+      "evidence/artifacts/cd/D45-linked-notify-calls.txt"
+    ],
+    "note": "4/4 checks passed. NOTES: linked-plugin half is asserted in the D36 linked run: notify() call count equals the number of events emitted (recorded in D45-linked-notify-calls.txt)"
+  },
+  {
+    "id": "D46",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/cd/D46-outage.txt",
+      "evidence/artifacts/cd/D46-after-restart.txt"
+    ],
+    "note": "6/6 checks passed."
+  }
+]

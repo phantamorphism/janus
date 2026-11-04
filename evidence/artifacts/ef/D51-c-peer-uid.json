@@ -1,0 +1,27 @@
+{
+  "same": {
+    "status": 200,
+    "plugin_stderr": "PEERPLUG_READY expected_uid=502\nRESOLVE_ROUTE_SERVED\n",
+    "plugin": {
+      "mode": "unix",
+      "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51c-same/p.sock",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:37.293613Z",
+      "dropped_events": 0
+    }
+  },
+  "other": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_error\",\"message\":\"the policy plugin could not be consulted (plugin_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "plugin_stderr": "PEERPLUG_READY expected_uid=503\n",
+    "plugin": {
+      "mode": "unix",
+      "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51c-other/p.sock",
+      "health": "error",
+      "last_error": "plugin returned gRPC status PermissionDenied: peer uid 502 is not the expected uid 503",
+      "last_ok_at": null,
+      "dropped_events": 0
+    }
+  }
+}

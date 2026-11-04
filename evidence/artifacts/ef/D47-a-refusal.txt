@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin: set exactly one of `endpoint` or `linked = true`, not both

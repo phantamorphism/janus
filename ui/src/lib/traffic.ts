@@ -22,7 +22,7 @@ export async function loadTraffic(api: ApiClient, minutes: number, signal: Abort
   for (let page = 0; page < MAX_PAGES; page++) {
     const res = await api.requests({ since, limit: MAX_LIMIT, before }, signal)
     if (res.disabled) return { disabled: true, total: 0, byOutcome, truncated: false, minutes }
-    for (const r of res.records) {
+    for (const r of res.requests) {
       total++
       if (r.outcome in byOutcome) byOutcome[r.outcome]++
     }

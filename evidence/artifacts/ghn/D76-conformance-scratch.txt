@@ -1,0 +1,50 @@
+
+running 42 tests
+test mem::release_lands_in_the_window_charged ... ok
+test mem::apply_is_idempotent_per_request_id ... ok
+test mem::apply_adds_to_every_bound ... ok
+test mem::apply_is_all_or_nothing_across_bounds ... ok
+test mem::settle_makes_an_op_final ... ok
+test mem::keys_are_isolated_per_identity_meter_period_and_window ... ok
+test mem::unlimited_bounds_cross_their_limit ... ok
+test mem::apply_limit_is_inclusive ... ok
+test mem::compact_drops_ledger_entries_past_the_ttl ... ok
+test mem::release_returns_false_when_there_is_nothing_to_undo ... ok
+test mem::concurrent_releases_undo_once ... ok
+test mem::concurrent_repeats_of_one_op_apply_once ... ok
+test mem::compact_drops_expired_keys_only ... ok
+test mem::concurrent_applies_never_exceed_limit ... ok
+test sql::settle_makes_an_op_final ... ok
+test third::apply_adds_to_every_bound ... ok
+test third::apply_is_all_or_nothing_across_bounds ... ok
+test sql::release_lands_in_the_window_charged ... ok
+test third::apply_is_idempotent_per_request_id ... ok
+test third::apply_limit_is_inclusive ... ok
+test third::compact_drops_expired_keys_only ... ok
+test third::compact_drops_ledger_entries_past_the_ttl ... ok
+test third::concurrent_releases_undo_once ... ok
+test third::concurrent_repeats_of_one_op_apply_once ... ok
+test third::keys_are_isolated_per_identity_meter_period_and_window ... ok
+test sql::concurrent_repeats_of_one_op_apply_once ... ok
+test third::release_lands_in_the_window_charged ... ok
+test sql::apply_is_all_or_nothing_across_bounds ... ok
+test third::release_returns_false_when_there_is_nothing_to_undo ... ok
+test sql::unlimited_bounds_cross_their_limit ... ok
+test third::settle_makes_an_op_final ... ok
+test sql::apply_is_idempotent_per_request_id ... ok
+test third::unlimited_bounds_cross_their_limit ... ok
+test third::concurrent_applies_never_exceed_limit ... ok
+test sql::apply_limit_is_inclusive ... ok
+test sql::compact_drops_expired_keys_only ... ok
+test sql::apply_adds_to_every_bound ... ok
+test sql::concurrent_releases_undo_once ... ok
+test sql::keys_are_isolated_per_identity_meter_period_and_window ... ok
+test sql::release_returns_false_when_there_is_nothing_to_undo ... ok
+test sql::compact_drops_ledger_entries_past_the_ttl ... ok
+test sql::concurrent_applies_never_exceed_limit ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+   Compiling qa-h v0.1.0 (/private/tmp/qa-ghn/run/h)
+    Finished `release` profile [optimized] target(s) in 1.19s
+     Running tests/conf.rs (/tmp/qa-target-ghn/release/deps/conf-34b9cb6717bd8069)

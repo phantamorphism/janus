@@ -23,6 +23,7 @@ data_dir = "/var/lib/janus"              # optional
 
 [data_plane]
 bind = "127.0.0.1:7600"
+max_connections = 1024                   # optional; default 1024
 
 [admin]                                  # optional; the admin socket always exists
 bind = "127.0.0.1:7601"
@@ -88,7 +89,17 @@ There are three TCP listeners and one unix socket, kept apart for the reasons in
 <ref target="docs/architecture#admin-surface">the admin surface is a separate
 listener</ref>.
 
-- **`[data_plane]`** (required) — `bind`: the address callers are pointed at.
+- **`[data_plane]`** (required)
+  - `bind` — the address callers are pointed at.
+  - `max_connections` (default `1024`, must be above zero) — the most
+    connections the data plane serves at once. A connection accepted beyond it
+    is closed without a response and counted in `data_plane.refused_connections`
+    of the <ref target="docs/admin-surface#status-endpoint">status
+    endpoint</ref>. An HTTP/1.1 call holds its connection for its whole life, so
+    this is also the ceiling on concurrent HTTP/1.1 calls (HTTP/2 multiplexes
+    calls on one connection). Each connection is a file descriptor; raise the
+    process limit with it. The admin and UI listeners have their own fixed cap
+    of 256 each.
 - **`[admin]`** (optional) — the admin unix socket at `<data_dir>/admin.sock`
   always exists; this section only adds the TCP admin listener.
   - `bind` — the TCP address. Every other `[admin]` key is refused without it.
@@ -103,9 +114,12 @@ listener</ref>.
   - `tls = { cert, key }` — required for a non-loopback `bind` unless
     `allow_plaintext = true`.
   - `allow_plaintext` (default `false`) — refused together with `tls`.
-  - `assets_dir` — the directory of the built UI. Defaults to the `ui/dist`
-    directory of the source tree the daemon was built from. A directory without
-    an `index.html` refuses startup.
+  - `assets_dir` — the directory of the built UI. When absent, the daemon uses
+    the first of these that holds an `index.html`: `ui` in the executable's
+    directory, then `../share/janus/ui` relative to the executable (debug builds
+    also try the source tree's `ui/dist`). A configured directory without an
+    `index.html`, or no default location holding one, refuses startup; the error
+    names every path tried.
 
 The listeners must use distinct addresses. An unspecified address (`0.0.0.0`,
 `[::]`) holds its port on every interface, so it collides with any listener on
@@ -174,6 +188,16 @@ Each `[[upstream]]` mounts one upstream implementation on the data plane:
   fragment. The request path, with the prefix removed, is appended to its path.
   (One exception: a ChatGPT-account OAuth credential for `openai` is valid only
   at the ChatGPT Codex backend, so its requests are targeted there.)
+- `token_url` (optional, `anthropic` and `openai` only) — the OAuth token
+  endpoint used to refresh this upstream's OAuth credentials, in place of the
+  vendor's own. It exists for private or mirrored token endpoints and for test
+  rigs that stand in for the vendor. It must be an absolute `https://` URL with
+  a host; plain `http://` is accepted only for a loopback IP literal
+  (`127.0.0.1`, `[::1]`; `localhost` is refused), because the refresh token is
+  sent to this endpoint and the tokens it returns become the credential. It is
+  refused on an upstream with no OAuth refresh (`openrouter`). Omitted, the
+  vendor's endpoint is used. Example:
+  `token_url = "https://auth.internal.example/oauth/token"`.
 - `[upstream.identity]` (optional) — this upstream's binding.
 - `[[upstream.route]]` (optional, repeatable) — `path` and `identity`: a
   path-specific binding.

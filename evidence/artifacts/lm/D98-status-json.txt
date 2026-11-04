@@ -1,0 +1,68 @@
+$ exit=0
+--- stdout
+{
+  "build": "dev",
+  "credentials": {
+    "by_status": {
+      "active": 1,
+      "disabled": 0,
+      "invalid": 0,
+      "rate_limited": 0
+    },
+    "total": 1
+  },
+  "data_plane": {
+    "refused_connections": 0
+  },
+  "listeners": {
+    "admin_socket": "/tmp/qa-lm/run/data/admin.sock",
+    "admin_tcp": {
+      "address": "127.0.0.1:26002",
+      "tls": false,
+      "url": "http://127.0.0.1:26002/"
+    },
+    "data_plane": "127.0.0.1:26001",
+    "ui": {
+      "address": "127.0.0.1:26003",
+      "tls": false,
+      "url": "http://127.0.0.1:26003/"
+    }
+  },
+  "plugin": {
+    "client_cert_expires_at": "2027-11-04T00:00:00Z",
+    "dropped_events": 0,
+    "endpoint": "https://localhost:26020/",
+    "health": "unknown",
+    "last_error": null,
+    "last_ok_at": null,
+    "mode": "tls"
+  },
+  "request_log": {
+    "dropped_records": 0,
+    "enabled": true,
+    "retain": "30days",
+    "retain_seconds": 2592000,
+    "rows": 0
+  },
+  "started_at": "2026-11-04T10:19:34.565159Z",
+  "upstreams": [
+    {
+      "base_url": "http://127.0.0.1:26010/",
+      "binding": "opaque",
+      "name": "openrouter",
+      "path_prefix": "/openrouter",
+      "routes": []
+    },
+    {
+      "base_url": "http://127.0.0.1:26010/",
+      "binding": "opaque",
+      "name": "anthropic",
+      "path_prefix": "/anthropic",
+      "routes": []
+    }
+  ],
+  "version": "0.1.0"
+}
+
+--- stderr
+

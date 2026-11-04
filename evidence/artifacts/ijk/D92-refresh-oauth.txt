@@ -1,0 +1,25 @@
+{
+  "manual": {
+    "status": 200,
+    "body": {
+      "ref": "oauth-1",
+      "upstream": "anthropic",
+      "kind": "oauth",
+      "label": null,
+      "source": "pool",
+      "status": "active",
+      "rate_limited_until": null,
+      "expires_at": "2026-11-04T11:19:55.139Z",
+      "last_used_at": null,
+      "request_count": 0,
+      "error_count": 0,
+      "last_error": null
+    }
+  },
+  "auto": {
+    "status": 200,
+    "expires_at": "2026-11-04T11:19:55.195Z"
+  },
+  "token_endpoint_calls": 2,
+  "apikey_refresh": "{\"error\":{\"code\":\"not_refreshable\",\"message\":\"credential \\\"cred-other\\\" is an API key; there is nothing to refresh\"}}"
+}

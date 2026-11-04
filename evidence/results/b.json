@@ -1,0 +1,175 @@
+[
+  {
+    "id": "D10",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D10-transcript.txt"
+    ],
+    "note": "ok: independently minted <claims-hex>.<sig-hex> token forwarded (HTTP 200, upstream hit); ok: log binding=hmac outcome=forwarded caller_identity=agent-1"
+  },
+  {
+    "id": "D11",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D11-transcript.txt"
+    ],
+    "note": "ok: a1-wrong-secret: HTTP 401 and not forwarded (got 401); ok: a1-wrong-secret: outcome=rejected_identity kind=invalid (want one of invalid); ok: a2-altered-claims: HTTP 401 and not forwarded (got 401); ok: a2-altered-claims: outcome=rejected_identity kind=invalid (want one of invalid); ok: b-expired: HTTP 401 and not forwarded (got 401); ok: b-expired: outcome=rejected_identity kind=expired (want one of expired,invalid); ok: c-wrong-ns: HTTP 401 and not forwarded (got 401); ok: c-wrong-ns: outcome=rejected_identity kind=wrong_namespace (want one of wrong_namespace)"
+  },
+  {
+    "id": "D12",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D12-JWKS-a-valid.txt",
+      "evidence/artifacts/b/D12-JWKS-b-wrong-aud.txt",
+      "evidence/artifacts/b/D12-JWKS-c-wrong-iss.txt",
+      "evidence/artifacts/b/D12-JWKS-d-other-key.txt",
+      "evidence/artifacts/b/D12-static-public-key-a-valid.txt",
+      "evidence/artifacts/b/D12-static-public-key-b-wrong-aud.txt",
+      "evidence/artifacts/b/D12-static-public-key-c-wrong-iss.txt",
+      "evidence/artifacts/b/D12-static-public-key-d-other-key.txt"
+    ],
+    "note": "ok: [JWKS] valid token forwarded, binding=jwt, caller_identity=jwt-user-1; ok: [JWKS] b-wrong-aud: 401, not forwarded, kind=wrong_namespace; ok: [JWKS] c-wrong-iss: 401, not forwarded, kind=wrong_namespace (want wrong_namespace); ok: [JWKS] d-other-key: 401, not forwarded, kind=invalid (want invalid); ok: [static-public-key] valid token forwarded, binding=jwt, caller_identity=jwt-user-1; ok: [static-public-key] b-wrong-aud: 401, not forwarded, kind=wrong_namespace; ok: [static-public-key] c-wrong-iss: 401, not forwarded, kind=wrong_namespace (want wrong_namespace); ok: [static-public-key] d-other-key: 401, not forwarded, kind=invalid (want invalid)"
+  },
+  {
+    "id": "D13",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D13-cli.txt",
+      "evidence/artifacts/b/D13-transcript.txt"
+    ],
+    "note": "ok: human `identity create` prints only the token on stdout; ok: opaque token forwarded; ok: log binding=opaque caller_identity=agent-7; ok: plugin ResolveRoute identity_claims={\"tenant\":\"acme\"}"
+  },
+  {
+    "id": "D14",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D14-revoked.txt",
+      "evidence/artifacts/b/D14-expired.txt",
+      "evidence/artifacts/b/D14-unknown.txt"
+    ],
+    "note": "ok: revoked: 401 kind=revoked (immediately, no restart); ok: entry usable before expiry; ok: expired: 401 kind=expired; ok: unknown token: 401 kind=invalid"
+  },
+  {
+    "id": "D15",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D15-a-explicit.txt",
+      "evidence/artifacts/b/D15-b-omitted-method.txt",
+      "evidence/artifacts/b/D15-c-source-override.txt"
+    ],
+    "note": "ok: (a) explicit trusted_header: caller_identity=alice binding=trusted_header; ok: (b) method omitted: never forwarded as alice / no trusted_header record; ok: (c) source-only upstream override over hmac default: never forwarded as alice / no trusted_header record"
+  },
+  {
+    "id": "D16",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D16-misplaced-main.txt",
+      "evidence/artifacts/b/D16-header+scheme.txt",
+      "evidence/artifacts/b/D16-header-noscheme.txt",
+      "evidence/artifacts/b/D16-query.txt",
+      "evidence/artifacts/b/D16-basic_password.txt",
+      "evidence/artifacts/b/D16-misplaced-hdr-route_gets_Bearer.txt",
+      "evidence/artifacts/b/D16-misplaced-query-route_gets_header.txt",
+      "evidence/artifacts/b/D16-misplaced-basic-route_gets_x-api-key.txt",
+      "evidence/artifacts/b/D16-misplaced-bearer-binding_gets_query.txt"
+    ],
+    "note": "ok: misplaced token (x-api-key to authorization binding): 401 kind=no_material; ok: header+scheme: forwarded with caller_identity=src-user; ok: header+scheme: outbound request carries no identity material; ok: header-noscheme: forwarded with caller_identity=src-user; ok: header-noscheme: outbound request carries no identity material; ok: query: forwarded with caller_identity=src-user; ok: query: outbound request carries no identity material; ok: basic_password: forwarded with caller_identity=src-user; ok: basic_password: outbound request carries no identity material; ok: misplaced (hdr-route gets Bearer): 401 kind=no_material; ok: misplaced (query-route gets header): 401 kind=no_material; ok: misplaced (basic-route gets x-api-key): 401 kind=no_material; ok: misplaced (bearer-binding gets query): 401 kind=no_material"
+  },
+  {
+    "id": "D17",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D17-route.txt",
+      "evidence/artifacts/b/D17-upstream-override.txt",
+      "evidence/artifacts/b/D17-daemon-default.txt"
+    ],
+    "note": "ok: route request: binding=opaque route=/v1/models; ok: other openai path (upstream override x-api-key hmac): binding=hmac route=null; ok: anthropic path (daemon default): binding=hmac"
+  },
+  {
+    "id": "D18",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D18-x-api-key-hmac.txt",
+      "evidence/artifacts/b/D18-authorization-hmac.txt",
+      "evidence/artifacts/b/D18-route-opaque.txt",
+      "evidence/artifacts/b/D18-route-hmac-xapikey.txt",
+      "evidence/artifacts/b/D18-route-hmac-bearer.txt"
+    ],
+    "note": "ok: upstream override: x-api-key hmac token verifies (binding hmac; method/secret/ns inherited); ok: upstream override: authorization token -> 401 no_material; ok: route: opaque token verifies; ok: route replaces (no merge): hmac token in x-api-key rejected (invalid); ok: route: hmac Bearer token rejected (no_material)"
+  },
+  {
+    "id": "D19",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D19-transcript.txt"
+    ],
+    "note": "ok: no binding: all requests rejected (401,401,401), upstream saw 0 requests; ok: no credential spent; ok: never behaves as method=none"
+  },
+  {
+    "id": "D20",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D20-ok-case.txt",
+      "evidence/artifacts/b/D20-rejection-case.txt"
+    ],
+    "note": "ok: forwarded with default-chain pool credential; ok: plugin ResolveRoute calls = 0; ok: no call_completed/call_abandoned for it; ok: log caller_identity=\"\" binding=none; ok: control: an identity-bearing call does produce call_completed (so absence above is meaningful); ok: plugin got credential_invalid (credential_invalid) with zero ResolveRoute; ok: still no call_completed/call_abandoned in rejection case; ok: rejection-case log: empty caller_identity, binding none"
+  },
+  {
+    "id": "D21",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D21-transcript.txt"
+    ],
+    "note": "ok: 401 returned while the (endless) body was still being sent: HTTP/1.1 401 Unauthorized after 0ms; ok: plugin saw zero ResolveRoute and zero Notify; ok: upstream saw no request/connection; ok: credential request_count (3->3) / last_used_at unchanged"
+  },
+  {
+    "id": "D22",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D22-no_material.txt",
+      "evidence/artifacts/b/D22-revoked.txt",
+      "evidence/artifacts/b/D22-expired.txt",
+      "evidence/artifacts/b/D22-invalid.txt",
+      "evidence/artifacts/b/D22-wrong_namespace.txt",
+      "evidence/artifacts/b/D22-log-query-human.txt",
+      "evidence/artifacts/b/D22-log-query-json-kinds.txt"
+    ],
+    "note": "ok: misplaced -> kind no_material; ok: revoked -> kind revoked; ok: expired -> kind expired; ok: tampered hmac -> invalid; ok: wrong ns -> wrong_namespace; ok: janus log query --outcome rejected_identity (json) has kind no_material; ok: janus log query --outcome rejected_identity (json) has kind invalid; ok: janus log query --outcome rejected_identity (json) has kind wrong_namespace; ok: janus log query --outcome rejected_identity (json) has kind expired; ok: janus log query --outcome rejected_identity (json) has kind revoked; ok: human `log query --outcome rejected_identity` output shows all five kinds"
+  },
+  {
+    "id": "D23",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D23-transcript.txt"
+    ],
+    "note": "ok: outcome=rejected_identity caller_identity=\"\" claimed_identity=bob; ok: not forwarded; ok: plugin saw no call carrying bob"
+  },
+  {
+    "id": "D24",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D24-transcript.txt"
+    ],
+    "note": "ok: ResolveRoute caller_identity=s1 identity_claims={\"agent_type\":\"coder\",\"session\":\"sess-42\"}"
+  },
+  {
+    "id": "D25",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D25-claim-variant.txt",
+      "evidence/artifacts/b/D25-neither.txt",
+      "evidence/artifacts/b/D25-header-variant.txt"
+    ],
+    "note": "ok: correlation_claim: ResolveRoute, Notify and log all carry claim value sess-42; ok: neither configured: correlation_id empty (route=/v1/nocorr, log=null); ok: ResolveRoute correlation_ids = [\"req-AAA\",\"req-BBB\",\"\"]; ok: log correlation_id equals header (empty when absent); ok: Notify call_completed correlation_ids = [\"req-AAA\",\"req-BBB\",\"\"]; ok: changing the header alone never changes caller_identity or the decision"
+  },
+  {
+    "id": "D26",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/b/D26-custom-build.txt",
+      "evidence/artifacts/b/D26-custom-extractor.txt",
+      "evidence/artifacts/b/D26-refuse-to-start.txt"
+    ],
+    "note": "ok: scratch custom daemon (Embedded { extractors: vec![introspect] }) builds against the public API; ok: custom accepts: binding=custom:introspect caller_identity=zed; ok: custom rejects invalid: 401 kind=invalid; ok: custom rejects missing material: 401 kind=no_material; ok: config naming custom:missing: daemon refuses to start (custom build); ok: stock daemon refuses a registered-nowhere custom method too"
+  }
+]

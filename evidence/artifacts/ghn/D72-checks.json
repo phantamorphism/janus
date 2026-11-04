@@ -1,0 +1,7 @@
+[
+  {
+    "name": "D72",
+    "ok": true,
+    "detail": "Allowed { used: 1, limit: 2 } Allowed { used: 2, limit: 2 } third=Exceeded { used: 2, limit: 2 } other meter=Allowed { used: 500, limit: 1000 } unknown meter=Some(\"no quotas configured for meter \\\"nosuch\\\"\")"
+  }
+]

@@ -1,0 +1,6 @@
+    Updating crates.io index
+     Locking 283 packages to latest compatible versions
+      Adding crypto-common v0.1.6 (available: v0.1.7)
+      Adding matchit v0.8.4 (available: v0.8.6)
+   Compiling qa-h v0.1.0 (/private/tmp/qa-ghn/run/h)
+    Finished `release` profile [optimized] target(s) in 3.08s

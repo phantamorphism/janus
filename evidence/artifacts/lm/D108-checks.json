@@ -1,0 +1,52 @@
+[
+  {
+    "name": "table row count matches `log query --limit 50`",
+    "ok": true,
+    "detail": "ui=28 cli=28"
+  },
+  {
+    "name": "table rows match CLI records in order (identity, outcome, path, status)",
+    "ok": true,
+    "detail": "2026-11-04 12:20:32 just now ui-keep openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms || 2026-11-04 12:20:32 just now unidentified openrouter rejected identity revoked POST /openrouter/v1/chat/completions — — 0 ms || 2026-11-04 12:20:31 2 s ago ui-revoke-me openrouter forwarded"
+  },
+  {
+    "name": "outcome filter control exists",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "outcome=denied table matches `log query --outcome denied`",
+    "ok": true,
+    "detail": "4 vs 4"
+  },
+  {
+    "name": "live tail toggle opens /v1/requests/stream",
+    "ok": true,
+    "detail": "[{\"method\":\"GET\",\"url\":\"/v1/requests/stream\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787636653}]"
+  },
+  {
+    "name": "stream request carries the token in Authorization, not the URL",
+    "ok": true,
+    "detail": "{\"method\":\"GET\",\"url\":\"/v1/requests/stream\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787636653}"
+  },
+  {
+    "name": "new requests appear live without reload while toggle is on",
+    "ok": true,
+    "detail": "before=28 after=30; 2026-11-04 12:20:37 just now live-agent openrouter forwarded POST /openrouter/v1/chat/completions or1 200 0 ms || 2026-11-04 12:20:37 just now live-agent openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms"
+  },
+  {
+    "name": "new requests do NOT appear after toggling off",
+    "ok": true,
+    "detail": "off before=2 after=2"
+  },
+  {
+    "name": "drawer opens for a record and shows its fields (matches `log show` of the same id)",
+    "ok": true,
+    "detail": "ok; rid=01a1a613-30a7-7546-8e7c-201b5b69c119; missing: "
+  },
+  {
+    "name": "drawer shows received time, duration, route, correlation id, error, usage rows",
+    "ok": true,
+    "detail": ""
+  }
+]

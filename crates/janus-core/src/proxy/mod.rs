@@ -32,6 +32,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use url::Url;
+
+use crate::contract::binding::is_loopback_ip_literal;
 use crate::contract::upstream::{UpstreamImpl, UpstreamKind};
 
 /// An upstream's forwarding allowlist: the headers every launch upstream's
@@ -120,6 +123,26 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// upstreams' own SDKs allow a request before giving up on it.
 const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
+/// Why `url` may not be an OAuth token endpoint, or `None` when it may.
+///
+/// A refresh sends the long-lived refresh token to the endpoint and trusts
+/// what comes back as the credential, so the URL must be `https://` with a
+/// host. Plain `http://` is accepted only for a loopback IP literal
+/// (`127.0.0.1`, `[::1]`), for a mirror or test rig on the same host.
+pub fn token_url_refusal(url: &Url) -> Option<&'static str> {
+    if url.host_str().is_none_or(str::is_empty) {
+        return Some("must be an https:// URL with a host");
+    }
+    match url.scheme() {
+        "https" => None,
+        "http" => (!is_loopback_ip_literal(url)).then_some(
+            "plain http:// is accepted only for a loopback IP literal (127.0.0.1, [::1]); \
+             the refresh token would cross the network unprotected — use https://",
+        ),
+        _ => Some("must be an https:// URL with a host"),
+    }
+}
+
 /// The HTTP client could not be constructed (TLS initialisation failed).
 #[derive(Debug, thiserror::Error)]
 #[error("cannot construct the upstream HTTP client: {0}")]
@@ -141,17 +164,26 @@ pub struct ClientInitError(String);
 ///   the call (and settles it) instead of holding it until the caller
 ///   gives up.
 fn http_client() -> Result<reqwest::Client, ClientInitError> {
-    http_client_with(READ_IDLE_TIMEOUT)
+    http_client_with(READ_IDLE_TIMEOUT, |builder| builder)
 }
 
-fn http_client_with(read_idle_timeout: Duration) -> Result<reqwest::Client, ClientInitError> {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .read_timeout(read_idle_timeout)
-        .build()
-        .map_err(|e| ClientInitError(e.to_string()))
+/// [`http_client`] with its idle bound set and `extend` applied to the
+/// builder before it is built. Idle connections are dropped after
+/// [`relay::POOL_IDLE_TIMEOUT`], see [`Forwarder`].
+fn http_client_with(
+    read_idle_timeout: Duration,
+    extend: impl FnOnce(reqwest::ClientBuilder) -> reqwest::ClientBuilder,
+) -> Result<reqwest::Client, ClientInitError> {
+    extend(
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .connect_timeout(CONNECT_TIMEOUT)
+            .read_timeout(read_idle_timeout)
+            .pool_idle_timeout(relay::POOL_IDLE_TIMEOUT),
+    )
+    .build()
+    .map_err(|e| ClientInitError(e.to_string()))
 }
 
 /// One [`UpstreamImpl`] per [`UpstreamKind::ALL`] entry, looked up by kind.
@@ -171,6 +203,23 @@ impl UpstreamSet {
             OpenAiUpstream::new()?,
             OpenRouterUpstream,
         ))
+    }
+
+    /// The shipped implementations, with the given OAuth token endpoints in
+    /// place of the vendors' (`None` keeps the vendor default).
+    pub fn with_token_urls(
+        anthropic: Option<Url>,
+        openai: Option<Url>,
+    ) -> Result<Self, ClientInitError> {
+        let mut a = AnthropicUpstream::new()?;
+        if let Some(url) = anthropic {
+            a = a.with_token_url(url);
+        }
+        let mut o = OpenAiUpstream::new()?;
+        if let Some(url) = openai {
+            o = o.with_token_url(url);
+        }
+        Ok(UpstreamSet::from_impls(a, o, OpenRouterUpstream))
     }
 
     /// A set from individually configured implementations, for a daemon
@@ -205,6 +254,19 @@ mod tests {
     /// Set in the environment of the child process
     /// [`outbound_calls_ignore_proxy_environment`] runs.
     const PROXY_ENV_CHILD: &str = "JANUS_TEST_PROXY_ENV_CHILD";
+
+    #[test]
+    fn token_urls_need_https_unless_loopback_literal() {
+        let refused = |u: &str| token_url_refusal(&Url::parse(u).unwrap()).is_some();
+        assert!(!refused("https://auth.example.com/oauth/token"));
+        assert!(!refused("http://127.0.0.1:9000/token"));
+        assert!(!refused("http://[::1]:9000/token"));
+        assert!(refused("http://auth.example.com/token"));
+        assert!(refused("http://localhost:9000/token"));
+        assert!(refused("http://10.0.0.5/token"));
+        assert!(refused("ftp://127.0.0.1/token"));
+        assert!(refused("file:///etc/token"));
+    }
 
     #[test]
     fn outbound_calls_ignore_proxy_environment() {

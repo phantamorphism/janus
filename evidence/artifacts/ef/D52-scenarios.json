@@ -1,0 +1,161 @@
+{
+  "public": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_tls_error\",\"message\":\"the policy plugin could not be consulted (plugin_tls_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "st": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23130/",
+      "health": "tls_error",
+      "last_error": "TLS handshake with plugin at localhost:23130 failed: invalid peer certificate: UnknownIssuer",
+      "last_ok_at": null,
+      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "dropped_events": 0
+    },
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "agent-d52-public",
+      "claimed_identity": null,
+      "class": "plugin_tls_error",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 5,
+      "error": "plugin_tls_error: TLS handshake with plugin at localhost:23130 failed: invalid peer certificate: UnknownIssuer",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:37.729187Z",
+      "request_id": "01a1a612-4581-7139-847a-a94526cee27b",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    }
+  },
+  "wronghost": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_tls_error\",\"message\":\"the policy plugin could not be consulted (plugin_tls_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "st": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23132/",
+      "health": "tls_error",
+      "last_error": "TLS handshake with plugin at localhost:23132 failed: invalid peer certificate: certificate not valid for name \"localhost\"; certificate is only valid for DnsName(\"other.test\")",
+      "last_ok_at": null,
+      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "dropped_events": 0
+    },
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "agent-d52-wronghost",
+      "claimed_identity": null,
+      "class": "plugin_tls_error",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 3,
+      "error": "plugin_tls_error: TLS handshake with plugin at localhost:23132 failed: invalid peer certificate: certificate not valid for name \"localhost\"; certificate is only valid for DnsName(\"other.test\")",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:37.899991Z",
+      "request_id": "01a1a612-462b-7159-8b3b-640d32902bbc",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    }
+  },
+  "servername": {
+    "status": 200,
+    "conns": [
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578045
+      },
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578047
+      }
+    ],
+    "st": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23134/",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:38.045461Z",
+      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "server_cert_expires_at": "2027-11-04T10:19:33Z",
+      "dropped_events": 0
+    }
+  },
+  "spiffe": {
+    "status": 200,
+    "conns": [
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578188
+      },
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578190
+      }
+    ]
+  },
+  "tls12": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_tls_error\",\"message\":\"the policy plugin could not be consulted (plugin_tls_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "st": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23140/",
+      "health": "tls_error",
+      "last_error": "TLS handshake with plugin at localhost:23140 failed: received fatal alert: ProtocolVersion",
+      "last_ok_at": null,
+      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "dropped_events": 0
+    },
+    "conns": [],
+    "tlsErrors": [
+      "8061D9F301000000:error:0A000102:SSL routines:tls_early_post_process_client_hello:unsupported protocol:../deps/openssl/openssl/ssl/statem/statem_srvr.c:1780:\n",
+      "8061D9F301000000:error:0A000102:SSL routines:tls_early_post_process_client_hello:unsupported protocol:../deps/openssl/openssl/ssl/statem/statem_srvr.c:1780:\n"
+    ]
+  },
+  "ok": {
+    "status": 200,
+    "conns": [
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578631
+      },
+      {
+        "authorized": true,
+        "authError": null,
+        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "protocol": "TLSv1.3",
+        "at": 1793787578634
+      }
+    ],
+    "st": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23142/",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:38.631729Z",
+      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "server_cert_expires_at": "2027-11-04T10:19:33Z",
+      "dropped_events": 0
+    }
+  }
+}

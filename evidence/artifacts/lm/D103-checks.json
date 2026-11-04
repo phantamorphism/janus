@@ -1,0 +1,42 @@
+[
+  {
+    "name": "valid config exits 0 even though the data-plane port is held",
+    "ok": true,
+    "detail": "\u001b[2m2026-11-04T10:19:45.934692Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mjanus_core::pool\u001b[0m\u001b[2m:\u001b[0m credential pool opened \u001b[3mdir\u001b[0m\u001b[2m=\u001b[0m/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/.tmpyVwdy4/credentials \u001b[3mcredentials\u001b[0m\u001b[2m=\u001b[0m0\n"
+  },
+  {
+    "name": "valid: no admin/UI port bound and no socket created",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "valid: check-config creates nothing in the data dir",
+    "ok": true,
+    "detail": "absent"
+  },
+  {
+    "name": "invalid config exits non-zero with a diagnostic naming the problem",
+    "ok": true,
+    "detail": "janus-daemon: config: upstream[openrouter].identity.secret_ref: secret \"no-such-secret\" is not declared under [secrets]\n"
+  },
+  {
+    "name": "invalid: no port bound and no socket created",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "invalid: check-config creates nothing in the data dir",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "check-config leaves the data-plane port free afterwards",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "`janus check-config` agrees (non-zero on invalid)",
+    "ok": true,
+    "detail": ""
+  }
+]

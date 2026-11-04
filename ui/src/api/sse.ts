@@ -4,15 +4,14 @@
 // the admin token travels only in `Authorization`
 // (`docs/admin-surface#requests-endpoint`). So the stream is read from a
 // fetch body and parsed here, following the WHATWG event-stream rules
-// (field parsing, `id`/`retry`, CR/LF/CRLF line ends), and reconnected the
-// way EventSource would: after the server's `retry` delay, presenting the
-// last seen event id in `Last-Event-ID`.
+// (field parsing, CR/LF/CRLF line ends). The daemon's tail is live only: its
+// events carry no `id` and it sends no `retry`, so there is nothing to
+// resume from. On reconnect the caller closes the gap with
+// `GET /v1/requests?since=` (`docs/admin-surface#requests-endpoint`).
 
 export interface SseEvent {
   event: string
   data: string
-  /** The last event id in force when this event was dispatched. */
-  lastEventId: string
 }
 
 export class SseParser {
@@ -21,8 +20,6 @@ export class SseParser {
   private data: string[] = []
   private eventType = ''
   private hasData = false
-  lastEventId = ''
-  retry: number | null = null
 
   /** Feed decoded text; returns the events completed by it. */
   feed(chunk: string): SseEvent[] {
@@ -65,12 +62,6 @@ export class SseParser {
         this.data.push(value)
         this.hasData = true
         break
-      case 'id':
-        if (!value.includes('\0')) this.lastEventId = value
-        break
-      case 'retry':
-        if (/^\d+$/.test(value)) this.retry = Number(value)
-        break
       default:
         break
     }
@@ -79,7 +70,7 @@ export class SseParser {
 
   private dispatch(): SseEvent | null {
     const ev: SseEvent | null = this.hasData
-      ? { event: this.eventType || 'message', data: this.data.join('\n'), lastEventId: this.lastEventId }
+      ? { event: this.eventType || 'message', data: this.data.join('\n') }
       : null
     this.data = []
     this.hasData = false
@@ -101,7 +92,7 @@ export interface TailOptions {
   onEvent: (ev: SseEvent) => void
   onState: (state: TailState) => void
   onUnauthorized: () => void
-  /** Reconnect delay before the server sends `retry`; doubles on failure. */
+  /** First reconnect delay; doubles on each consecutive failure. */
   initialRetryMs?: number
   maxRetryMs?: number
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>
@@ -141,7 +132,6 @@ export async function runTail(o: TailOptions): Promise<void> {
         Accept: 'text/event-stream',
         'Cache-Control': 'no-cache',
       }
-      if (parser.lastEventId) headers['Last-Event-ID'] = parser.lastEventId
       const res = await fetch(o.url, { headers, signal: o.signal, cache: 'no-store' })
       if (res.status === 401) {
         o.onState({ phase: 'stopped', reason: 'The daemon rejected the admin token.' })
@@ -178,7 +168,7 @@ export async function runTail(o: TailOptions): Promise<void> {
       reason = e instanceof Error ? e.message : String(e)
     }
     if (o.signal.aborted) return
-    const delay = parser.retry ?? Math.min(max, base * 2 ** failures)
+    const delay = Math.min(max, base * 2 ** failures)
     failures++
     o.onState({ phase: 'waiting', retryInMs: delay, reason })
     await sleep(delay, o.signal)

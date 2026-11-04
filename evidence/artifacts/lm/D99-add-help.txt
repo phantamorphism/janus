@@ -1,0 +1,16 @@
+Add a credential to the pool; live without a restart
+
+Usage: janus credential add [OPTIONS] --upstream <NAME> <--api-key-stdin|--from-file <PATH>>
+
+Options:
+      --admin <ADDRESS>    Admin surface address: unix://<path> or http(s)://host:port [env: JANUS_ADMIN=]
+      --upstream <NAME>    [possible values: anthropic, openai, openrouter]
+      --ref <REF>          The pool slot's name (generated when absent)
+      --token-file <PATH>  File holding the admin token, for an http(s) address [env: JANUS_TOKEN_FILE]
+      --ca-file <PATH>     For an https address: the only certificate(s) to trust — a private CA, or the listener's own self-signed certificate. System roots otherwise [env: JANUS_ADMIN_CA_FILE=]
+      --label <TEXT>       
+      --api-key-stdin      Read a bare API key from standard input (hidden when typed at a terminal)
+      --config <PATH>      The daemon's config file: its data_dir locates the admin socket and token, and it is the file `check-config` validates
+      --from-file <PATH>   Read the material from a file: a vendor CLI's credential file (JSON), or a file holding a bare API key
+      --json               Machine-readable output: the admin API's JSON documents (one JSON line per record for `log tail`); errors as JSON on stderr
+  -h, --help               Print help

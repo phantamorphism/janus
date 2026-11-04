@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "events": [
+    {
+      "t": 1793787581338,
+      "ev": {
+        "event_type": "call_completed",
+        "request_id": "01a1a612-5399-71c5-9178-ab3583d0b92b",
+        "correlation_id": "corr38",
+        "payload_json": "{\"caller_identity\":\"u38\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+      }
+    }
+  ],
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u38",
+    "claimed_identity": null,
+    "correlation_id": "corr38",
+    "credential_ref": "acct-a",
+    "duration_ms": 0,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:41.337958Z",
+    "request_id": "01a1a612-5399-71c5-9178-ab3583d0b92b",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "usage": {
+        "input_tokens": 11,
+        "output_tokens": 7
+      }
+    }
+  }
+}

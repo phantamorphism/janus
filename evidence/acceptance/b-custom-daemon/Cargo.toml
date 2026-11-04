@@ -1,0 +1,10 @@
+[package]
+name = "qa-custom-daemon"
+version = "0.1.0"
+edition = "2021"
+[workspace]
+[dependencies]
+janus-daemon = { path = "/Users/michaelhancock/hancock_industries/apps/janus/crates/janus-daemon" }
+janus-core = { path = "/Users/michaelhancock/hancock_industries/apps/janus/crates/janus-core" }
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"

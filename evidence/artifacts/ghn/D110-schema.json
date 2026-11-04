@@ -1,0 +1,79 @@
+{
+  "tables": [
+    "identities",
+    "requests"
+  ],
+  "identities": [
+    "id",
+    "token_hash",
+    "identity",
+    "claims",
+    "label",
+    "created_at",
+    "expires_at",
+    "revoked_at",
+    "last_seen_at"
+  ],
+  "requests": [
+    "seq",
+    "request_id",
+    "received_at",
+    "duration_ms",
+    "upstream",
+    "route",
+    "method",
+    "path",
+    "binding",
+    "caller_identity",
+    "claimed_identity",
+    "correlation_id",
+    "outcome",
+    "outcome_detail",
+    "credential_ref",
+    "status",
+    "usage",
+    "error"
+  ],
+  "requestsIndexes": [
+    {
+      "name": "requests_request_id",
+      "cols": [
+        "request_id"
+      ]
+    },
+    {
+      "name": "requests_identity_received_at",
+      "cols": [
+        "caller_identity",
+        "received_at"
+      ]
+    },
+    {
+      "name": "requests_received_at",
+      "cols": [
+        "received_at"
+      ]
+    }
+  ],
+  "identitiesIndexes": [
+    {
+      "name": "identities_identity",
+      "cols": [
+        "identity"
+      ]
+    },
+    {
+      "name": "sqlite_autoindex_identities_2",
+      "cols": [
+        "token_hash"
+      ]
+    },
+    {
+      "name": "sqlite_autoindex_identities_1",
+      "cols": [
+        "id"
+      ]
+    }
+  ],
+  "ddl": "CREATE TABLE identities (\n        id           TEXT PRIMARY KEY NOT NULL,\n        token_hash   TEXT NOT NULL UNIQUE,\n        identity     TEXT NOT NULL,\n        claims       TEXT NOT NULL,\n        label        TEXT,\n        created_at   TEXT NOT NULL,\n        expires_at   TEXT,\n        revoked_at   TEXT,\n        last_seen_at TEXT\n    );\nCREATE INDEX identities_identity ON identities (identity);\nCREATE TABLE requests (\n        seq             INTEGER PRIMARY KEY AUTOINCREMENT,\n        request_id      TEXT NOT NULL,\n        received_at     TEXT NOT NULL,\n        duration_ms     INTEGER NOT NULL,\n        upstream        TEXT,\n        route           TEXT,\n        method          TEXT NOT NULL,\n        path            TEXT NOT NULL,\n        binding         TEXT,\n        caller_identity TEXT NOT NULL,\n        claimed_identity TEXT,\n        correlation_id  TEXT,\n        outcome         TEXT NOT NULL,\n        outcome_detail  TEXT,\n        credential_ref  TEXT,\n        status          INTEGER,\n        usage           TEXT,\n        error           TEXT\n    );\nCREATE TABLE sqlite_sequence(name,seq);\nCREATE INDEX requests_received_at ON requests (received_at);\nCREATE INDEX requests_identity_received_at ON requests (caller_identity, received_at);\nCREATE INDEX requests_request_id ON requests (request_id);\n"
+}

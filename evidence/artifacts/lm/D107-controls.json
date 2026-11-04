@@ -1,0 +1,13 @@
+[
+  "FORM:Identity (exact)\nFilter\nInclude revoked\nInclude expired",
+  "INPUT:text",
+  "BUTTON:Filter",
+  "INPUT:checkbox",
+  "INPUT:checkbox",
+  "BUTTON:Revoke",
+  "BUTTON:Revoke",
+  "BUTTON:Revoke",
+  "BUTTON:Revoke",
+  "BUTTON:Revoke",
+  "BUTTON:Revoke"
+]

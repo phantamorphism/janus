@@ -5,6 +5,7 @@ import { useApi } from '@/api/context'
 import { runTail, type TailState } from '@/api/sse'
 import {
   DEFAULT_LIMIT,
+  MAX_LIMIT,
   OUTCOMES,
   UPSTREAMS,
   type OutcomeName,
@@ -55,6 +56,13 @@ function toQuery(d: Draft): RequestQuery {
   }
 }
 
+/**
+ * How far before a drop the gap query reaches: a record's `received_at` is
+ * when the request arrived, but it is committed only after the response
+ * finished (the same lookback as `janus log tail`).
+ */
+const GAP_LOOKBACK_MS = 300_000
+
 /** Live-tail records are kept newest first, at most this many. */
 const LIVE_CAP = 500
 
@@ -103,6 +111,8 @@ export function Requests() {
   const [live, setLive] = useState<{ key: string; records: RequestRecord[] }>({ key, records: [] })
   const [held, setHeld] = useState<{ key: string; records: RequestRecord[] }>({ key, records: [] })
   const [fresh, setFresh] = useState<Set<string>>(new Set())
+  const [gapError, setGapError] = useState<string | null>(null)
+  const [logDisabled, setLogDisabled] = useState(false)
   const [selected, setSelected] = useState<RequestRecord | null>(null)
 
   const pausedRef = useRef(paused)
@@ -116,34 +126,93 @@ export function Requests() {
   useEffect(() => {
     if (!liveOn) return
     const ctl = new AbortController()
+    const startedAt = Date.now()
+    // When the stream was last known good before a drop or `lagged`; null
+    // while nothing is missing. The gap is closed from here.
+    let gapFrom: number | null = null
+
+    function ingest(rec: RequestRecord) {
+      if (!matchesFilter(queryRef.current, rec)) return
+      // Keyed by the filters in force now: credential/since/until change
+      // without reconnecting, and records must land under the current key.
+      const streamKey = JSON.stringify(queryRef.current)
+      const add = (prev: { key: string; records: RequestRecord[] }) => ({
+        key: streamKey,
+        records: mergeUnique([rec], prev.key === streamKey ? prev.records : []).slice(0, LIVE_CAP),
+      })
+      if (pausedRef.current) {
+        setHeld(add)
+      } else {
+        setLive(add)
+        setFresh((f) => new Set(f).add(rec.request_id))
+      }
+    }
+
+    // `GET /v1/requests?since=` for what was committed while the stream was
+    // down or behind. Records already shown are dropped by id when merged.
+    async function closeGap() {
+      if (gapFrom === null) return
+      const since = new Date(Math.max(gapFrom - GAP_LOOKBACK_MS, startedAt)).toISOString()
+      gapFrom = null
+      const base = { ...queryRef.current, since, limit: MAX_LIMIT, before: undefined }
+      try {
+        const found: RequestRecord[] = []
+        let before: string | undefined
+        for (;;) {
+          const page = await api.requests({ ...base, before }, ctl.signal)
+          found.push(...page.requests)
+          if (!page.next) break
+          before = page.next
+        }
+        // Pages are newest first; ingest oldest first so the newest ends on top.
+        for (const rec of found.reverse()) ingest(rec)
+      } catch (e) {
+        if (ctl.signal.aborted) return
+        setGapError(errorMessage(e))
+        return
+      }
+      setGapError(null)
+    }
+
     runTail({
       url: streamUrl,
       headers: api.headers(),
       signal: ctl.signal,
       onUnauthorized: () => api.unauthorized(),
-      onState: setTail,
+      onState: (state) => {
+        setTail(state)
+        if (state.phase === 'waiting') gapFrom ??= Date.now()
+      },
       onEvent: (ev) => {
-        if (ev.event !== 'request') return
-        let rec: RequestRecord
-        try {
-          rec = JSON.parse(ev.data) as RequestRecord
-        } catch {
-          return
-        }
-        if (!rec || typeof rec.request_id !== 'string') return
-        if (!matchesFilter(queryRef.current, rec)) return
-        // Keyed by the filters in force now: credential/since/until change
-        // without reconnecting, and records must land under the current key.
-        const streamKey = JSON.stringify(queryRef.current)
-        const add = (prev: { key: string; records: RequestRecord[] }) => ({
-          key: streamKey,
-          records: mergeUnique([rec], prev.key === streamKey ? prev.records : []).slice(0, LIVE_CAP),
-        })
-        if (pausedRef.current) {
-          setHeld(add)
-        } else {
-          setLive(add)
-          setFresh((s) => new Set(s).add(rec.request_id))
+        switch (ev.event) {
+          case 'ping':
+            // The subscription is in place: nothing committed from here on
+            // is missed, so what came before can be queried safely.
+            void closeGap()
+            break
+          case 'lagged':
+            gapFrom ??= Date.now()
+            void closeGap()
+            break
+          case 'disabled':
+            setLogDisabled(true)
+            setLiveOn(false)
+            setTail(null)
+            ctl.abort()
+            break
+          case 'request': {
+            let rec: RequestRecord
+            try {
+              rec = JSON.parse(ev.data) as RequestRecord
+            } catch {
+              return
+            }
+            if (!rec || typeof rec.request_id !== 'string') return
+            ingest(rec)
+            break
+          }
+          default:
+            break
         }
       },
     })
@@ -193,7 +262,7 @@ export function Requests() {
       const page = await api.requests({ ...query, before: cursor })
       setOlder({
         key,
-        records: [...(olderHere?.records ?? []), ...page.records],
+        records: [...(olderHere?.records ?? []), ...page.requests],
         next: page.next,
       })
     } catch (e) {
@@ -206,9 +275,9 @@ export function Requests() {
   const liveRecords = live.key === key ? live.records : []
   const heldCount = held.key === key ? held.records.length : 0
   const records = first.data
-    ? mergeUnique(liveRecords, first.data.records, olderHere?.records ?? [])
+    ? mergeUnique(liveRecords, first.data.requests, olderHere?.records ?? [])
     : liveRecords
-  const disabled = first.data?.disabled === true
+  const disabled = first.data?.disabled === true || logDisabled
 
   return (
     <>
@@ -344,6 +413,11 @@ export function Requests() {
 
       <div aria-live="polite" className="mb-2 min-h-5 text-sm text-muted">
         {liveOn && <span role="status">{tailText(tail, paused, heldCount)}</span>}
+        {liveOn && gapError && (
+          <span role="alert" className="ml-2 text-bad">
+            Could not fill the gap after the reconnect: {gapError}
+          </span>
+        )}
       </div>
 
       {first.error !== undefined && <ErrorNotice error={first.error} what="requests" onRetry={first.reload} />}

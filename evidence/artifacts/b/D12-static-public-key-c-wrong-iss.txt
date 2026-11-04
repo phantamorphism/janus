@@ -1,0 +1,2 @@
+status=401
+{"binding":"jwt","caller_identity":"","claimed_identity":"jwt-user-1","correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"identity material is for a different namespace or issuer: token issuer is not \"https://issuer.example\"","kind":"wrong_namespace","method":"POST","outcome":"rejected_identity","path":"/openai/v1/x","received_at":"2026-11-04T10:19:39.797525Z","request_id":"01a1a612-4d95-76ef-89dd-1b48f18ff6bc","route":null,"status":null,"upstream":"openai","usage":null}

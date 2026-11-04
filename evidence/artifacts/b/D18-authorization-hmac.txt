@@ -1,0 +1,2 @@
+status=401 fwd=false
+{"binding":"hmac","caller_identity":"","claimed_identity":null,"correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"no identity material presented","kind":"no_material","method":"POST","outcome":"rejected_identity","path":"/openai/v1/chat","received_at":"2026-11-04T10:19:41.245885Z","request_id":"01a1a612-533d-751e-b74a-a4d7a745e2a8","route":null,"status":null,"upstream":"openai","usage":null}

@@ -1,0 +1,4 @@
+token=7b226e73223a226a616e75732d646174612d706c616e65222c22657870223a313739333739313137342c227375626a656374223a226167656e742d31227d.3ae1c6d172832fcac0b4cdef6f1570dff71c760922dbd7998e9497321666edc9
+status=200
+body={"ok":1}
+log={"binding":"hmac","caller_identity":"agent-1","claimed_identity":null,"correlation_id":null,"credential_ref":"a1","duration_ms":6,"error":null,"method":"POST","outcome":"forwarded","path":"/anthropic/v1/messages","received_at":"2026-11-04T10:19:34.034946Z","request_id":"01a1a612-3712-76ac-b5dc-45400a942d31","route":null,"status":200,"upstream":"anthropic","usage":null}

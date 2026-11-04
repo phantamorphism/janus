@@ -1,0 +1,23 @@
+flags: --admin <ADDRESS> | --upstream <NAME> | --ref <REF> | --token-file <PATH> | --ca-file <PATH> | --label <TEXT> | --api-key-stdin | --config <PATH> | --from-file <PATH> | --json | --help
+ps during add (janus lines):
+55026 /Users/michaelhancock/hancock_industries/apps/janus/target/release/janus credential add --upstream openrouter --ref ps1 --api-key-stdin
+rotate: exit=0
+upstream saw: {"content-type":"application/json","content-length":"2","accept":"*/*","user-agent":"node","authorization":"Bearer <redacted-key>","host":"127.0.0.1:26010"}
+add --from-file vendor json: $ exit=0
+--- stdout
+added credential ant1
+ref                 ant1
+upstream            anthropic
+kind                oauth
+label               vendor
+source              pool
+status              active
+rate limited until  -
+expires             2026-12-04T10:19:38Z
+last used           -
+requests            0
+errors              0
+last error          -
+
+--- stderr
+

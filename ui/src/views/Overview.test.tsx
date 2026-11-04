@@ -2,15 +2,15 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { apiError, json, mockApi } from '@/test/http'
-import { credential, plugin, record, status } from '@/test/fixtures'
+import { credential, plugin, record, status, credentialList, requestPage } from '@/test/fixtures'
 import { renderWithApi } from '@/test/render'
 import { Overview } from './Overview'
 
 function routes(over: Record<string, unknown> = {}) {
   return mockApi({
     'GET /v1/status': status(),
-    'GET /v1/credentials': [credential()],
-    'GET /v1/requests': { records: [], next: null, disabled: false },
+    'GET /v1/credentials': credentialList([credential()]),
+    'GET /v1/requests': requestPage([]),
     ...over,
   })
 }
@@ -34,17 +34,61 @@ describe('Overview view', () => {
     expect(within(pluginSection).getByText('Daemon client certificate expires')).toBeInTheDocument()
     expect(within(pluginSection).getByText('expired')).toBeInTheDocument()
     expect(screen.getByText('0.1.0')).toBeInTheDocument()
-    expect(await screen.findByText(/5,321 records stored, kept for 30d/)).toBeInTheDocument()
+    expect(await screen.findByText(/5,321 records stored, kept for 30days/)).toBeInTheDocument()
+  })
+
+  it('shows plugin dropped events, routes and listener URLs from the status document', async () => {
+    routes({
+      'GET /v1/status': status({
+        plugin: plugin({ dropped_events: 12 }),
+        listeners: {
+          admin_socket: '/s.sock',
+          admin_tcp: { address: '127.0.0.1:7000', tls: true, url: 'https://127.0.0.1:7000' },
+          ui: null,
+          data_plane: '127.0.0.1:8080',
+        },
+      }),
+    })
+    renderWithApi(<Overview />)
+    const pluginSection = await screen.findByRole('region', { name: 'Plugin' })
+    expect(within(pluginSection).getByLabelText('Dropped notify events')).toHaveTextContent('12')
+    const listeners = screen.getByRole('table', { name: 'Listeners' })
+    expect(within(listeners).getByText('https://127.0.0.1:7000')).toBeInTheDocument()
+    expect(within(listeners).queryByText('ui')).not.toBeInTheDocument()
+    const upstreams = screen.getByRole('table', { name: 'Upstreams' })
+    expect(within(upstreams).getByText('https://api.openai.com/')).toBeInTheDocument()
+    expect(within(upstreams).getByText(/\/openai\/v1\/embeddings/)).toBeInTheDocument()
+  })
+
+  it('shows dropped log records and refused connections, highlighting non-zero', async () => {
+    routes({
+      'GET /v1/status': status({
+        data_plane: { refused_connections: 5 },
+        request_log: { enabled: true, retain: '1day', retain_seconds: 86400, rows: 10, dropped_records: 3 },
+      }),
+    })
+    renderWithApi(<Overview />)
+    const dropped = await screen.findByLabelText('Dropped log records')
+    expect(dropped).toHaveTextContent('3')
+    expect(dropped).toHaveClass('text-bad')
+    expect(screen.getByLabelText('Refused connections')).toHaveTextContent('5')
+  })
+
+  it('shows zero dropped records and refused connections unhighlighted', async () => {
+    routes({})
+    renderWithApi(<Overview />)
+    expect(await screen.findByLabelText('Dropped log records')).not.toHaveClass('text-bad')
+    expect(screen.getByLabelText('Refused connections')).toHaveTextContent('0')
   })
 
   it('summarizes credential health by status and names the ones needing attention', async () => {
     routes({
-      'GET /v1/credentials': [
+      'GET /v1/credentials': credentialList([
         credential(),
         credential({ ref: 'b', status: 'active' }),
         credential({ ref: 'c', status: 'invalid', last_error: 'revoked upstream' }),
         credential({ ref: 'd', status: 'disabled' }),
-      ],
+      ]),
     })
     renderWithApi(<Overview />)
     const counts = await screen.findByRole('list', { name: 'Credentials by status' })
@@ -68,8 +112,8 @@ describe('Overview view', () => {
     const http = routes({
       'GET /v1/requests': (c: { query: URLSearchParams }) =>
         c.query.get('before') === 'p2'
-          ? json({ records: page2, next: null, disabled: false })
-          : json({ records: page1, next: 'p2', disabled: false }),
+          ? json({ requests: page2, next: null, disabled: false })
+          : json({ requests: page1, next: 'p2', disabled: false }),
     })
     renderWithApi(<Overview />)
     expect(await screen.findByLabelText('Request count')).toHaveTextContent('4')
@@ -90,7 +134,7 @@ describe('Overview view', () => {
   })
 
   it('says so when the request log is disabled', async () => {
-    routes({ 'GET /v1/requests': { records: [], next: null, disabled: true } })
+    routes({ 'GET /v1/requests': requestPage([], null, true) })
     renderWithApi(<Overview />)
     expect(await screen.findByText(/The request log is off/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Request count')).not.toBeInTheDocument()

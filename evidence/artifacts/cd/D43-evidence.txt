@@ -1,0 +1,87 @@
+{
+  "billing402": {
+    "status": 402,
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"billing_error\",\"message\":\"billing issue: account on hold\"}}",
+    "events": [
+      {
+        "event_type": "account_error",
+        "request_id": "01a1a612-5867-7576-98f7-1d1928583604",
+        "payload_json": "{\"credential_ref\":\"acct-ad\",\"reason\":\"402 Payment Required: billing_error: billing issue: account on hold\",\"status\":402,\"upstream\":\"anthropic\"}"
+      },
+      {
+        "event_type": "call_completed",
+        "request_id": "01a1a612-5867-7576-98f7-1d1928583604",
+        "payload_json": "{\"caller_identity\":\"u43billing402\",\"upstream\":\"anthropic\",\"status\":402,\"credential_ref\":\"acct-ad\",\"duration_ms\":1,\"usage\":null}"
+      }
+    ],
+    "cred": {
+      "error_count": 1,
+      "expires_at": null,
+      "kind": "api_key",
+      "label": null,
+      "last_error": "account error: 402 Payment Required: billing_error: billing issue: account on hold",
+      "last_used_at": "2026-11-04T10:19:42.568675Z",
+      "rate_limited_until": null,
+      "ref": "acct-ad",
+      "request_count": 1,
+      "source": "pool",
+      "status": "active",
+      "upstream": "anthropic"
+    }
+  },
+  "credit400": {
+    "status": 400,
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"}}",
+    "events": [
+      {
+        "event_type": "account_error",
+        "request_id": "01a1a612-5b14-7356-85fa-71bd86d94c8c",
+        "payload_json": "{\"credential_ref\":\"acct-ad\",\"reason\":\"400 Bad Request: invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\",\"status\":400,\"upstream\":\"anthropic\"}"
+      },
+      {
+        "event_type": "call_completed",
+        "request_id": "01a1a612-5b14-7356-85fa-71bd86d94c8c",
+        "payload_json": "{\"caller_identity\":\"u43credit400\",\"upstream\":\"anthropic\",\"status\":400,\"credential_ref\":\"acct-ad\",\"duration_ms\":1,\"usage\":null}"
+      }
+    ],
+    "cred": {
+      "error_count": 1,
+      "expires_at": null,
+      "kind": "api_key",
+      "label": null,
+      "last_error": "account error: 400 Bad Request: invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+      "last_used_at": "2026-11-04T10:19:43.254267Z",
+      "rate_limited_until": null,
+      "ref": "acct-ad",
+      "request_count": 1,
+      "source": "pool",
+      "status": "active",
+      "upstream": "anthropic"
+    }
+  },
+  "disabled403": {
+    "status": 403,
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your account has been disabled\"}}",
+    "events": [
+      {
+        "event_type": "call_completed",
+        "request_id": "01a1a612-5dcf-7580-943d-c4b26a02415b",
+        "payload_json": "{\"caller_identity\":\"u43disabled403\",\"upstream\":\"anthropic\",\"status\":403,\"credential_ref\":\"acct-ad\",\"duration_ms\":0,\"usage\":null}"
+      }
+    ],
+    "cred": {
+      "error_count": 0,
+      "expires_at": null,
+      "kind": "api_key",
+      "label": null,
+      "last_error": null,
+      "last_used_at": "2026-11-04T10:19:43.951897Z",
+      "rate_limited_until": null,
+      "ref": "acct-ad",
+      "request_count": 1,
+      "source": "pool",
+      "status": "active",
+      "upstream": "anthropic"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+custom build + custom:missing -> failed=true exit=1
+config: upstream[anthropic].identity.method: custom extractor "missing" is not registered in this build
+
+stock build + custom:introspect (not registered) -> failed=true exit=1
+janus-daemon: config: upstream[anthropic].identity.method: custom extractor "introspect" is not registered in this build
+

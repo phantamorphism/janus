@@ -12,7 +12,8 @@
 //! observation and the classification are sent once as a [`RelayOutcome`].
 
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
@@ -23,10 +24,9 @@ use http_body_util::BodyDataStream;
 use tokio::sync::oneshot;
 use url::Url;
 
-#[cfg(test)]
 use super::http_client_with;
 use super::outbound::strip_hop_by_hop;
-use super::{http_client, ClientInitError};
+use super::{ClientInitError, READ_IDLE_TIMEOUT};
 use crate::contract::credential::UpstreamFeedback;
 use crate::contract::upstream::{UpstreamImpl, UsageObserver};
 
@@ -88,27 +88,171 @@ pub struct Relayed {
     pub outcome: oneshot::Receiver<RelayOutcome>,
 }
 
+/// How much of a request body is kept so a call that failed on a stale
+/// pooled connection can be sent again. Completion requests are JSON
+/// documents of a few KiB to a few MiB; a body past this is not retried
+/// (and from then on nothing of it is kept), so the cap bounds the memory
+/// one call can pin.
+const REPLAY_LIMIT: usize = 1024 * 1024;
+
+/// A request body that remembers what it has handed out, up to
+/// [`REPLAY_LIMIT`] bytes (each chunk is copied, so the count is the bytes
+/// actually retained, not the size of the buffers they came from), so a second attempt can start from the first byte
+/// without the caller sending anything twice. The body is still streamed:
+/// each chunk goes upstream as it arrives from the caller.
+struct ReplayState {
+    /// The caller's body, from wherever the last attempt stopped reading.
+    inner: ChunkStream,
+    captured: Vec<Bytes>,
+    captured_len: usize,
+    /// More than [`REPLAY_LIMIT`] bytes were read, or the caller's body
+    /// failed: this body can no longer be sent again.
+    spent: bool,
+}
+
+/// One attempt's view of a [`ReplayState`]: the captured chunks first, then
+/// the rest of the caller's body.
+struct ReplayAttempt {
+    state: Arc<Mutex<ReplayState>>,
+    next: usize,
+}
+
+impl Stream for ReplayAttempt {
+    type Item = Result<Bytes, BoxError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = &mut *self;
+        let mut state = this.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(chunk) = state.captured.get(this.next) {
+            let chunk = chunk.clone();
+            this.next += 1;
+            return Poll::Ready(Some(Ok(chunk)));
+        }
+        let polled = state.inner.as_mut().poll_next(cx);
+        match &polled {
+            Poll::Ready(Some(Ok(chunk))) if !state.spent => {
+                if state.captured_len + chunk.len() > REPLAY_LIMIT {
+                    state.spent = true;
+                    state.captured = Vec::new();
+                } else {
+                    state.captured_len += chunk.len();
+                    // A copy, not a clone: a clone of a slice would pin the
+                    // whole buffer it came from, so the count would not be
+                    // what is retained.
+                    state.captured.push(Bytes::copy_from_slice(chunk));
+                    this.next += 1;
+                }
+            }
+            Poll::Ready(Some(Err(_))) => state.spent = true,
+            _ => {}
+        }
+        polled
+    }
+}
+
+/// Whether `error` is the signature of a request sent down a connection the
+/// upstream had already closed: the connection ended before any response
+/// byte arrived (hyper's "connection closed before message completed", or a
+/// cancelled dispatch) or was reset under the write.
+pub(super) fn is_dead_connection(error: &reqwest::Error) -> bool {
+    if error.is_connect() || error.is_timeout() || error.is_builder() || error.is_body() {
+        return false;
+    }
+    let mut source = std::error::Error::source(error);
+    while let Some(cause) = source {
+        if let Some(hyper) = cause.downcast_ref::<hyper::Error>() {
+            if hyper.is_incomplete_message() || hyper.is_canceled() {
+                return true;
+            }
+        }
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            use std::io::ErrorKind::*;
+            if matches!(
+                io.kind(),
+                ConnectionReset | ConnectionAborted | BrokenPipe | UnexpectedEof
+            ) {
+                return true;
+            }
+        }
+        source = cause.source();
+    }
+    false
+}
+
+/// A transport failure with its causes (reqwest's own text is only "error
+/// sending request"), minus the URL: the URL carries the caller's query,
+/// which can hold a credential and must reach no log or diagnostic.
+pub(super) fn transport_error(error: reqwest::Error) -> String {
+    use std::error::Error as _;
+    let error = error.without_url();
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
 /// Executes outbound calls. Holds one connection-pooling client; cheap to
 /// clone and share.
+///
+/// ## Stale pooled connections
+///
+/// The client keeps idle connections for reuse, and an upstream closes idle
+/// connections on its own schedule (Node's default is 5 s, load balancers
+/// 60 s and up). A request can therefore be written to a connection whose
+/// close is already on its way, and fail with no response byte at all. For
+/// a transparent proxy that is not an upstream failure, so:
+///
+/// - the pool drops connections idle for [`POOL_IDLE_TIMEOUT`] (4 s, under
+///   the shortest common server keep-alive, so the usual case never
+///   arises and the long-lived streaming calls lose nothing), and
+/// - a call that fails with a dead-connection error is sent once more on a
+///   fresh connection, but only when all of these hold: the failed attempt
+///   used a reused connection (no new connection was opened while it ran —
+///   a concurrent call opening one makes us not retry, the safe direction);
+///   no response byte was seen (`send` returned an error, so the response
+///   was never handed to the caller); and the request body can be sent
+///   again (none, or at most [`REPLAY_LIMIT`] bytes, kept as it streams
+///   through). A fresh connection that fails, a refused connect, a timeout
+///   and any failure after the response began are never retried, so an
+///   unreachable upstream is attempted exactly once.
+///
+/// The remaining risk is inherent to HTTP/1.1: an upstream that read the
+/// request and then closed without answering looks the same as one that
+/// closed before reading it, so that request may reach the upstream twice.
+/// That is the same trade-off browsers and Go's `net/http` make.
 #[derive(Debug, Clone)]
 pub struct Forwarder {
     client: reqwest::Client,
+    /// Connections opened by `client`, to tell a reused connection from a
+    /// new one.
+    connects: Arc<AtomicUsize>,
 }
+
+/// How long the pool keeps an idle connection; see [`Forwarder`].
+pub(super) const POOL_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 
 impl Forwarder {
     pub fn new() -> Result<Self, ClientInitError> {
-        Ok(Forwarder {
-            client: http_client()?,
-        })
+        Forwarder::with_read_idle_timeout(READ_IDLE_TIMEOUT)
     }
 
-    /// A forwarder whose idle bound is `read_idle_timeout`, so a test can
-    /// see a stall end without waiting the real one out.
-    #[cfg(test)]
-    fn with_read_idle_timeout(read_idle_timeout: std::time::Duration) -> Self {
-        Forwarder {
-            client: http_client_with(read_idle_timeout).unwrap(),
-        }
+    /// A forwarder whose idle bound is `read_idle_timeout`.
+    fn with_read_idle_timeout(
+        read_idle_timeout: std::time::Duration,
+    ) -> Result<Self, ClientInitError> {
+        let connects = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&connects);
+        let client = http_client_with(read_idle_timeout, move |builder| {
+            builder.connector_layer(tower::layer::layer_fn(move |inner| CountConnects {
+                inner,
+                connects: Arc::clone(&counter),
+            }))
+        })?;
+        Ok(Forwarder { client, connects })
     }
 
     /// Send `outbound` (from [`super::build_outbound`]) with `body` — the
@@ -128,19 +272,51 @@ impl Forwarder {
         let target = outbound.uri.to_string();
         let url = Url::parse(&target).map_err(|_| ForwardError::BadTarget(target.clone()))?;
         let method = outbound.method;
-        let mut request = self
-            .client
-            .request(method.clone(), url)
-            .headers(outbound.headers);
         // A request that has no body keeps having none (no chunked framing
         // on a GET); any other body is streamed through without buffering.
-        if !(body.is_end_stream() || body.size_hint().exact() == Some(0)) {
-            request = request.body(reqwest::Body::wrap_stream(BodyDataStream::new(body)));
-        }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| ForwardError::Upstream(e.without_url().to_string()))?;
+        let replay = if body.is_end_stream() || body.size_hint().exact() == Some(0) {
+            None
+        } else {
+            let inner: ChunkStream = Box::pin(BodyDataStream::new(body).map_err(Into::into));
+            Some(Arc::new(Mutex::new(ReplayState {
+                inner,
+                captured: Vec::new(),
+                captured_len: 0,
+                spent: false,
+            })))
+        };
+        let mut retried = false;
+        let response = loop {
+            let mut request = self
+                .client
+                .request(method.clone(), url.clone())
+                .headers(outbound.headers.clone());
+            if let Some(state) = &replay {
+                request = request.body(reqwest::Body::wrap_stream(ReplayAttempt {
+                    state: Arc::clone(state),
+                    next: 0,
+                }));
+            }
+            let connects_before = self.connects.load(Ordering::SeqCst);
+            match request.send().await {
+                Ok(response) => break response,
+                Err(e) => {
+                    let reused = self.connects.load(Ordering::SeqCst) == connects_before;
+                    let replayable = replay
+                        .as_ref()
+                        .is_none_or(|s| !s.lock().unwrap_or_else(|e| e.into_inner()).spent);
+                    if !retried && reused && replayable && is_dead_connection(&e) {
+                        tracing::debug!(
+                            error = %transport_error(e),
+                            "pooled upstream connection was closed; retrying once on a new one"
+                        );
+                        retried = true;
+                        continue;
+                    }
+                    return Err(ForwardError::Upstream(transport_error(e)));
+                }
+            }
+        };
 
         let status = response.status();
         let mut headers = response.headers().clone();
@@ -169,6 +345,31 @@ impl Forwarder {
             response: relayed,
             outcome: rx,
         })
+    }
+}
+
+/// Counts the connections the client opens.
+#[derive(Clone)]
+struct CountConnects<S> {
+    inner: S,
+    connects: Arc<AtomicUsize>,
+}
+
+impl<S, R> tower::Service<R> for CountConnects<S>
+where
+    S: tower::Service<R>,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: R) -> Self::Future {
+        self.connects.fetch_add(1, Ordering::SeqCst);
+        self.inner.call(request)
     }
 }
 
@@ -320,7 +521,6 @@ impl Drop for RelayBody {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     use futures::StreamExt;
@@ -739,11 +939,9 @@ mod tests {
         let parts = outbound(&base, Method::POST, "/v1/x", &[]);
         let forwarded = tokio::time::timeout(
             Duration::from_secs(5),
-            Forwarder::with_read_idle_timeout(Duration::from_millis(200)).forward(
-                openrouter(),
-                parts,
-                Full::new(Bytes::from_static(b"{}")),
-            ),
+            Forwarder::with_read_idle_timeout(Duration::from_millis(200))
+                .unwrap()
+                .forward(openrouter(), parts, Full::new(Bytes::from_static(b"{}"))),
         )
         .await
         .expect("a stalled upstream ends the call");
@@ -764,6 +962,7 @@ mod tests {
         .await;
         let parts = outbound(&upstream.url, Method::POST, "/v1/x", &[]);
         let relayed = Forwarder::with_read_idle_timeout(Duration::from_millis(200))
+            .unwrap()
             .forward(openrouter(), parts, Full::new(Bytes::from_static(b"{}")))
             .await
             .unwrap();
@@ -792,6 +991,223 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, ForwardError::Upstream(_)), "{err}");
         assert!(!err.to_string().contains("sk-or-real"));
+    }
+
+    /// Reads one request (head and `content-length` body) from `socket`;
+    /// `None` when the peer closed first.
+    async fn read_request(socket: &mut tokio::net::TcpStream) -> Option<Vec<u8>> {
+        use tokio::io::AsyncReadExt;
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            if let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                let head = String::from_utf8_lossy(&buf[..end]).to_ascii_lowercase();
+                let len = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length: "))
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                let chunked = head.contains("transfer-encoding: chunked");
+                if (chunked && buf.ends_with(b"\r\n0\r\n\r\n"))
+                    || (!chunked && buf.len() >= end + 4 + len)
+                {
+                    return Some(buf);
+                }
+            }
+            match socket.read(&mut chunk).await {
+                Ok(0) | Err(_) => return None,
+                Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            }
+        }
+    }
+
+    const OK_KEEP_ALIVE: &[u8] = b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok";
+
+    /// A raw-socket upstream: `script(connection_number, socket)` runs per
+    /// accepted connection. Returns the base URL and the accept count.
+    async fn raw_upstream<F, Fut>(script: F) -> (Url, Arc<AtomicUsize>)
+    where
+        F: Fn(usize, tokio::net::TcpStream) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&accepted);
+        tokio::spawn(async move {
+            while let Ok((socket, _)) = listener.accept().await {
+                let n = count.fetch_add(1, Ordering::SeqCst) + 1;
+                tokio::spawn(script(n, socket));
+            }
+        });
+        (base, accepted)
+    }
+
+    async fn post_to(
+        forwarder: &Forwarder,
+        base: &Url,
+        body: Bytes,
+    ) -> Result<Relayed, ForwardError> {
+        let parts = outbound(base, Method::POST, "/v1/x", &[]);
+        forwarder
+            .forward(openrouter(), parts, Full::new(body))
+            .await
+    }
+
+    #[tokio::test]
+    async fn a_request_on_a_connection_the_upstream_closed_is_sent_again_on_a_new_one() {
+        use tokio::io::AsyncWriteExt;
+        let bodies = Arc::new(Mutex::new(Vec::<String>::new()));
+        let seen = Arc::clone(&bodies);
+        let (base, accepted) = raw_upstream(move |n, mut socket| {
+            let seen = Arc::clone(&seen);
+            async move {
+                while let Some(request) = read_request(&mut socket).await {
+                    let text = String::from_utf8_lossy(&request).into_owned();
+                    seen.lock().unwrap().push(text);
+                    // Connection 1 answers once, then closes on the next
+                    // request without reading it through to an answer: the
+                    // idle-close race, made deterministic.
+                    if n == 1 && seen.lock().unwrap().len() > 1 {
+                        return;
+                    }
+                    socket.write_all(OK_KEEP_ALIVE).await.unwrap();
+                }
+            }
+        })
+        .await;
+        let forwarder = Forwarder::new().unwrap();
+        for body in ["{\"a\":1}", "{\"b\":2}"] {
+            let relayed = post_to(&forwarder, &base, Bytes::from(body)).await.unwrap();
+            assert_eq!(relayed.response.status(), 200);
+            let collected = relayed.response.into_body().collect().await.unwrap();
+            assert_eq!(collected.to_bytes(), "ok");
+        }
+        assert_eq!(accepted.load(Ordering::SeqCst), 2);
+        // The retried request carried the whole body.
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 3);
+        for (request, body) in bodies.iter().zip(["{\"a\":1}", "{\"b\":2}", "{\"b\":2}"]) {
+            assert!(request.contains(body), "{request:?} lacks {body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_request_over_the_replay_limit_is_not_sent_again() {
+        use tokio::io::AsyncWriteExt;
+        let (base, accepted) = raw_upstream(|n, mut socket| async move {
+            if read_request(&mut socket).await.is_some() && n == 1 {
+                socket.write_all(OK_KEEP_ALIVE).await.unwrap();
+                // Next request: close without answering.
+                let _ = read_request(&mut socket).await;
+            }
+        })
+        .await;
+        let forwarder = Forwarder::new().unwrap();
+        let first = post_to(&forwarder, &base, Bytes::from_static(b"{}"))
+            .await
+            .unwrap();
+        first.response.into_body().collect().await.unwrap();
+        let big = Bytes::from(vec![b'x'; REPLAY_LIMIT + 1]);
+        let err = post_to(&forwarder, &base, big).await.unwrap_err();
+        assert!(matches!(err, ForwardError::Upstream(_)), "{err}");
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn nothing_is_sent_again_once_the_response_has_begun() {
+        use tokio::io::AsyncWriteExt;
+        let (base, accepted) = raw_upstream(|_, mut socket| async move {
+            if read_request(&mut socket).await.is_some() {
+                // A head promising ten bytes, three of them, then gone.
+                socket
+                    .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 10\r\n\r\nabc")
+                    .await
+                    .unwrap();
+            }
+        })
+        .await;
+        let forwarder = Forwarder::new().unwrap();
+        let relayed = post_to(&forwarder, &base, Bytes::from_static(b"{}"))
+            .await
+            .unwrap();
+        let mut body = relayed.response.into_body();
+        let mut got = Vec::new();
+        let mut failed = false;
+        while let Some(frame) = body.frame().await {
+            match frame {
+                Ok(frame) => got.extend(frame.into_data().unwrap_or_default()),
+                Err(_) => failed = true,
+            }
+        }
+        assert!(failed, "the cut-off body must surface as an error");
+        assert_eq!(got, b"abc");
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+        assert!(matches!(
+            relayed.outcome.await.unwrap().end,
+            RelayEnd::UpstreamFailed(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_error_that_is_not_a_dead_connection_is_not_sent_again() {
+        use tokio::io::AsyncWriteExt;
+        // Connection 1 answers once, then replies to the next request with
+        // garbage: an upstream that did process it. Any later connection
+        // would answer fine, so a retry would hide the failure.
+        let (base, accepted) = raw_upstream(|n, mut socket| async move {
+            let mut served = 0;
+            while read_request(&mut socket).await.is_some() {
+                served += 1;
+                let reply: &[u8] = if n == 1 && served > 1 {
+                    b"this is not http\r\n\r\n"
+                } else {
+                    OK_KEEP_ALIVE
+                };
+                socket.write_all(reply).await.unwrap();
+            }
+        })
+        .await;
+        let forwarder = Forwarder::new().unwrap();
+        let first = post_to(&forwarder, &base, Bytes::from_static(b"{}"))
+            .await
+            .unwrap();
+        first.response.into_body().collect().await.unwrap();
+        let err = post_to(&forwarder, &base, Bytes::from_static(b"{}"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ForwardError::Upstream(_)), "{err}");
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn the_upstream_error_text_never_carries_the_request_query() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        drop(listener);
+        let parts = outbound(&base, Method::POST, "/v1/x?key=sk-secret-query", &[]);
+        let err = Forwarder::new()
+            .unwrap()
+            .forward(openrouter(), parts, Full::new(Bytes::new()))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ForwardError::Upstream(_)), "{err}");
+        let text = format!("{err} {err:?}");
+        assert!(!text.contains("sk-secret-query"), "{text}");
+        assert!(!text.contains("/v1/x"), "{text}");
+    }
+
+    #[tokio::test]
+    async fn an_upstream_that_drops_every_connection_is_tried_once() {
+        // Not a stale connection: every connection is new, so a failure is
+        // the upstream's and is reported after a single attempt.
+        let (base, accepted) = raw_upstream(|_, socket| async move { drop(socket) }).await;
+        let err = post_to(&Forwarder::new().unwrap(), &base, Bytes::from_static(b"{}"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ForwardError::Upstream(_)), "{err}");
+        assert!(!err.to_string().contains("sk-or-real"));
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

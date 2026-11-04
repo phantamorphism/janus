@@ -1,0 +1,124 @@
+{
+  "sane": {
+    "status": 200,
+    "pluginStatus": {
+      "client_cert_expires_at": "2027-11-04T00:00:00Z",
+      "dropped_events": 0,
+      "endpoint": "https://localhost:22030/",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:53.452602Z",
+      "mode": "tls",
+      "server_cert_expires_at": "2027-11-04T00:00:00Z"
+    }
+  },
+  "untrusted": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_tls_error\",\"message\":\"the policy plugin could not be consulted (plugin_tls_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "tls-untrusted",
+      "claimed_identity": null,
+      "class": "plugin_tls_error",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 2,
+      "error": "plugin_tls_error: TLS handshake with plugin at localhost:22031 failed: unexpected error: the plugin's certificate is not the pinned_cert",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:53.710882Z",
+      "request_id": "01a1a612-83ee-7250-9b57-4401fab77761",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    },
+    "pluginStatus": {
+      "client_cert_expires_at": "2027-11-04T00:00:00Z",
+      "dropped_events": 0,
+      "endpoint": "https://localhost:22031/",
+      "health": "tls_error",
+      "last_error": "TLS handshake with plugin at localhost:22031 failed: unexpected error: the plugin's certificate is not the pinned_cert",
+      "last_ok_at": null,
+      "mode": "tls"
+    },
+    "resolves": 0,
+    "forwarded": 0
+  },
+  "noclient": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_no_client_auth\",\"message\":\"the policy plugin could not be consulted (plugin_no_client_auth)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "tls-noclient",
+      "claimed_identity": null,
+      "class": "plugin_no_client_auth",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 3,
+      "error": "plugin_no_client_auth: the plugin at localhost:22032 did not request a client certificate; it must verify the daemon",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:53.980103Z",
+      "request_id": "01a1a612-84fc-71e5-8cc4-aaf3f2a5c2d6",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    },
+    "pluginStatus": {
+      "client_cert_expires_at": "2027-11-04T00:00:00Z",
+      "dropped_events": 0,
+      "endpoint": "https://localhost:22032/",
+      "health": "no_client_auth",
+      "last_error": "the plugin at localhost:22032 did not request a client certificate; it must verify the daemon",
+      "last_ok_at": null,
+      "mode": "tls",
+      "server_cert_expires_at": "2027-11-04T00:00:00Z"
+    },
+    "resolves": 0,
+    "forwarded": 0
+  },
+  "rejected": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_rejected_client_cert\",\"message\":\"the policy plugin could not be consulted (plugin_rejected_client_cert)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "tls-rejected",
+      "claimed_identity": null,
+      "class": "plugin_rejected_client_cert",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 3,
+      "error": "plugin_rejected_client_cert: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:54.853267Z",
+      "request_id": "01a1a612-8865-711e-a372-675dd8312666",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    },
+    "pluginStatus": {
+      "client_cert_expires_at": "2027-11-04T00:00:00Z",
+      "dropped_events": 0,
+      "endpoint": "https://localhost:22033/",
+      "health": "rejected_client_cert",
+      "last_error": "the plugin rejected the daemon's client certificate (TLS alert UnknownCA)",
+      "last_ok_at": null,
+      "mode": "tls",
+      "server_cert_expires_at": "2027-11-04T00:00:00Z"
+    },
+    "resolves": 0,
+    "forwarded": 0
+  },
+  "rejected_immediate_reset_server": {
+    "status": 503,
+    "class": "plugin_unreachable",
+    "health": "unreachable"
+  }
+}

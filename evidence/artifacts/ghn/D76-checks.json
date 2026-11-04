@@ -1,0 +1,22 @@
+[
+  {
+    "name": "suite macro runs for Memory, Sqlite and a third-party store: all pass",
+    "ok": true,
+    "detail": "test result: ok. 42 passed; 0 failed"
+  },
+  {
+    "name": "suite covers memory, sqlite and third-party modules",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "cargo test --features testing,sqlite in janus-core passes",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "suite includes atomicity/idempotency/release/compact checks",
+    "ok": true,
+    "detail": ""
+  }
+]

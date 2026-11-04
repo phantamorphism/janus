@@ -1,0 +1,1092 @@
+[
+ {
+  "id": "D1",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D1-sdk-transcript.json"
+  ],
+  "note": "Stock @anthropic-ai/sdk with only baseURL=/anthropic and apiKey=caller identity token succeeded; returned the upstream message identical to a direct call; upstream saw the pool key. (Upstream is a mock at base_url; real upstream not contacted.)"
+ },
+ {
+  "id": "D2",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D2-calls-and-status.json"
+  ],
+  "note": "One call through each of /anthropic,/openai,/openrouter reached only its own configured base_url mock and returned its response; status lists upstreams [\"anthropic\",\"openai\",\"openrouter\"]."
+ },
+ {
+  "id": "D3",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D3-rewrite.json"
+  ],
+  "note": "Upstream received '/v1/messages?beta=true&k=v' (prefix stripped, query kept); log upstream=anthropic method=POST path=/anthropic/v1/messages"
+ },
+ {
+  "id": "D4",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D4-recording-upstream.json"
+  ],
+  "note": "At the recording upstreams: anthropic API key carried as x-api-key (sk-ant-QAREALKEY-0001); openai and openrouter carry Authorization: Bearer <pool key> (Bearer sk-QAREALKEY-0002 / Bearer sk-or-QAREALKEY-0003); Anthropic OAuth credential (.credentials.json) carried as Authorization: Bearer <access token> (no x-api-key, refresh token not sent); pool key bytes present and the caller token (whole, claims part, signature part) absent from URL, all headers and body. Live-vendor acceptance is out of scope per spec."
+ },
+ {
+  "id": "D5",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D5-outbound.json"
+  ],
+  "note": "Outbound headers: content-type,content-length,accept,user-agent,authorization,host; no identity material, x-sandbox-secret absent, content-type present. correlation header forwarded=false (spec leaves open); log correlation_id=null."
+ },
+ {
+  "id": "D6",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D6-library-build-outbound.txt"
+  ],
+  "note": "Scratch crate with a custom UpstreamImpl whose forwarding allowlist wrongly includes the identity header: build_outbound returned Err(SubstitutionError::IdentityLeak{location}) for x-api-key, authorization and basic-password cases; stock allowlist control built a request with pool key and no caller token. (With no identity presented, i.e. method none, a request is built - nothing to assert.)"
+ },
+ {
+  "id": "D7",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D7-compare.json",
+   "evidence/artifacts/a/D7-D9-upstream-429-401.json"
+  ],
+  "note": "Status, body bytes (incl. non-UTF8 binary) and headers through Janus identical to calling the mock directly for 200/404/500/binary; no extra headers or body fields. Upstream 429 and 401 also relayed with identical status/body."
+ },
+ {
+  "id": "D8",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D8-streaming.json"
+  ],
+  "note": "SSE upstream emits an event every 500ms for ~2.5s; first byte via Janus at 4ms (total 3007ms), 6 separate chunks, byte-identical stream, for all three upstreams."
+ },
+ {
+  "id": "D9",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/a/D9-responses.json",
+   "evidence/artifacts/a/D7-D9-upstream-429-401.json"
+  ],
+  "note": "Inspected headers+bodies of 7 caller-visible responses (success, 4 identity denials, upstream 500/401, upstream connection killed, unknown prefix): credential bytes/credential_ref leaks=[]; success response indistinguishable from direct upstream call=true. Statuses: success=201 deniedBadToken=401 deniedNoToken=401 deniedExpired=401 upstream500=500 upstreamKilled=502 unknownPrefix=404"
+ },
+ {
+  "id": "D10",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D10-transcript.txt"
+  ],
+  "note": "ok: independently minted <claims-hex>.<sig-hex> token forwarded (HTTP 200, upstream hit); ok: log binding=hmac outcome=forwarded caller_identity=agent-1"
+ },
+ {
+  "id": "D11",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D11-transcript.txt"
+  ],
+  "note": "ok: a1-wrong-secret: HTTP 401 and not forwarded (got 401); ok: a1-wrong-secret: outcome=rejected_identity kind=invalid (want one of invalid); ok: a2-altered-claims: HTTP 401 and not forwarded (got 401); ok: a2-altered-claims: outcome=rejected_identity kind=invalid (want one of invalid); ok: b-expired: HTTP 401 and not forwarded (got 401); ok: b-expired: outcome=rejected_identity kind=expired (want one of expired,invalid); ok: c-wrong-ns: HTTP 401 and not forwarded (got 401); ok: c-wrong-ns: outcome=rejected_identity kind=wrong_namespace (want one of wrong_namespace)"
+ },
+ {
+  "id": "D12",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D12-JWKS-a-valid.txt",
+   "evidence/artifacts/b/D12-JWKS-b-wrong-aud.txt",
+   "evidence/artifacts/b/D12-JWKS-c-wrong-iss.txt",
+   "evidence/artifacts/b/D12-JWKS-d-other-key.txt",
+   "evidence/artifacts/b/D12-static-public-key-a-valid.txt",
+   "evidence/artifacts/b/D12-static-public-key-b-wrong-aud.txt",
+   "evidence/artifacts/b/D12-static-public-key-c-wrong-iss.txt",
+   "evidence/artifacts/b/D12-static-public-key-d-other-key.txt"
+  ],
+  "note": "ok: [JWKS] valid token forwarded, binding=jwt, caller_identity=jwt-user-1; ok: [JWKS] b-wrong-aud: 401, not forwarded, kind=wrong_namespace; ok: [JWKS] c-wrong-iss: 401, not forwarded, kind=wrong_namespace (want wrong_namespace); ok: [JWKS] d-other-key: 401, not forwarded, kind=invalid (want invalid); ok: [static-public-key] valid token forwarded, binding=jwt, caller_identity=jwt-user-1; ok: [static-public-key] b-wrong-aud: 401, not forwarded, kind=wrong_namespace; ok: [static-public-key] c-wrong-iss: 401, not forwarded, kind=wrong_namespace (want wrong_namespace); ok: [static-public-key] d-other-key: 401, not forwarded, kind=invalid (want invalid)"
+ },
+ {
+  "id": "D13",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D13-cli.txt",
+   "evidence/artifacts/b/D13-transcript.txt"
+  ],
+  "note": "ok: human `identity create` prints only the token on stdout; ok: opaque token forwarded; ok: log binding=opaque caller_identity=agent-7; ok: plugin ResolveRoute identity_claims={\"tenant\":\"acme\"}"
+ },
+ {
+  "id": "D14",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D14-revoked.txt",
+   "evidence/artifacts/b/D14-expired.txt",
+   "evidence/artifacts/b/D14-unknown.txt"
+  ],
+  "note": "ok: revoked: 401 kind=revoked (immediately, no restart); ok: entry usable before expiry; ok: expired: 401 kind=expired; ok: unknown token: 401 kind=invalid"
+ },
+ {
+  "id": "D15",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D15-a-explicit.txt",
+   "evidence/artifacts/b/D15-b-omitted-method.txt",
+   "evidence/artifacts/b/D15-c-source-override.txt"
+  ],
+  "note": "ok: (a) explicit trusted_header: caller_identity=alice binding=trusted_header; ok: (b) method omitted: never forwarded as alice / no trusted_header record; ok: (c) source-only upstream override over hmac default: never forwarded as alice / no trusted_header record"
+ },
+ {
+  "id": "D16",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D16-misplaced-main.txt",
+   "evidence/artifacts/b/D16-header+scheme.txt",
+   "evidence/artifacts/b/D16-header-noscheme.txt",
+   "evidence/artifacts/b/D16-query.txt",
+   "evidence/artifacts/b/D16-basic_password.txt",
+   "evidence/artifacts/b/D16-misplaced-hdr-route_gets_Bearer.txt",
+   "evidence/artifacts/b/D16-misplaced-query-route_gets_header.txt",
+   "evidence/artifacts/b/D16-misplaced-basic-route_gets_x-api-key.txt",
+   "evidence/artifacts/b/D16-misplaced-bearer-binding_gets_query.txt"
+  ],
+  "note": "ok: misplaced token (x-api-key to authorization binding): 401 kind=no_material; ok: header+scheme: forwarded with caller_identity=src-user; ok: header+scheme: outbound request carries no identity material; ok: header-noscheme: forwarded with caller_identity=src-user; ok: header-noscheme: outbound request carries no identity material; ok: query: forwarded with caller_identity=src-user; ok: query: outbound request carries no identity material; ok: basic_password: forwarded with caller_identity=src-user; ok: basic_password: outbound request carries no identity material; ok: misplaced (hdr-route gets Bearer): 401 kind=no_material; ok: misplaced (query-route gets header): 401 kind=no_material; ok: misplaced (basic-route gets x-api-key): 401 kind=no_material; ok: misplaced (bearer-binding gets query): 401 kind=no_material"
+ },
+ {
+  "id": "D17",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D17-route.txt",
+   "evidence/artifacts/b/D17-upstream-override.txt",
+   "evidence/artifacts/b/D17-daemon-default.txt"
+  ],
+  "note": "ok: route request: binding=opaque route=/v1/models; ok: other openai path (upstream override x-api-key hmac): binding=hmac route=null; ok: anthropic path (daemon default): binding=hmac"
+ },
+ {
+  "id": "D18",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D18-x-api-key-hmac.txt",
+   "evidence/artifacts/b/D18-authorization-hmac.txt",
+   "evidence/artifacts/b/D18-route-opaque.txt",
+   "evidence/artifacts/b/D18-route-hmac-xapikey.txt",
+   "evidence/artifacts/b/D18-route-hmac-bearer.txt"
+  ],
+  "note": "ok: upstream override: x-api-key hmac token verifies (binding hmac; method/secret/ns inherited); ok: upstream override: authorization token -> 401 no_material; ok: route: opaque token verifies; ok: route replaces (no merge): hmac token in x-api-key rejected (invalid); ok: route: hmac Bearer token rejected (no_material)"
+ },
+ {
+  "id": "D19",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D19-transcript.txt"
+  ],
+  "note": "ok: no binding: all requests rejected (401,401,401), upstream saw 0 requests; ok: no credential spent; ok: never behaves as method=none"
+ },
+ {
+  "id": "D20",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D20-ok-case.txt",
+   "evidence/artifacts/b/D20-rejection-case.txt"
+  ],
+  "note": "ok: forwarded with default-chain pool credential; ok: plugin ResolveRoute calls = 0; ok: no call_completed/call_abandoned for it; ok: log caller_identity=\"\" binding=none; ok: control: an identity-bearing call does produce call_completed (so absence above is meaningful); ok: plugin got credential_invalid (credential_invalid) with zero ResolveRoute; ok: still no call_completed/call_abandoned in rejection case; ok: rejection-case log: empty caller_identity, binding none"
+ },
+ {
+  "id": "D21",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D21-transcript.txt"
+  ],
+  "note": "ok: 401 returned while the (endless) body was still being sent: HTTP/1.1 401 Unauthorized after 0ms; ok: plugin saw zero ResolveRoute and zero Notify; ok: upstream saw no request/connection; ok: credential request_count (3->3) / last_used_at unchanged"
+ },
+ {
+  "id": "D22",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D22-no_material.txt",
+   "evidence/artifacts/b/D22-revoked.txt",
+   "evidence/artifacts/b/D22-expired.txt",
+   "evidence/artifacts/b/D22-invalid.txt",
+   "evidence/artifacts/b/D22-wrong_namespace.txt",
+   "evidence/artifacts/b/D22-log-query-human.txt",
+   "evidence/artifacts/b/D22-log-query-json-kinds.txt"
+  ],
+  "note": "ok: misplaced -> kind no_material; ok: revoked -> kind revoked; ok: expired -> kind expired; ok: tampered hmac -> invalid; ok: wrong ns -> wrong_namespace; ok: janus log query --outcome rejected_identity (json) has kind no_material; ok: janus log query --outcome rejected_identity (json) has kind invalid; ok: janus log query --outcome rejected_identity (json) has kind wrong_namespace; ok: janus log query --outcome rejected_identity (json) has kind expired; ok: janus log query --outcome rejected_identity (json) has kind revoked; ok: human `log query --outcome rejected_identity` output shows all five kinds"
+ },
+ {
+  "id": "D23",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D23-transcript.txt"
+  ],
+  "note": "ok: outcome=rejected_identity caller_identity=\"\" claimed_identity=bob; ok: not forwarded; ok: plugin saw no call carrying bob"
+ },
+ {
+  "id": "D24",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D24-transcript.txt"
+  ],
+  "note": "ok: ResolveRoute caller_identity=s1 identity_claims={\"agent_type\":\"coder\",\"session\":\"sess-42\"}"
+ },
+ {
+  "id": "D25",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D25-claim-variant.txt",
+   "evidence/artifacts/b/D25-neither.txt",
+   "evidence/artifacts/b/D25-header-variant.txt"
+  ],
+  "note": "ok: correlation_claim: ResolveRoute, Notify and log all carry claim value sess-42; ok: neither configured: correlation_id empty (route=/v1/nocorr, log=null); ok: ResolveRoute correlation_ids = [\"req-AAA\",\"req-BBB\",\"\"]; ok: log correlation_id equals header (empty when absent); ok: Notify call_completed correlation_ids = [\"req-AAA\",\"req-BBB\",\"\"]; ok: changing the header alone never changes caller_identity or the decision"
+ },
+ {
+  "id": "D26",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/b/D26-custom-build.txt",
+   "evidence/artifacts/b/D26-custom-extractor.txt",
+   "evidence/artifacts/b/D26-refuse-to-start.txt"
+  ],
+  "note": "ok: scratch custom daemon (Embedded { extractors: vec![introspect] }) builds against the public API; ok: custom accepts: binding=custom:introspect caller_identity=zed; ok: custom rejects invalid: 401 kind=invalid; ok: custom rejects missing material: 401 kind=no_material; ok: config naming custom:missing: daemon refuses to start (custom build); ok: stock daemon refuses a registered-nowhere custom method too"
+ },
+ {
+  "id": "D27",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D27-responses.txt",
+   "evidence/artifacts/cd/D27-status.txt",
+   "evidence/artifacts/cd/D27-listener-connections.txt",
+   "evidence/artifacts/cd/D27-plugin-status-cli.txt"
+  ],
+  "note": "3/3 checks passed."
+ },
+ {
+  "id": "D28",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D28-resolve-requests.txt",
+   "evidence/artifacts/cd/D28-responses.txt",
+   "evidence/artifacts/cd/D28-notify-events.txt"
+  ],
+  "note": "8/8 checks passed."
+ },
+ {
+  "id": "D29",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D29-evidence.txt"
+  ],
+  "note": "3/3 checks passed."
+ },
+ {
+  "id": "D30",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D30-evidence.txt"
+  ],
+  "note": "5/5 checks passed."
+ },
+ {
+  "id": "D31",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D31-evidence.txt"
+  ],
+  "note": "4/4 checks passed. NOTES: denial HTTP status observed: 403"
+ },
+ {
+  "id": "D32",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D32-check-config.txt",
+   "evidence/artifacts/cd/D32-evidence.txt"
+  ],
+  "note": "3/3 checks passed."
+ },
+ {
+  "id": "D33",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D33-b-default-sleep1000.txt",
+   "evidence/artifacts/cd/D33-b-raw-v1-plugin.txt",
+   "evidence/artifacts/cd/D33-c-default-sleep100.txt",
+   "evidence/artifacts/cd/D33-a-timeout1000-sleep2000.txt"
+  ],
+  "note": "7/7 checks passed."
+ },
+ {
+  "id": "D34",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D34-a-grpc-error.txt",
+   "evidence/artifacts/cd/D34-b-empty-response.txt"
+  ],
+  "note": "5/5 checks passed. NOTES: (b) observed log: {\"binding\":\"hmac\",\"caller_identity\":\"u34b\",\"claimed_identity\":null,\"class\":\"plugin_error\",\"correlation_id\":null,\"credential_ref\":null,\"duration_ms\":0,\"error\":\"plugin_error: ResolveRouteResponse has no outcome set\",\"method\":\"POST\",\"outcome\":\"plugin_failed\",\"path\":\"/anthropic/v1/messages\",\"received_at\":\"2026-11-04T10:19:38.990676Z\",\"request_id\":\"01a1a612-4a6e-7193-99ca-48e167bfb1bb\",\"route\":null,\"status\":null,\"upstream\":\"anthropic\",\"usage\":null}"
+ },
+ {
+  "id": "D35",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D35-tls-init.txt",
+   "evidence/artifacts/cd/D35-check-config-sane.txt",
+   "evidence/artifacts/cd/D35-evidence.txt"
+  ],
+  "note": "11/11 checks passed."
+ },
+ {
+  "id": "D36",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D36-linked-run.txt"
+  ],
+  "note": "4/4 checks passed. NOTES: log outcome/class for crash (spec leaves open): {\"outcome\":\"plugin_failed\",\"class\":\"plugin_error\"}"
+ },
+ {
+  "id": "D37",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D37-resolve-identities.txt"
+  ],
+  "note": "2/2 checks passed."
+ },
+ {
+  "id": "D38",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D38-evidence.txt"
+  ],
+  "note": "4/4 checks passed."
+ },
+ {
+  "id": "D39",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D39-disabled-credential-events.txt",
+   "evidence/artifacts/cd/D39-unknown-ref-events.txt",
+   "evidence/artifacts/cd/D39-denied-events.txt",
+   "evidence/artifacts/cd/D39-disabled-credential-response.txt"
+  ],
+  "note": "4/4 checks passed. NOTES: denied request -> call_abandoned stage=resolve; unknown ref stage=credential"
+ },
+ {
+  "id": "D40",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D40-evidence.txt"
+  ],
+  "note": "5/5 checks passed."
+ },
+ {
+  "id": "D41",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D41-status-codes.txt",
+   "evidence/artifacts/cd/D41-settlement-per-resolved-request.txt",
+   "evidence/artifacts/cd/D41-unresolved-requests-events.txt",
+   "evidence/artifacts/cd/D41-request-log-new.txt"
+  ],
+  "note": "5/5 checks passed."
+ },
+ {
+  "id": "D42",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D42-evidence.txt"
+  ],
+  "note": "3/3 checks passed."
+ },
+ {
+  "id": "D43",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D43-evidence.txt"
+  ],
+  "note": "3/3 checks passed."
+ },
+ {
+  "id": "D44",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D44-evidence.txt"
+  ],
+  "note": "4/4 checks passed."
+ },
+ {
+  "id": "D45",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D45-evidence.txt",
+   "evidence/artifacts/cd/D45-linked-notify-calls.txt"
+  ],
+  "note": "4/4 checks passed. NOTES: linked-plugin half is asserted in the D36 linked run: notify() call count equals the number of events emitted (recorded in D45-linked-notify-calls.txt)"
+ },
+ {
+  "id": "D46",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/cd/D46-outage.txt",
+   "evidence/artifacts/cd/D46-after-restart.txt"
+  ],
+  "note": "6/6 checks passed."
+ },
+ {
+  "id": "D47",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D47-a-refusal.txt",
+   "evidence/artifacts/ef/D47-b-refusal.txt",
+   "evidence/artifacts/ef/D47-c-env-and-flags.txt",
+   "evidence/artifacts/ef/D47-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D48",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D48-https-no-tls.txt",
+   "evidence/artifacts/ef/D48-http-no-flag.txt",
+   "evidence/artifacts/ef/D48-http-loopback.txt",
+   "evidence/artifacts/ef/D48-ftp.txt",
+   "evidence/artifacts/ef/D48-plaintext-startup.txt",
+   "evidence/artifacts/ef/D48-mode-tls.txt",
+   "evidence/artifacts/ef/D48-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D49",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D49-a-missing-ca.txt",
+   "evidence/artifacts/ef/D49-b-mismatched-key.txt",
+   "evidence/artifacts/ef/D49-c-expired-cert.txt",
+   "evidence/artifacts/ef/D49-d-key-0644.txt",
+   "evidence/artifacts/ef/D49-e-both-anchors.txt",
+   "evidence/artifacts/ef/D49-f-no-anchor.txt",
+   "evidence/artifacts/ef/D49-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D50",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D50-plugin-status.json",
+   "evidence/artifacts/ef/D50-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D51",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D51-a-refusal.txt",
+   "evidence/artifacts/ef/D51-b1-status.json",
+   "evidence/artifacts/ef/D51-b2-status.json",
+   "evidence/artifacts/ef/D51-c-peer-uid.json",
+   "evidence/artifacts/ef/D51-transcript.txt"
+  ],
+  "note": "(c) emulated: no second OS user available (sudo needs a password), so \"another user\" is exercised by configuring the plugin to expect a different uid than the daemon runs as; a true cross-user connection could not be made."
+ },
+ {
+  "id": "D52",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D52-scenarios.json",
+   "evidence/artifacts/ef/D52-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D53",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D53-status.json",
+   "evidence/artifacts/ef/D53-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D54",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D54-reload.json",
+   "evidence/artifacts/ef/D54-near-expiry-client.txt",
+   "evidence/artifacts/ef/D54-near-expiry-server-status.json",
+   "evidence/artifacts/ef/D54-near-expiry-server-daemon.log",
+   "evidence/artifacts/ef/D54-near-expiry-server.txt",
+   "evidence/artifacts/ef/D54-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D55",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D55-init-1-stdout.txt",
+   "evidence/artifacts/ef/D55-rotation.json",
+   "evidence/artifacts/ef/D55-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D56",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D56-a-cli.txt",
+   "evidence/artifacts/ef/D56-a-api.json",
+   "evidence/artifacts/ef/D56-a-front-events.json",
+   "evidence/artifacts/ef/D56-a-daemon.log",
+   "evidence/artifacts/ef/D56-b-cli.txt",
+   "evidence/artifacts/ef/D56-b-api.json",
+   "evidence/artifacts/ef/D56-c-daemon.log",
+   "evidence/artifacts/ef/D56-c-front-events.json",
+   "evidence/artifacts/ef/D56-c-cli.txt",
+   "evidence/artifacts/ef/D56-c-api.json",
+   "evidence/artifacts/ef/D56-d-cli.txt",
+   "evidence/artifacts/ef/D56-d-api.json",
+   "evidence/artifacts/ef/D56-d-unsafe-cli.txt",
+   "evidence/artifacts/ef/D56-summary.json",
+   "evidence/artifacts/ef/D56-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D57",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D57-requests.json",
+   "evidence/artifacts/ef/D57-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D58",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ef/D58-a-stock-linked.txt",
+   "evidence/artifacts/ef/D58-b-custom-endpoint.txt",
+   "evidence/artifacts/ef/D58-c-custom-noplugin.txt",
+   "evidence/artifacts/ef/D58-transcript.txt"
+  ],
+  "note": "all acceptance assertions held"
+ },
+ {
+  "id": "D59",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D59-credential-list.json",
+   "evidence/artifacts/ghn/D59-pool-layout.txt",
+   "evidence/artifacts/ghn/D59-janus-db-secret-grep.txt",
+   "evidence/artifacts/ghn/D59-checks.json"
+  ],
+  "note": "39 checks passed"
+ },
+ {
+  "id": "D60",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D60-observation-retry-after-failed-refresh.json",
+   "evidence/artifacts/ghn/D60-anthropic.json",
+   "evidence/artifacts/ghn/D60-openai.json",
+   "evidence/artifacts/ghn/D60-openai-note.txt",
+   "evidence/artifacts/ghn/D60-checks.json"
+  ],
+  "note": "9 checks passed; Anthropic: full path verified (expired token + valid refresh token -> mock token_url called, request 200, expires_at moved forward, upstream got the new token, caller never saw it, refresh-failure path -> 503 not forwarded). OpenAI/Codex: only the refresh itself is observable (token endpoint called, expires_at moved) because the Codex backend host is fixed and not redirected by base_url, so the forwarded request cannot be observed."
+ },
+ {
+  "id": "D61",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D61-cases.json",
+   "evidence/artifacts/ghn/D61-refresh-failure-note.txt",
+   "evidence/artifacts/ghn/D61-checks.json"
+  ],
+  "note": "22 checks passed"
+ },
+ {
+  "id": "D62",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D62-default-chain.json",
+   "evidence/artifacts/ghn/D62-all-disabled.json",
+   "evidence/artifacts/ghn/D62-checks.json"
+  ],
+  "note": "10 checks passed"
+ },
+ {
+  "id": "D63",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D63-before-after.json",
+   "evidence/artifacts/ghn/D63-observation-generic-401-body.json",
+   "evidence/artifacts/ghn/D63-rotate-output.txt",
+   "evidence/artifacts/ghn/D63-checks.json"
+  ],
+  "note": "16 checks passed"
+ },
+ {
+  "id": "D64",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D64-add-response.txt",
+   "evidence/artifacts/ghn/D64-leak-sweep.txt",
+   "evidence/artifacts/ghn/D64-ui-overview.png",
+   "evidence/artifacts/ghn/D64-ui-credentials.png",
+   "evidence/artifacts/ghn/D64-ui-identities.png",
+   "evidence/artifacts/ghn/D64-ui-requests.png",
+   "evidence/artifacts/ghn/D64-ui-plugin.png",
+   "evidence/artifacts/ghn/D64-ui-views-text.txt",
+   "evidence/artifacts/ghn/D64-checks.json"
+  ],
+  "note": "11 checks passed"
+ },
+ {
+  "id": "D65",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D65-build.txt",
+   "evidence/artifacts/ghn/D65-output.txt",
+   "evidence/artifacts/ghn/D65-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D66",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D66-output.txt",
+   "evidence/artifacts/ghn/D66-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D67",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D67-output.txt",
+   "evidence/artifacts/ghn/D67-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D68",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D68-output.txt",
+   "evidence/artifacts/ghn/D68-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D69",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D69-output.txt",
+   "evidence/artifacts/ghn/D69-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D70",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D70-output.txt",
+   "evidence/artifacts/ghn/D70-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D71",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D71-output.txt",
+   "evidence/artifacts/ghn/D71-checks.json"
+  ],
+  "note": "4 checks passed"
+ },
+ {
+  "id": "D72",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D72-output.txt",
+   "evidence/artifacts/ghn/D72-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D73",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D73-output.txt",
+   "evidence/artifacts/ghn/D73-checks.json"
+  ],
+  "note": "2 checks passed"
+ },
+ {
+  "id": "D74",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D74-output.txt",
+   "evidence/artifacts/ghn/D74-checks.json"
+  ],
+  "note": "1 checks passed"
+ },
+ {
+  "id": "D75",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D75-output.txt",
+   "evidence/artifacts/ghn/D75-sigkill-durability.txt",
+   "evidence/artifacts/ghn/D75-checks.json"
+  ],
+  "note": "7 checks passed; VERIFIED: durability()==Durable; count survives restart; second-process open refused with a lock error and succeeds once the holder dies; journal_mode==wal (read by sqlite3 after clean close); acknowledged commits survive SIGKILL of the writer. NOT VERIFIED: synchronous=FULL and BEGIN IMMEDIATE/single-writer-thread are per-connection/internal settings that cannot be observed from outside; the SIGKILL test only shows process-crash durability (the OS page cache survives a process kill), not power-loss durability that synchronous=FULL guards."
+ },
+ {
+  "id": "D76",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D76-conformance-scratch.txt",
+   "evidence/artifacts/ghn/D76-janus-core-tests.txt",
+   "evidence/artifacts/ghn/D76-checks.json"
+  ],
+  "note": "4 checks passed"
+ },
+ {
+  "id": "D77",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D77-plugin-meter-sequence.json",
+   "evidence/artifacts/ghn/D77-no-metering-endpoints.json",
+   "evidence/artifacts/ghn/D77-no-plugin-60-requests.txt",
+   "evidence/artifacts/ghn/D77-checks.json"
+  ],
+  "note": "6 checks passed; Metering is exercised in Section H (library); the daemon-level checks use a node plugin that counts call_completed payloads."
+ },
+ {
+  "id": "D78",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D78-records.txt"
+  ],
+  "note": "ok: statuses forwarded=200 rejected=401 denied=403 | ok: a 'forwarded' record exists | ok: janus log show forwarded exit 0 | ok: log show --json parses for forwarded | ok: forwarded record has all listed fields (missing: none) | ok: forwarded record contains no request body text | ok: forwarded record contains no response body text | ok: a 'rejected_identity' record exists | ok: janus log show rejected_identity exit 0 | ok: log show --json parses for rejected_identity | ok: rejected_identity record has all listed fields (missing: none) | ok: rejected_identity record contains no request body text | ok: rejected_identity record contains no response body text | ok: a 'denied' record exists | ok: janus log show denied exit 0 | ok: log show --json parses for denied | ok: denied record has all listed fields (missing: none) | ok: denied record contains no request body text | ok: denied record contains no response body text | ok: janus.db (+wal) contains neither request nor response distinctive text | ok: forwarded record content (identity, status, credential_ref, upstream, method, path) | ok: rejected record: empty caller_identity, no upstream status | ok: denied record carries caller_identity | ok: request_id is Janus-assigned"
+ },
+ {
+  "id": "D79",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D79-outcomes.txt"
+  ],
+  "note": "ok: plugin-failed request is refused (status 503) | ok: unknown credential ref -> failure (status 503) | ok: upstream down -> failure (status 502) | ok: every record (7) has an outcome in the 7-value vocabulary: abandoned,upstream_error,credential_unavailable,denied,rejected_identity,forwarded,plugin_failed | ok: all 1 abandoned records carry a stage | ok: janus log query --outcome forwarded finds records | ok: --outcome rejected_identity finds records with kind (invalid) | ok: --outcome denied finds record with reason (budget exhausted) | ok: --outcome plugin_failed finds record with class ({\"class\":\"plugin_unreachable\",\"outcome\":\"plugin_failed\"})"
+ },
+ {
+  "id": "D80",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D80-timing.txt"
+  ],
+  "note": "ok: external writer holds BEGIN IMMEDIATE on janus.db (locked) | ok: 1 baseline record for dave before the lock (1) | ok: request 0 under locked DB returns 200 | ok: request 1 under locked DB returns 200 | ok: request 2 under locked DB returns 200 | ok: latency under lock 1,1,1ms (baseline 2ms) | ok: while the DB is locked the 3 new records are NOT yet in the log (visible=1, before=1) - the writes are pending, yet all 3 responses already returned 200 | ok: all 4 records appear after the lock is released (4)"
+ },
+ {
+  "id": "D81",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D81-default-status.txt",
+   "evidence/artifacts/ijk/D81-disabled.txt",
+   "evidence/artifacts/ijk/D81-retain.txt"
+  ],
+  "note": "ok: default status.request_log={\"dropped_records\":0,\"enabled\":true,\"retain\":\"30days\",\"retain_seconds\":2592000,\"rows\":10} (retain rendered \"30days\", 30 days = 2592000 s) | ok: default config writes records (rows=10) | ok: retention rendered as \"30days\" (spec text: 30d) | ok: disabled: GET /v1/requests -> 200 {\"requests\":[],\"next\":null,\"disabled\":true} | ok: disabled: status.request_log={\"dropped_records\":0,\"enabled\":false,\"retain\":\"30days\",\"retain_seconds\":2592000,\"rows\":0} | ok: retain=1m daemon wrote 3 rows initially | ok: retain=1m reflected in status (retain_seconds=60) | ok: rows older than retain=1m were purged by the periodic job (3 -> 0 after 106s)"
+ },
+ {
+  "id": "D82",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D82-socket.txt"
+  ],
+  "note": "ok: admin.sock mode 600 (socket=true) | ok: socket owned by daemon user | ok: GET /v1/status over socket with no token -> 200 | ok: curl --unix-socket -> 200 | info (not an assertion): another-user probe not possible (sudo needs a password); mode 0600 + owner-only enforced by kernel (stat evidence)"
+ },
+ {
+  "id": "D83",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D83-trace.txt"
+  ],
+  "note": "ok: data plane /v1/status without admin token -> 404 | ok: no admin data in /v1/status body | ok: data plane /v1/status with admin token -> 404 | ok: no admin data in /v1/status body | ok: data plane /v1/credentials without admin token -> 404 | ok: no admin data in /v1/credentials body | ok: data plane /v1/credentials with admin token -> 404 | ok: no admin data in /v1/credentials body | ok: data plane /v1/requests/stream without admin token -> 404 | ok: no admin data in /v1/requests/stream body | ok: data plane /v1/requests/stream with admin token -> 404 | ok: no admin data in /v1/requests/stream body | ok: data plane /v1/plugin without admin token -> 404 | ok: no admin data in /v1/plugin body | ok: data plane /v1/plugin with admin token -> 404 | ok: no admin data in /v1/plugin body | ok: data plane /v1/identities without admin token -> 404 | ok: no admin data in /v1/identities body | ok: data plane /v1/identities with admin token -> 404 | ok: no admin data in /v1/identities body"
+ },
+ {
+  "id": "D84",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D84-refusals.txt"
+  ],
+  "note": "ok: missing-secret refused to start (exit 1); data-plane port never listened: true | ok: missing-secret printed a diagnostic | ok: unreachable-jwks refused to start (exit 1); data-plane port never listened: true | ok: unreachable-jwks printed a diagnostic | ok: custom-unregistered refused to start (exit 1); data-plane port never listened: true | ok: custom-unregistered printed a diagnostic | ok: plugin-both refused to start (exit 1); data-plane port never listened: true | ok: plugin-both printed a diagnostic | ok: plugin-neither refused to start (exit 1); data-plane port never listened: true | ok: plugin-neither printed a diagnostic | ok: plugin-http-plain refused to start (exit 1); data-plane port never listened: true | ok: plugin-http-plain printed a diagnostic | ok: plugin-https-no-tls refused to start (exit 1); data-plane port never listened: true | ok: plugin-https-no-tls printed a diagnostic | ok: plugin-ftp refused to start (exit 1); data-plane port never listened: true | ok: plugin-ftp printed a diagnostic | ok: plugin-unsafe-socket-dir refused to start (exit 1); data-plane port never listened: true | ok: plugin-unsafe-socket-dir printed a diagnostic | ok: plugin-linked-stock refused to start (exit 1); data-plane port never listened: true | ok: plugin-linked-stock printed a diagnostic | ok: admin-nonloopback-no-flag refused to start (exit 1); data-plane port never listened: true | ok: admin-nonloopback-no-flag printed a diagnostic | ok: admin-nonloopback-no-tls refused to start (exit 1); data-plane port never listened: true | ok: admin-nonloopback-no-tls printed a diagnostic | ok: ui-nonloopback-no-tls refused to start (exit 1); data-plane port never listened: true | ok: ui-nonloopback-no-tls printed a diagnostic | ok: control: a valid config starts and listens"
+ },
+ {
+  "id": "D85",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D85-trace.txt"
+  ],
+  "note": "ok: no token refused 401 with JSON error shape | ok: wrong token refused 401 with JSON error shape | ok: correct token -> 200 | ok: non-Bearer scheme refused | ok: 0.0.0.0 without allow_non_loopback refuses to start: exit=1 janus-daemon: config: admin.bind: 0.0.0.0:25021 is not a loopback address; set admin.allow_non_loopback = true to allow it | ok: (a) allow_non_loopback without tls refuses to start: exit=1 janus-daemon: config: admin.tls: non-loopback admin bind 0.0.0.0:25021 requires admin.tls = { cert, key } unless admin.allow_plaintext = true | ok: (b) tls non-loopback admin starts | ok: (b) HTTPS requires the token (none=401 wrong=401 ok=200) | ok: (b) plaintext HTTP to the TLS listener does not serve (conn-error:HPE_INVALID_CONSTANT) | ok: (c) allow_plaintext non-loopback admin starts | ok: (c) plaintext listener still requires the token (none=401 ok=200)"
+ },
+ {
+  "id": "D86",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D86-token.txt"
+  ],
+  "note": "ok: admin-token mode 600 | ok: opaque token length 43 | ok: admin token as caller identity on data plane -> 401 | ok: control: caller token works on data plane | ok: caller identity as admin bearer -> 401 {\"error\":{\"code\":\"unauthorized\",\"message\":\"the admin token is not valid\"}} | ok: socket still works | ok: token reused across restart | ok: mode still 0600 after restart | ok: registry persisted across restart"
+ },
+ {
+  "id": "D87",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D87-ui-root.png",
+   "evidence/artifacts/ijk/D87-trace.txt"
+  ],
+  "note": "ok: (a) a [ui] section with no bind is refused at startup (exit 1, janus-daemon: config: config does not parse: TOML parse error at line 15, column 1 /    | / 15 | [ui]) | ok: (a/b) loopback bind is the address reported by /v1/status: listeners.ui={\"address\":\"127.0.0.1:25012\",\"tls\":false,\"url\":\"http://127.0.0.1:25012/\"} | ok: UI root serves HTML | ok: UI asset /assets/index-CtyEb1es.js -> 200 | ok: UI API requires token (none=401 wrong=401 ok=200) | ok: preflight response carries no Access-Control-Allow-* headers (status 401, found: ) | ok: daemon log contains the UI URL and the admin-token path | ok: (c) non-loopback ui.bind without TLS refuses to start: exit=1 janus-daemon: config: ui.tls: non-loopback UI bind 0.0.0.0:25072 requires ui.tls = { cert, key } unless ui.allow_plaintext = true | ok: (d) daemon without [ui] starts | ok: (d) UI disabled: listeners.ui=null | ok: (d) UI port refuses connections when UI disabled | ok: (d) admin socket still answers when UI disabled"
+ },
+ {
+  "id": "D88",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D88-audit.txt"
+  ],
+  "note": "ok: 404 error 404 {\"error\":{\"code\":\"credential_not_found\",\"message\":\"no credential \\\"does-not-exist\\\"\"}} | ok: disable over socket=200, over TCP=200 | ok: daemon log: one mutation entry, principal=socket naming aud-1 | ok: daemon log: one mutation entry, principal=admin_tcp naming aud-2"
+ },
+ {
+  "id": "D89",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D89-status.txt"
+  ],
+  "note": "ok: status top-level keys present (build,credentials,data_plane,listeners,plugin,request_log,started_at,upstreams,version) | ok: listeners lists data_plane/admin_socket/admin_tcp/ui | ok: each upstream lists binding method (openai:opaque,openrouter:opaque) | ok: request log size and retention present | ok: no-plugin: plugin object has mode/endpoint/health/last_error/last_ok_at | ok: no plugin: mode=none health=unknown | ok: /v1/plugin body equals status.plugin (no plugin) | ok: janus plugin tls init ran | ok: daemon with TLS plugin starts | ok: TLS plugin before any call: mode=tls health=unknown | ok: request via TLS plugin -> 200 | ok: mode/health in vocabularies (tls/ok) | ok: after call: health=ok last_ok_at=2026-11-04T10:20:02.031837Z endpoint=https://localhost:25061/ | ok: cert expiries present (2026-12-04T00:00:00Z, 2026-12-04T00:00:00Z) | ok: TLS plugin object has all base fields | ok: /v1/plugin body equals status.plugin (TLS plugin) | ok: janus plugin status"
+ },
+ {
+  "id": "D90",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D90-metadata.txt"
+  ],
+  "note": "ok: list returns array (5) | ok: every list item has all listed metadata fields | ok: ?upstream=openai filter applied (4) | ok: ?upstream=openrouter filter applied (1 of 5) | ok: show returns metadata for lst-a | ok: default peek returns metadata {\"ref\":\"aud-1\",\"upstream\":\"openai\",\"kind\":\"api_key\",\"label\":null,\"source\":\"pool\",\"status\":\"active\",\"rate_limited_until\":null,\"expires_at\":null,\"last_used_at\":nu | ok: no material-ish keys in responses (keys: credentials,ref,upstream,kind,label,source,status,rate_limited_until,expires_at,last_used_at,request_count,error_count,last_error) | ok: key bytes absent from every response | ok: default peek equals credential used by next request: [[\"aud-1\",\"aud-1\"],[\"aud-1\",\"aud-1\"],[\"aud-1\",\"aud-1\"],[\"aud-1\",\"aud-1\"]]"
+ },
+ {
+  "id": "D91",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D91-add.txt"
+  ],
+  "note": "ok: POST status 201 | ok: generated ref openrouter-d5e32d04 | ok: response has no material | ok: immediate request to openrouter -> 200 | ok: upstream received the new key without restart (Bearer sk-or-NEW-9981) | ok: log credential_ref=openrouter-d5e32d04 | ok: slot directory /tmp/qa-ijk/run/adm/data/credentials/openrouter-d5e32d04 exists: api_key,slot.json"
+ },
+ {
+  "id": "D92",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D92-refresh-oauth.txt",
+   "evidence/artifacts/ijk/D92-lifecycle.txt"
+  ],
+  "note": "ok: upstream 401 -> credential invalid (invalid, rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided) [caller saw 401] | ok: PUT material -> 200 {\"ref\":\"cred-bad\",\"upstream\":\"openai\",\"kind\":\"api_key\",\"label\":null,\"source\":\"pool\",\"status\":\"active\",\"rate_limited_unti | ok: after rotate status=active | ok: rotate response has no material | ok: rotated credential is usable | ok: disable -> disabled | ok: while disabled the default chain only uses cred-other (cred-other) | ok: default peek skips disabled (cred-other) | ok: enable -> active | ok: plugin-named disabled ref -> failure 503 | ok: nothing was forwarded upstream | ok: no fall-through: other credential request_count unchanged | ok: log outcome credential_unavailable | ok: refresh on an API-key credential -> 409 {\"error\":{\"code\":\"not_refreshable\",\"message\":\"credential \\\"cred-other\\\" is an API key; the | ok: daemon with upstream token_url starts | ok: expired OAuth credential added (expires_at 1970-01-01T00:00:01Z) | ok: POST .../refresh -> 200, expires_at 2026-11-04T11:19:55.139Z | ok: token endpoint received a refresh_token grant with the stored refresh token | ok: refresh response contains no token material | ok: request using an expired credential succeeds (200) | ok: automatic refresh happened before use | ok: upstream received the refreshed access token, not the expired one | ok: expires_at moved into the future (2026-11-04T11:19:55.195Z) | ok: caller never sees the refreshed token | ok: DELETE -> 204 | ok: GET after delete -> 404 {\"error\":{\"code\":\"credential_not_found\",\"message\":\"no credential \\\"cred-other\\\"\"}} | ok: slot directory removed"
+ },
+ {
+  "id": "D93",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D93-create.txt"
+  ],
+  "note": "ok: token base64url decodes to 32 bytes (43 chars) | ok: create returns entry metadata | ok: show and list never contain the token | ok: entries are addressed by id, not token (GET by token -> 404) | ok: identities table has token_hash column: CREATE TABLE identities ( id TEXT PRIMARY KEY NOT NULL, token_hash TEXT NOT NULL UNIQUE, identity TEXT NOT NULL, claims TEXT NOT NULL, label TEXT, created_at TEXT NOT NULL, expires_at TEXT, revoked_at | ok: plaintext token appears nowhere in janus.db / -wal | ok: the stored value is the SHA-256 of the token | ok: create with supplied token: status 400, returned token n/a | ok: guessable123 on data plane -> 401"
+ },
+ {
+  "id": "D94",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D94-lifecycle.txt"
+  ],
+  "note": "ok: expires_in \"1s\" accepted, expires_at set | ok: both tokens for one identity verify | ok: revoke twice -> 200, 200 | ok: revoked token rejected immediately | ok: sibling token unaffected | ok: default list hides revoked + expired (1 shown) | ok: include_revoked=true shows revoked only | ok: include_expired=true shows expired only | ok: both flags show all 3 | ok: unfiltered list includes other identities | ok: identity filter restricts the list | ok: show has listed fields and revoked_at set | ok: expired token rejected | ok: last_seen_at advances after use (2026-11-04T10:19:55.269171Z -> 2026-11-04T10:19:56.782100Z) | ok: delete -> 204 | ok: deleted entry GET -> 404 | ok: deleted token rejected"
+ },
+ {
+  "id": "D95",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D95-paging.txt"
+  ],
+  "note": "ok: log holds 1273 rows (dropped=0) | ok: default page = 100 items, next=true | ok: newest first | ok: limit=5000 -> 1000 items (status 200) | ok: walked 4 pages / 1273 records: duplicates=0 ordered=true | ok: walk covers all rows (1273 vs 1273) | ok: next page after limit=1000 is older and disjoint | ok: GET /v1/requests/{id} | ok: identity filter (500) | ok: upstream filter (251) | ok: outcome filter (264) | ok: credential filter aud-1 (758) | ok: since filter (501) | ok: until filter (772) | ok: combined filters | ok: CLI log query --limit 3"
+ },
+ {
+  "id": "D96",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ijk/D96-stream.txt"
+  ],
+  "note": "ok: ?token= without header refused (401 {\"error\":{\"code\":\"unauthorized\",\"message\":\"this listener requires the admin toke) | ok: stream status 200, content-type text/event-stream | ok: only openai 'request' events arrive (3 events, upstreams openai) | ok: all 3 openai calls delivered, none of the 3 openrouter calls | ok: periodic ping event arrives (first at +-2s after traffic) | ok: pings keep arriving periodically"
+ },
+ {
+  "id": "D97",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D97-checks.json",
+   "evidence/artifacts/lm/D97-help.txt",
+   "evidence/artifacts/lm/D97-token-flag-rejected.txt",
+   "evidence/artifacts/lm/D97-transcript.txt"
+  ],
+  "note": "16/16 checks passed."
+ },
+ {
+  "id": "D98",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D98-checks.json",
+   "evidence/artifacts/lm/D98-json-commands.txt",
+   "evidence/artifacts/lm/D98-status-json.txt",
+   "evidence/artifacts/lm/D98-status.txt"
+  ],
+  "note": "32/32 checks passed."
+ },
+ {
+  "id": "D99",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D99-add-help.txt",
+   "evidence/artifacts/lm/D99-checks.json",
+   "evidence/artifacts/lm/D99-transcript.txt"
+  ],
+  "note": "17/17 checks passed."
+ },
+ {
+  "id": "D100",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D100-checks.json",
+   "evidence/artifacts/lm/D100-transcript.txt"
+  ],
+  "note": "12/12 checks passed."
+ },
+ {
+  "id": "D101",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D101-checks.json",
+   "evidence/artifacts/lm/D101-transcript.txt"
+  ],
+  "note": "17/17 checks passed."
+ },
+ {
+  "id": "D102",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D102-checks.json",
+   "evidence/artifacts/lm/D102-transcript.txt"
+  ],
+  "note": "11/11 checks passed."
+ },
+ {
+  "id": "D103",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D103-checks.json",
+   "evidence/artifacts/lm/D103-transcript.txt"
+  ],
+  "note": "8/8 checks passed."
+ },
+ {
+  "id": "D104",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D104-1-token-prompt.png",
+   "evidence/artifacts/lm/D104-2-after-login.png",
+   "evidence/artifacts/lm/D104-3-after-reload.png",
+   "evidence/artifacts/lm/D104-4-wrong-token.png",
+   "evidence/artifacts/lm/D104-browser-console.txt",
+   "evidence/artifacts/lm/D104-checks.json",
+   "evidence/artifacts/lm/D104-network-log.json",
+   "evidence/artifacts/lm/D104-response-headers.txt",
+   "evidence/artifacts/lm/D104-secret-scan.txt",
+   "evidence/artifacts/lm/D104-storage.json",
+   "evidence/artifacts/lm/D104-wrong-token-text.txt"
+  ],
+  "note": "20/20 checks passed."
+ },
+ {
+  "id": "D105",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D105-checks.json",
+   "evidence/artifacts/lm/D105-cli-credentials.json",
+   "evidence/artifacts/lm/D105-cli-status.json",
+   "evidence/artifacts/lm/D105-counts.json",
+   "evidence/artifacts/lm/D105-credential-health.json",
+   "evidence/artifacts/lm/D105-overview-text.txt",
+   "evidence/artifacts/lm/D105-overview.png"
+  ],
+  "note": "13/13 checks passed."
+ },
+ {
+  "id": "D106",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D106-1-credentials.png",
+   "evidence/artifacts/lm/D106-2-after-disable.png",
+   "evidence/artifacts/lm/D106-3-after-refresh.png",
+   "evidence/artifacts/lm/D106-3b-after-oauth-refresh.png",
+   "evidence/artifacts/lm/D106-4-remove-confirm.png",
+   "evidence/artifacts/lm/D106-checks.json",
+   "evidence/artifacts/lm/D106-final-credentials.txt",
+   "evidence/artifacts/lm/D106-oauth-refresh.json"
+  ],
+  "note": "17/17 checks passed."
+ },
+ {
+  "id": "D107",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D107-1-identities.png",
+   "evidence/artifacts/lm/D107-2-filter-identity.png",
+   "evidence/artifacts/lm/D107-3-include-revoked.png",
+   "evidence/artifacts/lm/D107-4-revoke-clicked.png",
+   "evidence/artifacts/lm/D107-5-after-revoke.png",
+   "evidence/artifacts/lm/D107-checks.json",
+   "evidence/artifacts/lm/D107-controls.json"
+  ],
+  "note": "14/14 checks passed."
+ },
+ {
+  "id": "D108",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D108-1-requests.png",
+   "evidence/artifacts/lm/D108-2-filter-denied.png",
+   "evidence/artifacts/lm/D108-3-live-on.png",
+   "evidence/artifacts/lm/D108-4-live-rows-arrived.png",
+   "evidence/artifacts/lm/D108-5-live-off.png",
+   "evidence/artifacts/lm/D108-6-drawer.png",
+   "evidence/artifacts/lm/D108-checks.json",
+   "evidence/artifacts/lm/D108-drawer-text.txt",
+   "evidence/artifacts/lm/D108-record.json",
+   "evidence/artifacts/lm/D108-table-vs-cli.json"
+  ],
+  "note": "10/10 checks passed."
+ },
+ {
+  "id": "D109",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/lm/D109-1-plugin.png",
+   "evidence/artifacts/lm/D109-2-check-healthy.png",
+   "evidence/artifacts/lm/D109-3-check-misconfigured.png",
+   "evidence/artifacts/lm/D109-4-plugin-down.png",
+   "evidence/artifacts/lm/D109-checks.json",
+   "evidence/artifacts/lm/D109-healthy-cli.json",
+   "evidence/artifacts/lm/D109-healthy-ui.txt",
+   "evidence/artifacts/lm/D109-misconfigured-cli.json",
+   "evidence/artifacts/lm/D109-misconfigured-ui.txt"
+  ],
+  "note": "7/7 checks passed."
+ },
+ {
+  "id": "D110",
+  "result": "PASS",
+  "artifacts": [
+   "evidence/artifacts/ghn/D110-schema.json",
+   "evidence/artifacts/ghn/D110-restart.txt",
+   "evidence/artifacts/ghn/D110-checks.json"
+  ],
+  "note": "26 checks passed"
+ }
+]

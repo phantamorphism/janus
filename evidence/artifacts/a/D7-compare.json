@@ -1,0 +1,42 @@
+[
+  {
+    "p": "/v1/status/200",
+    "viaStatus": 200,
+    "directStatus": 200,
+    "viaBodyHex": "7b226d6f636b5f737461747573223a3230307d",
+    "directBodyHex": "7b226d6f636b5f737461747573223a3230307d",
+    "same": true,
+    "extraHeaders": [],
+    "missingHeaders": []
+  },
+  {
+    "p": "/v1/status/404",
+    "viaStatus": 404,
+    "directStatus": 404,
+    "viaBodyHex": "7b226d6f636b5f737461747573223a3430347d",
+    "directBodyHex": "7b226d6f636b5f737461747573223a3430347d",
+    "same": true,
+    "extraHeaders": [],
+    "missingHeaders": []
+  },
+  {
+    "p": "/v1/status/500",
+    "viaStatus": 500,
+    "directStatus": 500,
+    "viaBodyHex": "7b226d6f636b5f737461747573223a3530307d",
+    "directBodyHex": "7b226d6f636b5f737461747573223a3530307d",
+    "same": true,
+    "extraHeaders": [],
+    "missingHeaders": []
+  },
+  {
+    "p": "/v1/binary",
+    "viaStatus": 200,
+    "directStatus": 200,
+    "viaBodyHex": "000102fffe7b7d0a0dc3287061796c6f61642d776974682d6279746573",
+    "directBodyHex": "000102fffe7b7d0a0dc3287061796c6f61642d776974682d6279746573",
+    "same": true,
+    "extraHeaders": [],
+    "missingHeaders": []
+  }
+]

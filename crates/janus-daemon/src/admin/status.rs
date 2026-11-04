@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -97,6 +98,15 @@ struct RequestLogSummary {
     retain_seconds: u64,
     /// Rows currently stored.
     rows: u64,
+    /// Records dropped since start because the writer's queue was full.
+    dropped_records: u64,
+}
+
+#[derive(Serialize)]
+struct DataPlaneSummary {
+    /// Connections closed unanswered since start for being over
+    /// `data_plane.max_connections`.
+    refused_connections: u64,
 }
 
 /// Credential health at a glance: how many credentials are in each status.
@@ -113,6 +123,7 @@ struct Status<'a> {
     started_at: DateTime<Utc>,
     listeners: &'a Listeners,
     upstreams: &'a [UpstreamSummary],
+    data_plane: DataPlaneSummary,
     request_log: RequestLogSummary,
     credentials: PoolSummary,
     plugin: PluginStatus,
@@ -157,11 +168,15 @@ pub(crate) async fn status(
         started_at: DateTime::<Utc>::from(state.deps.started_at),
         listeners: &state.listeners,
         upstreams: &state.upstreams,
+        data_plane: DataPlaneSummary {
+            refused_connections: state.deps.data_plane_refused.load(Ordering::Relaxed),
+        },
         request_log: RequestLogSummary {
             enabled: log.enabled,
             retain: humantime::format_duration(log.retain).to_string(),
             retain_seconds: log.retain.as_secs(),
             rows: log.rows,
+            dropped_records: log.dropped,
         },
         credentials: PoolSummary {
             total: credentials.len(),

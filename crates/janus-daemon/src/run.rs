@@ -35,8 +35,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use janus_core::contract::binding::Method;
 use janus_core::contract::credential::{CredentialPool, PoolError, Secret};
@@ -196,8 +197,29 @@ async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared,
     embedded.check_against(config)?;
     let data_dir = config.data_dir().ok_or(RunError::NoDataDir)?;
     ensure_data_dir(&data_dir)?;
+    build(config, embedded, data_dir).await
+}
 
-    let upstreams = UpstreamSet::new()?;
+/// The validation and construction of [`prepare`] against `data_dir`, which
+/// must exist. Everything stateful (database, pool directory) is created
+/// under `data_dir`; `admin::check_config` only reads the real data
+/// directory configured, which [`check_config`] passes separately.
+async fn build(
+    config: &DaemonConfig,
+    embedded: &Embedded,
+    data_dir: PathBuf,
+) -> Result<Prepared, RunError> {
+    let token_url = |kind| {
+        config
+            .upstreams
+            .iter()
+            .find(|up| up.name == kind)
+            .and_then(|up| up.token_url.clone())
+    };
+    let upstreams = UpstreamSet::with_token_urls(
+        token_url(UpstreamKind::Anthropic),
+        token_url(UpstreamKind::OpenAi),
+    )?;
     let forwarder = Forwarder::new()?;
     let store = Store::open(&data_dir, &config.request_log)?;
 
@@ -226,7 +248,7 @@ async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared,
         configured: configured_credentials(config)?,
     })?;
     let plugin = PluginHandle::from_config(config.plugin.as_ref(), embedded.plugin.clone())?;
-    admin::check_config(config, &data_dir)?;
+    admin::check_config(config, &config.data_dir().ok_or(RunError::NoDataDir)?)?;
 
     Ok(Prepared {
         data_dir,
@@ -238,6 +260,10 @@ async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared,
         forwarder,
     })
 }
+
+/// How long shutdown waits for settlement work after the data plane has
+/// stopped, so a wedged task cannot hold the process up.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// A running daemon. [`run`] is this plus signal handling; a custom build or
 /// a test that wants the bound address or its own shutdown trigger uses it
@@ -252,6 +278,7 @@ pub struct Daemon {
     jobs: JoinHandle<()>,
     plugin: Option<Arc<PluginHandle>>,
     requests: Arc<RequestLog>,
+    refused: Arc<AtomicU64>,
 }
 
 impl fmt::Debug for Daemon {
@@ -283,8 +310,10 @@ impl Daemon {
             .local_addr()
             .map_err(|source| RunError::Bind { addr, source })?;
 
+        let refused = Arc::new(AtomicU64::new(0));
         let admin = admin::start(
             AdminDeps {
+                data_plane_refused: Arc::clone(&refused),
                 config: Arc::clone(&config),
                 data_dir: prepared.data_dir.clone(),
                 pool: Arc::clone(&pool),
@@ -313,6 +342,8 @@ impl Daemon {
             plugin: prepared.plugin.clone(),
             requests: Arc::clone(&requests),
             tracker: tracker.clone(),
+            max_connections: config.data_plane.max_connections,
+            refused: Arc::clone(&refused),
         });
         let serving = tokio::spawn(dataplane::serve(listener, dp, cancel.clone()));
         tracing::info!(
@@ -332,6 +363,7 @@ impl Daemon {
             jobs,
             plugin: prepared.plugin,
             requests,
+            refused,
         })
     }
 
@@ -343,6 +375,12 @@ impl Daemon {
     /// The request log the data plane writes to.
     pub fn requests(&self) -> &Arc<RequestLog> {
         &self.requests
+    }
+
+    /// Data-plane connections closed unanswered since start for being over
+    /// `data_plane.max_connections`.
+    pub fn refused_connections(&self) -> u64 {
+        self.refused.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Re-read the plugin's TLS material (what `SIGHUP` does); a no-op
@@ -362,7 +400,16 @@ impl Daemon {
         if let Err(e) = self.serving.await {
             tracing::error!(error = %e, "data-plane task failed");
         }
-        self.tracker.idle().await;
+        if tokio::time::timeout(IDLE_TIMEOUT, self.tracker.idle())
+            .await
+            .is_err()
+        {
+            tracing::warn!("settlement work still running after the timeout; shutting down anyway");
+        }
+        // Commit the settled records before anything else can delay the
+        // process (an admin connection draining, a supervisor's kill
+        // timer): the jobs' final flush below then only covers stragglers.
+        self.requests.flush().await;
         self.admin.wait().await;
         self.jobs_cancel.cancel();
         if let Err(e) = self.jobs.await {
@@ -403,7 +450,8 @@ pub struct CheckReport {
     pub data_plane: SocketAddr,
     pub plugin: PluginMode,
     pub upstreams: Vec<CheckedUpstream>,
-    /// Credentials in the pool (slots and `[[credential]]` entries).
+    /// The `[[credential]]` entries the config declares (pool slots already
+    /// on disk are not read: the check touches no state).
     pub credentials: usize,
 }
 
@@ -444,11 +492,19 @@ impl fmt::Display for CheckReport {
 
 /// `janus-daemon check-config`: load the config at `path` and run the full
 /// startup validation against `embedded` without binding any listener.
-/// Like a first start, it may create the data directory, the database and
-/// the pool directory.
+/// It has no side effects: the database and pool are built in a scratch
+/// directory that is removed afterwards, so the configured data directory
+/// is neither created nor touched.
 pub async fn check_config(path: &Path, embedded: Embedded) -> Result<CheckReport, RunError> {
     let config = DaemonConfig::load(path)?;
-    let prepared = prepare(&config, &embedded).await?;
+    config.validate()?;
+    embedded.check_against(&config)?;
+    let data_dir = config.data_dir().ok_or(RunError::NoDataDir)?;
+    let scratch = tempfile::tempdir().map_err(|source| RunError::DataDir {
+        path: data_dir.clone(),
+        source,
+    })?;
+    let prepared = build(&config, &embedded, scratch.path().to_path_buf()).await?;
     let credentials = prepared.pool.list(None).await?.len();
     let upstreams = config
         .resolve_bindings()?
@@ -470,7 +526,7 @@ pub async fn check_config(path: &Path, embedded: Embedded) -> Result<CheckReport
         })
         .collect();
     Ok(CheckReport {
-        data_dir: prepared.data_dir,
+        data_dir,
         data_plane: config.data_plane.bind,
         plugin: config.plugin_mode()?,
         upstreams,

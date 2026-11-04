@@ -1,0 +1,51 @@
+{
+  "def": {
+    "error_count": 0,
+    "expires_at": null,
+    "kind": "api_key",
+    "label": null,
+    "last_error": null,
+    "last_used_at": "2026-11-04T10:19:35.544457Z",
+    "rate_limited_until": null,
+    "ref": "acct-a",
+    "request_count": 3,
+    "source": "pool",
+    "status": "active",
+    "upstream": "anthropic"
+  },
+  "status": 200,
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u30",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "acct-a",
+    "duration_ms": 0,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:35.963153Z",
+    "request_id": "01a1a612-3e9b-76c7-a509-e37b1d28cc6c",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "usage": {
+        "input_tokens": 11,
+        "output_tokens": 7
+      }
+    }
+  },
+  "settle": [
+    {
+      "t": 1793787575964,
+      "ev": {
+        "event_type": "call_completed",
+        "request_id": "01a1a612-3e9b-76c7-a509-e37b1d28cc6c",
+        "payload_json": "{\"caller_identity\":\"u30\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+      }
+    }
+  ],
+  "keyUsed": "sk-ant-AAA"
+}

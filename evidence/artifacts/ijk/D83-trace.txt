@@ -1,0 +1,10 @@
+/v1/status token=false -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/status token=true -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/credentials token=false -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/credentials token=true -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/requests/stream token=false -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/requests/stream token=true -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/plugin token=false -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/plugin token=true -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/identities token=false -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ
+/v1/identities token=true -> 404 {"error":{"code":"not_found","message":"no upstream is routed at this path","typ

@@ -68,25 +68,66 @@ export function plugin(over: Partial<PluginStatus> = {}): PluginStatus {
     last_ok_at: '2026-11-03T10:00:00Z',
     client_cert_expires_at: '2027-11-03T00:00:00Z',
     server_cert_expires_at: '2027-05-01T00:00:00Z',
+    dropped_events: 0,
     ...over,
   }
 }
 
+// Envelopes exactly as the daemon serializes them (`admin/credentials.rs`
+// `CredentialList`, `admin/identities.rs` `IdentityList`,
+// `admin/requests.rs` `Page`). Keep these literal: a wrong key must fail.
+export function credentialList(credentials: CredentialMetadata[]) {
+  return { credentials }
+}
+
+export function identityList(identities: IdentityRecord[]) {
+  return { identities }
+}
+
+export function requestPage(requests: RequestRecord[], next: string | null = null, disabled = false) {
+  return { requests, next, disabled }
+}
+
+/** `GET /v1/status` as `admin/status.rs` serializes it (Url adds a trailing slash). */
 export function status(over: Record<string, unknown> = {}) {
   return {
     version: '0.1.0',
     build: 'abc1234',
     started_at: '2026-11-03T08:00:00Z',
     listeners: {
-      data_plane: '127.0.0.1:8080',
       admin_socket: '/var/lib/janus/admin.sock',
-      ui: { address: '127.0.0.1:8090', tls: false },
+      admin_tcp: null,
+      ui: { address: '127.0.0.1:8090', tls: false, url: 'http://127.0.0.1:8090' },
+      data_plane: '127.0.0.1:8080',
     },
     upstreams: [
-      { name: 'openai', path_prefix: '/openai', binding: { method: 'hmac' } },
-      { name: 'anthropic', path_prefix: '/anthropic', binding: 'opaque' },
+      {
+        name: 'openai',
+        path_prefix: '/openai',
+        base_url: 'https://api.openai.com/',
+        binding: 'hmac',
+        routes: [{ path: '/openai/v1/embeddings', binding: 'jwt' }],
+      },
+      {
+        name: 'anthropic',
+        path_prefix: '/anthropic',
+        base_url: 'https://api.anthropic.com/',
+        binding: 'opaque',
+        routes: [],
+      },
     ],
-    request_log: { enabled: true, retain: '30d', rows: 5321 },
+    data_plane: { refused_connections: 0 },
+    request_log: {
+      enabled: true,
+      retain: '30days',
+      retain_seconds: 2_592_000,
+      rows: 5321,
+      dropped_records: 0,
+    },
+    credentials: {
+      total: 4,
+      by_status: { active: 2, invalid: 1, disabled: 1, rate_limited: 0 },
+    },
     plugin: plugin(),
     ...over,
   }

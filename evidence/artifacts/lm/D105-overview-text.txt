@@ -1,0 +1,83 @@
+Overview
+
+What this Janus daemon is, where it listens, and how its traffic and credentials are doing.
+
+Reload
+Daemon
+Version
+0.1.0
+Build
+dev
+Started
+2026-11-04 12:19:3431 s ago
+Listeners
+Listener	Address	TLS
+data plane	127.0.0.1:26001	—
+admin socket	/tmp/qa-lm/run/data/admin.sock	—
+admin tcp	http://127.0.0.1:26002/	no
+ui	http://127.0.0.1:26003/	no
+Upstreams
+Upstream	Path prefix	Base URL	Identity binding	Routes
+openrouter	/openrouter	http://127.0.0.1:26010/	opaque	—
+anthropic	/anthropic	http://127.0.0.1:26010/	opaque	—
+Plugin
+Health
+ok
+Mode
+tlsgRPC over mutual TLS
+Endpoint
+https://localhost:26020/
+Last successful call
+2026-11-04 12:20:041 s ago
+Dropped notify events
+0
+Daemon client certificate expires
+2027-11-04 02:00:00in 364 d
+Plugin server certificate expires
+2027-11-04 02:00:00in 364 d
+Credential health
+1
+active
+0
+rate limited
+0
+invalid
+1
+disabled
+or2 (openrouter) disabled
+Traffic
+Window
+Last 15 minutes
+Last hour
+Last 24 hours
+Requests
+24
+0.40 per minute
+Denied by the plugin
+4
+0.07 per minute, 16.7% of requests
+Rejected at identity
+5
+0.08 per minute, 20.8% of requests
+Outcome	Count
+
+forwarded	15
+
+rejected identity	5
+
+denied	4
+
+plugin failed	0
+
+credential unavailable	0
+
+upstream error	0
+
+abandoned	0
+
+Request log on, 24 records stored, kept for 30days.
+
+Dropped log records
+0
+Refused connections
+0

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { apiError, mockApi } from '@/test/http'
-import { credential, plugin, status } from '@/test/fixtures'
+import { credential, plugin, status, credentialList, requestPage, identityList } from '@/test/fixtures'
 
 const TOKEN = 'admin-tok-9a1'
 
@@ -14,10 +14,10 @@ function daemon(acceptedToken = TOKEN) {
       : apiError(401, 'unauthorized', 'missing or wrong admin token')
   return mockApi({
     'GET /v1/status': ok(status()),
-    'GET /v1/credentials': ok([credential()]),
-    'GET /v1/requests': ok({ records: [], next: null, disabled: false }),
+    'GET /v1/credentials': ok(credentialList([credential()])),
+    'GET /v1/requests': ok(requestPage([])),
     'GET /v1/plugin': ok(plugin()),
-    'GET /v1/identities': ok([]),
+    'GET /v1/identities': ok(identityList([])),
   })
 }
 

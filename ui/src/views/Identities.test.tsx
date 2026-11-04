@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { json, mockApi } from '@/test/http'
-import { identity } from '@/test/fixtures'
+import { identity, identityList } from '@/test/fixtures'
 import { renderWithApi } from '@/test/render'
 import type { IdentityRecord } from '@/api/types'
 import { Identities } from './Identities'
@@ -13,12 +13,12 @@ function registry(entries: IdentityRecord[]) {
     'GET /v1/identities': (c: { query: URLSearchParams }) => {
       const now = Date.now()
       return json(
-        rows.filter(
+        identityList(rows.filter(
           (r) =>
             (!c.query.get('identity') || r.identity === c.query.get('identity')) &&
             (c.query.get('include_revoked') === 'true' || !r.revoked_at) &&
             (c.query.get('include_expired') === 'true' || !r.expires_at || new Date(r.expires_at).getTime() > now),
-        ),
+        )),
       )
     },
   }

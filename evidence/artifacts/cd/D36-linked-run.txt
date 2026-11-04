@@ -1,0 +1,47 @@
+{
+  "crash": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_error\",\"message\":\"the policy plugin could not be consulted (plugin_error)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "forwardedForCrash": 0,
+    "log": {
+      "binding": "hmac",
+      "caller_identity": "crash",
+      "claimed_identity": null,
+      "class": "plugin_error",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 0,
+      "error": "plugin_error: linked plugin panicked: linked plugin deliberately panics",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:56.303833Z",
+      "request_id": "01a1a612-8e0f-717b-9857-5e41e1c9099a",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    }
+  },
+  "next": 200,
+  "oks": [
+    200,
+    200,
+    200,
+    200
+  ],
+  "rBad": 401,
+  "rCrash2": 503,
+  "rNext2": 200,
+  "aliveAfterFirstCrash": true,
+  "aliveAtEnd": true,
+  "pluginStatus": {
+    "dropped_events": 0,
+    "endpoint": null,
+    "health": "ok",
+    "last_error": "linked plugin panicked: linked plugin deliberately panics",
+    "last_ok_at": "2026-11-04T10:19:56.318410Z",
+    "mode": "linked"
+  },
+  "daemonLog": "\nthread 'tokio-rt-worker' (49046112) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nthread 'tokio-rt-worker' (49046111) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\n"
+}

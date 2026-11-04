@@ -199,6 +199,7 @@ impl Builder {
             plugin,
             started_at: SystemTime::now(),
             data_plane_addr: self.data_plane_bound.unwrap_or(self.data_plane),
+            data_plane_refused: Arc::default(),
         };
         match admin::start(deps, cancel.clone()).await {
             Ok(handle) => Ok(Daemon {

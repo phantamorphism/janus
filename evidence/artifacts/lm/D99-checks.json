@@ -1,0 +1,87 @@
+[
+  {
+    "name": "credential add --help lists no key-value flag (value flags: --admin,--upstream,--ref,--token-file,--ca-file,--label,--config,--from-file)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "--api-key <value> is rejected",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "janus credential add is visible in ps (so the check is meaningful)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "secret absent from ps while add runs",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "secret absent from add output",
+    "ok": true,
+    "detail": "added credential ps1\nref                 ps1\nupstream            openrouter\nkind                api_key\nlabel               -\nsource              pool\nstatus              active\nrate limited until  -\nexpires             -\nlast used           -\nrequests            0\nerrors              0\nlast error  "
+  },
+  {
+    "name": "secret never in list/show/default output",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "secret never in status/log output",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "rotate performs its admin call (upstream sees rotated key)",
+    "ok": true,
+    "detail": "{\"content-type\":\"application/json\",\"content-length\":\"2\",\"accept\":\"*/*\",\"user-agent\":\"node\",\"authorization\":\"Bearer <redacted-key>\",\"host\":\"127.0.0.1:26010\"}"
+  },
+  {
+    "name": "rotate output has no secret",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "disable -> status disabled",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "enable -> status active",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "list --upstream filters",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh performs its admin call (API key: daemon answers not_refreshable, exit 1)",
+    "ok": true,
+    "detail": "janus: credential \"ps1\" is an API key; there is nothing to refresh (not_refreshable, HTTP 409)\n"
+  },
+  {
+    "name": "add --from-file (vendor credential JSON) succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "vendor credential shows as oauth with expiry and no material",
+    "ok": true,
+    "detail": "{\n  \"error_count\": 0,\n  \"expires_at\": \"2026-12-04T10:19:38.474Z\",\n  \"kind\": \"oauth\",\n  \"label\": \"vendor\",\n  \"last_error\": null,\n  \"last_used_at\": null,\n  \"rate_limited_until\": null,\n  \"ref\": \"ant1\",\n  \"request_count\": 0,\n  \"source\": \"pool\",\n  \"status\": \"active\",\n  \"upstream\": \"anthropic\"\n}\n"
+  },
+  {
+    "name": "add --from-file (bare key file) succeeds, no key in output",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "rm removes the slot",
+    "ok": true,
+    "detail": ""
+  }
+]

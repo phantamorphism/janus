@@ -1,0 +1,22 @@
+[
+  {
+    "name": "D71-a",
+    "ok": true,
+    "detail": "charge, settle, then refund -> false (expected false)"
+  },
+  {
+    "name": "D71-b",
+    "ok": true,
+    "detail": "charge r1 at T, compact(T+59m) dropped 0 (expected 0), refund -> true (expected true; entry survived default 1h TTL)"
+  },
+  {
+    "name": "D71-c",
+    "ok": true,
+    "detail": "charge r2 at T, compact(T+61m) dropped 1 (expected >0), refund -> false (expected false), counter still 4 (expected 4: charge stands)"
+  },
+  {
+    "name": "D71-d",
+    "ok": true,
+    "detail": "record r3 (5) at T, compact(T+61m) dropped 1 (expected >0), record r3 again -> count 10 (expected 10: redelivery counted again)"
+  }
+]

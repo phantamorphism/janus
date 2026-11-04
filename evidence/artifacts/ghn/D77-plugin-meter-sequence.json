@@ -1,0 +1,35 @@
+{
+  "limit": 3,
+  "seq": [
+    {
+      "i": 0,
+      "status": 200,
+      "body": "{\"id\":\"mock-1\",\"model\":\"mock\",\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2,\"cost\":5}}",
+      "meterUsed": 5
+    },
+    {
+      "i": 1,
+      "status": 403,
+      "body": "{\"error\":{\"code\":\"denied\",\"message\":\"budget exhausted used=5\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+      "meterUsed": 5
+    },
+    {
+      "i": 2,
+      "status": 403,
+      "body": "{\"error\":{\"code\":\"denied\",\"message\":\"budget exhausted used=5\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+      "meterUsed": 5
+    },
+    {
+      "i": 3,
+      "status": 403,
+      "body": "{\"error\":{\"code\":\"denied\",\"message\":\"budget exhausted used=5\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+      "meterUsed": 5
+    }
+  ],
+  "events": [
+    "{\"caller_identity\":\"ref:an-exp2\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"an-exp2\",\"duration_ms\":12,\"usage\":{\"model\":\"mock\",\"usage\":{\"completion_tokens\":4,\"prompt_tokens\":3,\"total_tokens\":7}}}",
+    "{\"caller_identity\":\"ref:or-good\",\"upstream\":\"openrouter\",\"status\":200,\"credential_ref\":\"or-good\",\"duration_ms\":3,\"usage\":{\"model\":\"mock\",\"usage\":{\"completion_tokens\":4,\"prompt_tokens\":3,\"total_tokens\":7}}}",
+    "{\"caller_identity\":\"ref:or-bad\",\"upstream\":\"openrouter\",\"status\":200,\"credential_ref\":\"or-bad\",\"duration_ms\":1,\"usage\":{\"model\":\"mock\",\"usage\":{\"completion_tokens\":4,\"prompt_tokens\":3,\"total_tokens\":7}}}",
+    "{\"caller_identity\":\"meter:budget\",\"upstream\":\"openrouter\",\"status\":200,\"credential_ref\":\"or-cost\",\"duration_ms\":1,\"usage\":{\"model\":\"mock\",\"usage\":{\"completion_tokens\":1,\"cost\":5,\"prompt_tokens\":1,\"total_tokens\":2}}}"
+  ]
+}

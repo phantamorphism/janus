@@ -25,6 +25,8 @@ async fn status_command_json() {
     assert_eq!(s["upstreams"][0]["name"], "openrouter");
     assert_eq!(s["upstreams"][0]["binding"], "opaque");
     assert_eq!(s["request_log"]["enabled"], true);
+    assert_eq!(s["request_log"]["dropped_records"], 0);
+    assert_eq!(s["data_plane"]["refused_connections"], 0);
     assert!(s["version"].is_string() && s["started_at"].is_string());
 
     let human = d.janus(&["status"]).await;
@@ -32,6 +34,8 @@ async fn status_command_json() {
     for needle in [
         "version",
         "admin socket",
+        "dropped records  0",
+        "refused conns    0",
         "openrouter",
         "opaque",
         "plugin",

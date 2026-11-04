@@ -1,0 +1,80 @@
+{
+  "invalid": {
+    "ref": "cred-bad",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "invalid",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:19:54.390720Z",
+    "request_count": 1,
+    "error_count": 1,
+    "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
+  },
+  "after_rotate": {
+    "ref": "cred-bad",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:19:54.390720Z",
+    "request_count": 1,
+    "error_count": 1,
+    "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
+  },
+  "disabled": {
+    "ref": "cred-bad",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "disabled",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:19:54.424676Z",
+    "request_count": 2,
+    "error_count": 1,
+    "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
+  },
+  "default_when_disabled": {
+    "ref": "cred-other",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:19:54.471436Z",
+    "request_count": 4,
+    "error_count": 0,
+    "last_error": null
+  },
+  "plugin_disabled_ref": {
+    "status": 503,
+    "outcome": {
+      "request_id": "01a1a612-86fa-75b9-a01b-f335010e9f00",
+      "received_at": "2026-11-04T10:19:54.490104Z",
+      "duration_ms": 0,
+      "upstream": "openai",
+      "route": null,
+      "method": "POST",
+      "path": "/openai/v1/chat",
+      "binding": "opaque",
+      "caller_identity": "usedisabled",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "outcome": "credential_unavailable",
+      "credential_ref": null,
+      "status": null,
+      "usage": null,
+      "error": "credential \"dis-ref\" is Disabled"
+    }
+  },
+  "after_delete": "{\"error\":{\"code\":\"credential_not_found\",\"message\":\"no credential \\\"cred-other\\\"\"}}"
+}

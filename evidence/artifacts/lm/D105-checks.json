@@ -1,0 +1,67 @@
+[
+  {
+    "name": "listeners match status --json",
+    "ok": true,
+    "detail": "127.0.0.1:26001,/tmp/qa-lm/run/data/admin.sock,http://127.0.0.1:26002/,http://127.0.0.1:26003/"
+  },
+  {
+    "name": "upstreams + bindings match status --json",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "version shown",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "plugin mode and health match",
+    "ok": true,
+    "detail": "ok"
+  },
+  {
+    "name": "client certificate expiry matches status --json",
+    "ok": true,
+    "detail": "2027-11-04T00:00:00Z vs 2027-11-04 02:00:00in 364 d"
+  },
+  {
+    "name": "server certificate expiry matches status --json",
+    "ok": true,
+    "detail": "2027-11-04T00:00:00Z vs 2027-11-04 02:00:00in 364 d"
+  },
+  {
+    "name": "credential health matches `credential list --json` status values",
+    "ok": true,
+    "detail": "{\"by\":{\"active\":1,\"disabled\":1},\"uiMap\":{\"active\":1,\"rate_limited\":0,\"invalid\":0,\"disabled\":1}}"
+  },
+  {
+    "name": "request count matches `log query` total over the same period",
+    "ok": true,
+    "detail": "ui=24 cli=24"
+  },
+  {
+    "name": "denied count matches `log query --outcome denied`",
+    "ok": true,
+    "detail": "ui=4 cli=4"
+  },
+  {
+    "name": "rejected-at-identity count matches `--outcome rejected_identity`",
+    "ok": true,
+    "detail": "ui=5 cli=5"
+  },
+  {
+    "name": "rates are shown and consistent (count / 60 min; denial % = denied/total)",
+    "ok": true,
+    "detail": "0.40 16.7"
+  },
+  {
+    "name": "window selector re-queries (24h count matches log query --since 24h)",
+    "ok": true,
+    "detail": "Requests\n24"
+  },
+  {
+    "name": "outcome breakdown table matches log",
+    "ok": true,
+    "detail": "{\"rejected_identity\":5,\"denied\":4,\"forwarded\":15} / "
+  }
+]

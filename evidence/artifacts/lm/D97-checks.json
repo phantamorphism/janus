@@ -1,0 +1,82 @@
+[
+  {
+    "name": "no --token <value> option anywhere in help",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "--token-file exists (path, not value)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "`--token abc` rejected as unknown option",
+    "ok": true,
+    "detail": "error: unexpected argument '--token' found\n\n  tip: a similar argument exists: '--token-file'\n\nUsage: janus status --token-file <PATH>\n\nFor more information, try '--help'.\n"
+  },
+  {
+    "name": "status over default admin.sock via JANUS_DATA_DIR",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status over default $HOME/.janus/admin.sock",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status via --config data_dir",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status via JANUS_ADMIN=unix://",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "TCP with --token-file succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "TCP with JANUS_ADMIN_TOKEN succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "TCP with <data_dir>/admin-token succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "TCP via JANUS_ADMIN succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "wrong token fails non-zero",
+    "ok": true,
+    "detail": "janus: the admin token is not valid; this listener requires the admin token: pass --token-file <path> (or set JANUS_TOKEN_FILE or JANUS_ADMIN_TOKEN), or run on the daemon's host where <data_dir>/admin-token is read (unauthorized, HTTP 401)\n"
+  },
+  {
+    "name": "no token source fails non-zero",
+    "ok": true,
+    "detail": "janus: this listener requires the admin token as `Authorization: Bearer <token>`; this listener requires the admin token: pass --token-file <path> (or set JANUS_TOKEN_FILE or JANUS_ADMIN_TOKEN), or run on the daemon's host where <data_dir>/admin-token is read (unauthorized, HTTP 401)\n"
+  },
+  {
+    "name": "unreachable unix socket -> non-zero",
+    "ok": true,
+    "detail": "janus: cannot reach the admin surface at unix:///tmp/qa-lm/does-not-exist.sock: No such file or directory (os error 2) (is janus-daemon running over this data directory? Point the CLI elsewhere with --admin, JANUS_ADMIN, --config or JANUS_DATA_DIR)\n"
+  },
+  {
+    "name": "unreachable TCP on a mutating command -> non-zero, no token printed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unreachable: nothing created locally",
+    "ok": true,
+    "detail": ""
+  }
+]

@@ -1,0 +1,162 @@
+[
+  {
+    "name": "status --json valid JSON, exit 0",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status shows version",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status shows listeners",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status shows upstreams with binding method",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status shows log size/retention",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status shows plugin mode/health",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "status: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential list: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential list --upstream: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential show: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential default: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential add (stdin): exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential add (--from-file): exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential rotate (stdin): exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential rotate (--from-file): exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential disable: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential enable: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential refresh on API-key slot: non-zero exit with JSON error on stderr",
+    "ok": true,
+    "detail": "exit=1 {\"error\":{\"code\":\"not_refreshable\",\"message\":\"credential \\\"jc1\\\" is an API key; there is nothing to refresh\",\"status\":409}}\n"
+  },
+  {
+    "name": "credential rm: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "credential rm: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "identity create: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "identity create --json has an id",
+    "ok": true,
+    "detail": "{\n  \"claims\": {},\n  \"created_at\": \"2026-11-04T10:19:35.209840Z\",\n  \"expires_at\": null,\n  \"id\": \"01a1a612-3ba9-72c8-b9e0-"
+  },
+  {
+    "name": "identity list: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "identity show: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "identity revoke: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "identity rm: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "log query: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "log show: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "log tail --json: every line valid JSON",
+    "ok": true,
+    "detail": "{\"binding\":\"opaque\",\"caller_identity\":\"agent-1\",\"claimed_identity\":null,\"correlation_id\":null,\"credential_ref\":\"or1\",\"duration_ms\":4,\"error\":null,\"method\":\"POST\",\"outcome\":\"forwarded\",\"path\":\"/openrou"
+  },
+  {
+    "name": "plugin status: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "plugin check: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  },
+  {
+    "name": "plugin tls init: exit 0 + valid JSON",
+    "ok": true,
+    "detail": "exit=0 "
+  }
+]

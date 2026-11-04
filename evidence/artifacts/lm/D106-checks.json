@@ -1,0 +1,87 @@
+[
+  {
+    "name": "list shows credentials with status and counters",
+    "ok": true,
+    "detail": "Credentials\n\nThe upstream accounts in the pool, with their health and use. Adding a credential and rotating its material happen with the janus CLI, never in a browser.\n\nUpstream\nAll\nanthropic\nopenai\nopenrouter\nReload\nCredential\tUpstream\tStatus\tExpires\tLast used\tRequests\tErrors\t\nActions\n\n\nor1\nAPI key"
+  },
+  {
+    "name": "counters match CLI (or1 requests)",
+    "ok": true,
+    "detail": "14"
+  },
+  {
+    "name": "no add/rotate/material entry form in the view",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no key material displayed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Disable button works -> `credential show` status disabled",
+    "ok": true,
+    "detail": "ok disabled"
+  },
+  {
+    "name": "UI row reflects disabled",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Enable button works -> status active",
+    "ok": true,
+    "detail": "ok active"
+  },
+  {
+    "name": "Refresh button issues the refresh admin call with the token",
+    "ok": true,
+    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/ui1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787613404}"
+  },
+  {
+    "name": "Refresh on an API key surfaces the daemon refusal in the UI",
+    "ok": true,
+    "detail": "Credentials\n\nThe upstream accounts in the pool, with their health and use. Adding a credential and rotating its material happen with the janus CLI, never in a browser.\n\nUpstream\nAll\nanthropic\nopenai\nopenrouter\nReload\n\nCould not refresh ui1: credential \"ui1\" is an API key; there is nothing to refresh"
+  },
+  {
+    "name": "OAuth credential added for the Refresh test",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI Refresh on an OAuth credential calls the refresh admin endpoint with the token",
+    "ok": true,
+    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/oauth1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787616998}"
+  },
+  {
+    "name": "daemon contacted the mock token endpoint (token_url) exactly once",
+    "ok": true,
+    "detail": "[{\"method\":\"POST\",\"url\":\"/token\",\"ct\":\"application/json\",\"body\":\"{\\\"client_id\\\":\\\"9d1c250a-e61b-44d9-88ed-5944d1962f5e\\\",\\\"grant_type\\\":\\\"refresh_token\\\",\\\"refresh_token\\\":\\\"<redacted-key>\\\"}\"}]"
+  },
+  {
+    "name": "state actually changes: expires_at moved forward (confirmed by `credential show`)",
+    "ok": true,
+    "detail": "2026-11-04T10:50:14.676Z -> 2026-11-04T12:20:17.003Z"
+  },
+  {
+    "name": "UI row shows the new expiry and no token material",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Remove works -> `credential show` no longer finds it",
+    "ok": true,
+    "detail": "ok exit=1 Skip to content|Janus|Overview|Credentials|Identities|Requests|Plugin|Forget token|Credentials||The upstream accounts in"
+  },
+  {
+    "name": "removed credential gone from the UI table rows",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "remaining actions do not touch other credentials",
+    "ok": true,
+    "detail": ""
+  }
+]

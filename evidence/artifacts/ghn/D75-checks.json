@@ -1,0 +1,37 @@
+[
+  {
+    "name": "durability() is Durable",
+    "ok": true,
+    "detail": "durability=Durable\ncharge=Allowed { used: 7, limit: 100 }\n"
+  },
+  {
+    "name": "count survives restart",
+    "ok": true,
+    "detail": "check=Allowed { used: 7, limit: 100 }\ncount=7\n"
+  },
+  {
+    "name": "second process open fails with error",
+    "ok": true,
+    "detail": "OPEN_ERR usage store is locked by another process: /tmp/qa-ghn/run/s75/u.db / Locked(\"/tmp/qa-ghn/run/s75/u.db\")\n"
+  },
+  {
+    "name": "after holder dies, lock is released (open ok)",
+    "ok": true,
+    "detail": "OPEN_OK\n"
+  },
+  {
+    "name": "journal_mode is wal after close",
+    "ok": true,
+    "detail": "wal\n"
+  },
+  {
+    "name": "SIGKILL mid-run: every acknowledged charge survives",
+    "ok": true,
+    "detail": "acked=92 survived=92"
+  },
+  {
+    "name": "store reopens after SIGKILL (stale lock released)",
+    "ok": true,
+    "detail": ""
+  }
+]

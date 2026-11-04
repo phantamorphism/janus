@@ -35,9 +35,14 @@ pub struct Opts<'a> {
     /// (`[upstream.identity]`, `[[upstream.route]]`).
     pub openrouter_extra: &'a str,
     pub anthropic: Option<&'a str>,
+    /// TOML keys placed in the anthropic `[[upstream]]` table, before its
+    /// `[upstream.identity]` (e.g. `token_url = "..."`).
+    pub anthropic_extra: &'a str,
     /// Emit the daemon-wide `[identity]` default.
     pub default_identity: bool,
     pub data_plane: &'a str,
+    /// `data_plane.max_connections`; `None` leaves the default.
+    pub max_connections: Option<usize>,
 }
 
 impl<'a> Opts<'a> {
@@ -48,8 +53,10 @@ impl<'a> Opts<'a> {
             openrouter,
             openrouter_extra: "",
             anthropic: None,
+            anthropic_extra: "",
             default_identity: true,
             data_plane: "127.0.0.1:0",
+            max_connections: None,
         }
     }
 }
@@ -80,10 +87,14 @@ impl Env {
     pub fn toml(&self, o: &Opts<'_>) -> String {
         let p = |name: &str| self.path(name).display().to_string();
         let mut t = format!(
-            "data_dir = \"{data}\"\n\n[data_plane]\nbind = \"{bind}\"\n\n",
+            "data_dir = \"{data}\"\n\n[data_plane]\nbind = \"{bind}\"\n",
             data = p("data"),
             bind = o.data_plane,
         );
+        if let Some(max) = o.max_connections {
+            t += &format!("max_connections = {max}\n");
+        }
+        t.push('\n');
         match o.plugin {
             PluginCfg::None => {}
             PluginCfg::Grpc => {
@@ -112,7 +123,8 @@ impl Env {
         );
         if let Some(anthropic) = o.anthropic {
             t += &format!(
-                "[[upstream]]\nname = \"anthropic\"\npath_prefix = \"/anthropic\"\nbase_url = \"{anthropic}\"\n[upstream.identity]\nsource = {{ header = \"x-api-key\" }}\n\n"
+                "[[upstream]]\nname = \"anthropic\"\npath_prefix = \"/anthropic\"\nbase_url = \"{anthropic}\"\n{}\n[upstream.identity]\nsource = {{ header = \"x-api-key\" }}\n\n",
+                o.anthropic_extra
             );
             t += &format!(
                 "[[credential]]\nref = \"ant-main\"\nupstream = \"anthropic\"\nfile = \"{}\"\n\n",

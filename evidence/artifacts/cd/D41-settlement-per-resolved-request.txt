@@ -1,0 +1,41 @@
+{
+  "resolvedIdentities": [
+    [
+      "01a1a612-4a81-715b-a7b2-e0d660cdf944",
+      "m-ok"
+    ],
+    [
+      "01a1a612-4a82-77fb-877a-2bb2d839ea30",
+      "m-deny"
+    ],
+    [
+      "01a1a612-4ab0-77b3-a414-838f95a5b74a",
+      "m-credfail"
+    ],
+    [
+      "01a1a612-4ab1-7314-80f2-0e26a797eee1",
+      "m-timeout"
+    ],
+    [
+      "01a1a612-4bb3-74ac-8907-97c1379fc813",
+      "m-noref"
+    ]
+  ],
+  "cnt": {
+    "01a1a612-4a81-715b-a7b2-e0d660cdf944": [
+      "call_completed"
+    ],
+    "01a1a612-4a82-77fb-877a-2bb2d839ea30": [
+      "call_abandoned"
+    ],
+    "01a1a612-4ab0-77b3-a414-838f95a5b74a": [
+      "call_abandoned"
+    ],
+    "01a1a612-4ab1-7314-80f2-0e26a797eee1": [
+      "call_abandoned"
+    ],
+    "01a1a612-4bb3-74ac-8907-97c1379fc813": [
+      "call_abandoned"
+    ]
+  }
+}

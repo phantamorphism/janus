@@ -1,0 +1,23 @@
+{
+  "rows": {
+    "dropped_records": 0,
+    "enabled": true,
+    "retain": "30days",
+    "retain_seconds": 2592000,
+    "rows": 1273
+  },
+  "page1_len": 100,
+  "big_len": 1000,
+  "pages": 4,
+  "count": 1273,
+  "dup": 0,
+  "ordered": true,
+  "filters": {
+    "identity": 500,
+    "upstream": 251,
+    "outcome": 264,
+    "credential": 758,
+    "since": 501,
+    "until": 772
+  }
+}

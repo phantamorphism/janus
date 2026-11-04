@@ -1,0 +1,23 @@
+{
+  "probes": {
+    "/v1/meters": 404,
+    "/v1/metering": 404,
+    "/v1/usage": 404,
+    "/v1/quotas": 404,
+    "/v1/counters": 404,
+    "/v1/budgets": 404,
+    "/v1/limits": 404
+  },
+  "statusKeys": [
+    "build",
+    "credentials",
+    "data_plane",
+    "listeners",
+    "plugin",
+    "request_log",
+    "started_at",
+    "upstreams",
+    "version"
+  ],
+  "statusMentionsMeter": false
+}

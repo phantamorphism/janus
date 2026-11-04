@@ -1,0 +1,12 @@
+OK   cert from a CA outside the configured anchor fails plugin_tls_error (HTTP 503); log=plugin_failed/plugin_tls_error: TLS handshake with plugin at localhost:23130 failed: invalid peer certificate: UnknownIssuer
+OK   no ResolveRoute reached the untrusted plugin
+OK   correct anchor but cert for a different hostname fails plugin_tls_error (HTTP 503); log=plugin_failed/plugin_tls_error: TLS handshake with plugin at localhost:23132 failed: invalid peer certificate: certificate not valid for name "localhost"; certificate is only valid for DnsName("other.test")
+OK   same plugin with server_name="other.test" succeeds (HTTP 200, resolve=1)
+OK   plugin observed the daemon client certificate on a TLSv1.3 handshake
+OK   SPIFFE plugin with matching expected_san succeeds (HTTP 200); hostname check replaced
+OK   plugin observed the daemon client cert
+OK   (extra) SPIFFE plugin with a non-matching expected_san fails plugin_tls_error (HTTP 503)
+OK   TLS1.2-only plugin fails (HTTP 503, resolve=0); class=tls_error/TLS handshake with plugin at localhost:23140 failed: received fatal alert: ProtocolVersion
+OK   TLS 1.2-only failure is classed plugin_tls_error
+OK   baseline mTLS succeeds; plugin saw authorized client cert 45:03:5C:10:79:DA:14
+OK   health=ok

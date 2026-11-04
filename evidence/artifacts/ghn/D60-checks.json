@@ -1,0 +1,47 @@
+[
+  {
+    "name": "add expired anthropic cred (fresh)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh request reached the mock token endpoint with the refresh token",
+    "ok": true,
+    "detail": "[{\"host\":\"127.0.0.1:24095\",\"url\":\"/anthropic/oauth/token\",\"method\":\"POST\",\"body\":\"{\\\"client_id\\\":\\\"9d1c250a-e61b-44d9-88ed-5944d1962f5e\\\",\\\"grant_type\\\":\\\"refresh_token\\\",\\\"refresh_token\\\":\\\"RT-ANTH-E"
+  },
+  {
+    "name": "request succeeds",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "expires_at moved into the future",
+    "ok": true,
+    "detail": "2026-11-04T09:20:08.040Z -> 2026-11-04T12:20:08.101Z"
+  },
+  {
+    "name": "upstream saw refreshed access token",
+    "ok": true,
+    "detail": "Bearer AT-ANTH-REFRESHED-aa11bb22cc33dd44"
+  },
+  {
+    "name": "caller never sees refreshed token",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "pool file updated with refreshed token",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "openai expired cred: refresh attempted",
+    "ok": true,
+    "detail": "hosts=127.0.0.1:24095"
+  },
+  {
+    "name": "openai expires_at in future",
+    "ok": true,
+    "detail": "2026-11-04T09:20:08Z -> 2026-11-04T12:20:08Z"
+  }
+]

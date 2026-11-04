@@ -1,0 +1,44 @@
+{
+  "before": {
+    "ref": "an-exp2",
+    "upstream": "anthropic",
+    "kind": "oauth",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": "2026-11-04T09:20:08.040Z",
+    "last_used_at": null,
+    "request_count": 0,
+    "error_count": 0,
+    "last_error": null
+  },
+  "after": {
+    "ref": "an-exp2",
+    "upstream": "anthropic",
+    "kind": "oauth",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": "2026-11-04T12:20:08.101Z",
+    "last_used_at": "2026-11-04T10:20:08.111384Z",
+    "request_count": 1,
+    "error_count": 0,
+    "last_error": null
+  },
+  "status": 200,
+  "body": "{\"id\":\"mock-1\",\"model\":\"mock\",\"choices\":[],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4,\"total_tokens\":7}}",
+  "mockAuth": [
+    "Bearer AT-ANTH-REFRESHED-aa11bb22cc33dd44"
+  ],
+  "tokenRequests": [
+    {
+      "host": "127.0.0.1:24095",
+      "url": "/anthropic/oauth/token",
+      "ct": "application/json",
+      "bodyHasRefresh": true
+    }
+  ],
+  "proxyConnects": []
+}

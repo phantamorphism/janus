@@ -1,0 +1,82 @@
+[
+  {
+    "name": "add bad key",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "add rl key",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "good calls succeed",
+    "ok": true,
+    "detail": "200,200,200"
+  },
+  {
+    "name": "good request_count +3",
+    "ok": true,
+    "detail": "3"
+  },
+  {
+    "name": "good last_used_at set",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "good status active",
+    "ok": true,
+    "detail": "active"
+  },
+  {
+    "name": "good error_count 0",
+    "ok": true,
+    "detail": "0"
+  },
+  {
+    "name": "rejected cred invalid",
+    "ok": true,
+    "detail": "invalid"
+  },
+  {
+    "name": "rejected cred last_error set",
+    "ok": true,
+    "detail": "rejected by the upstream: 401 Unauthorized: 401: User not found."
+  },
+  {
+    "name": "rejected cred error_count>=1 and request_count>=1",
+    "ok": true,
+    "detail": "1/1"
+  },
+  {
+    "name": "rejected upstream status relayed 401",
+    "ok": true,
+    "detail": "401"
+  },
+  {
+    "name": "rate-limited cred status",
+    "ok": true,
+    "detail": "rate_limited"
+  },
+  {
+    "name": "rate_limited_until in future",
+    "ok": true,
+    "detail": "2026-11-04T10:21:34.317675Z"
+  },
+  {
+    "name": "rate-limited request_count>=1",
+    "ok": true,
+    "detail": "1"
+  },
+  {
+    "name": "rate-limit 429 relayed",
+    "ok": true,
+    "detail": "429"
+  },
+  {
+    "name": "rotate clears invalid (status active)",
+    "ok": true,
+    "detail": "active"
+  }
+]

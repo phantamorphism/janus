@@ -1,0 +1,417 @@
+[
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-B…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-R…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-B…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/messages",
+  "auth": "Bearer AT-ANTH…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-R…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-C…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-oa-K…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ },
+ {
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "auth": "Bearer sk-or-G…"
+ }
+]

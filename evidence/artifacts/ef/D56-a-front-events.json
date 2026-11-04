@@ -1,0 +1,66 @@
+[
+  {
+    "event": "listening",
+    "t": 1793787589.106314
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.297277
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.301124
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.305505
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.307405
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
+    "t": 1793787589.308248
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.3134952
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.314641
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
+    "t": 1793787589.315354
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.316843
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.317915
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
+    "t": 1793787589.318611
+  }
+]

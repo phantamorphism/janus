@@ -8,9 +8,7 @@ description = "Janus proxy core: caller-identity extraction, credential pool, cr
 build = "build.rs"
 
 [features]
-# Reserved for janus_core::metering (leaf 1.2.3): gates `SqliteUsageStore`.
 sqlite = ["dep:rusqlite"]
-# Reserved for janus_core::metering (leaf 1.2.3): gates the UsageStore conformance suite.
 testing = []
 
 [dependencies]
@@ -31,7 +29,6 @@ reqwest.workspace = true
 url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-humantime.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 hmac.workspace = true

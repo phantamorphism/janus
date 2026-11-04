@@ -1,0 +1,7 @@
+no token -> 401 {"error":{"code":"unauthorized","message":"this listener requires the admin token as `Authorization: Bearer <token>`"}}
+wrong -> 401 {"error":{"code":"unauthorized","message":"the admin token is not valid"}}
+correct -> 200
+(b) https no token -> 401; wrong -> 401; token -> 200; plaintext http with token -> conn-error:HPE_INVALID_CONSTANT
+(c) plaintext no token -> 401; with token -> 200
+
+note: constant-time comparison is not observable black-box

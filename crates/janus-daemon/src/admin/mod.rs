@@ -39,9 +39,10 @@
 //!   the request log disabled the stream is one `disabled` event;
 //! - `POST /v1/plugin/check` with no `[plugin]` block is `409 no_plugin`:
 //!   there is no channel to check;
-//! - the UI's assets come from `ui.assets_dir`, else from the `ui/dist`
-//!   directory of the source tree this daemon was built from; a directory
-//!   without `index.html` is a startup refusal. Unknown non-API paths get
+//! - the UI's assets come from `ui.assets_dir`, else from `ui` beside the
+//!   executable, else `../share/janus/ui` relative to it (debug builds
+//!   also try the source tree's `ui/dist`); no directory with an
+//!   `index.html` is a startup refusal naming every path tried. Unknown non-API paths get
 //!   `index.html` (the single-page app routes them); every path under `/v1`
 //!   is the API's, token-gated, and never answered with `index.html`;
 //! - resource bounds: request bodies over [`MAX_BODY_BYTES`] are `413
@@ -60,7 +61,7 @@ mod api;
 mod credentials;
 mod error;
 mod identities;
-mod listen;
+pub(crate) mod listen;
 mod requests;
 mod status;
 mod token;
@@ -68,6 +69,7 @@ mod ui;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -103,6 +105,9 @@ pub struct AdminDeps {
     /// The address the data plane actually bound (resolving port `0`), as
     /// `/v1/status` reports it.
     pub data_plane_addr: SocketAddr,
+    /// Connections the data plane refused for being over its cap, as
+    /// `/v1/status` reports in `data_plane.refused_connections`.
+    pub data_plane_refused: Arc<AtomicU64>,
 }
 
 /// Why the admin surface refused to start. Nothing is left listening when
@@ -215,20 +220,33 @@ struct Validated {
 /// config's listener rules, the bindings `/v1/status` reports, the data
 /// directory, the socket path's length, listener TLS material and the UI's
 /// assets. Reads files; creates and binds nothing.
-fn validate(config: &DaemonConfig, data_dir: &Path) -> Result<Validated, AdminError> {
+///
+/// `data_dir` must exist unless `may_be_absent`: `check-config` validates a
+/// first start before the directory has been created.
+fn validate(
+    config: &DaemonConfig,
+    data_dir: &Path,
+    may_be_absent: bool,
+) -> Result<Validated, AdminError> {
     // The listener rules are part of the config's static validation; run it
     // again here so no caller can start a listener the docs forbid.
     config.validate()?;
     let upstreams = status::upstream_summaries(config)?;
-    let meta = std::fs::metadata(data_dir).map_err(|source| AdminError::DataDir {
-        path: data_dir.to_path_buf(),
-        source,
-    })?;
-    if !meta.is_dir() {
-        return Err(AdminError::DataDir {
-            path: data_dir.to_path_buf(),
-            source: std::io::Error::new(std::io::ErrorKind::NotADirectory, "not a directory"),
-        });
+    match std::fs::metadata(data_dir) {
+        Ok(meta) if meta.is_dir() => {}
+        Ok(_) => {
+            return Err(AdminError::DataDir {
+                path: data_dir.to_path_buf(),
+                source: std::io::Error::new(std::io::ErrorKind::NotADirectory, "not a directory"),
+            })
+        }
+        Err(e) if may_be_absent && e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(source) => {
+            return Err(AdminError::DataDir {
+                path: data_dir.to_path_buf(),
+                source,
+            })
+        }
     }
     listen::check_socket_path(&paths::admin_socket_path(data_dir))?;
     let admin_tls = load_tls("admin", config.admin.tls.as_ref())?;
@@ -248,14 +266,14 @@ fn validate(config: &DaemonConfig, data_dir: &Path) -> Result<Validated, AdminEr
 }
 
 /// `check-config`'s share of the admin surface: every refusal [`start`]
-/// can make from `config` and the state of `data_dir` (which must exist) —
+/// can make from `config` and the state of `data_dir` (which may be absent) —
 /// listener rules, listener TLS material, UI assets, an existing
 /// `admin-token` file's ownership, mode and length — without binding a
 /// listener or creating any file. A missing `admin-token` passes: [`start`]
 /// generates it. What only binding can show (an address in use, another
 /// daemon on the admin socket) is not checked.
 pub fn check_config(config: &DaemonConfig, data_dir: &Path) -> Result<(), AdminError> {
-    validate(config, data_dir)?;
+    validate(config, data_dir, true)?;
     token::AdminToken::check(&paths::admin_token_path(data_dir))
 }
 
@@ -267,7 +285,7 @@ pub async fn start(deps: AdminDeps, cancel: CancellationToken) -> Result<AdminHa
         upstreams,
         admin_tls,
         ui: ui_setup,
-    } = validate(&deps.config, &deps.data_dir)?;
+    } = validate(&deps.config, &deps.data_dir, false)?;
     let token_path = paths::admin_token_path(&deps.data_dir);
     let admin_token = Arc::new(token::AdminToken::load_or_create(&token_path)?);
 

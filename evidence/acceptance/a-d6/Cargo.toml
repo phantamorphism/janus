@@ -1,0 +1,10 @@
+[package]
+name = "d6"
+version = "0.0.0"
+edition = "2021"
+[dependencies]
+janus-core = { path = "/Users/michaelhancock/hancock_industries/apps/janus/crates/janus-core" }
+http = "1"
+url = "2"
+async-trait = "0.1"
+[workspace]

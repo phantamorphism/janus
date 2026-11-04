@@ -1,0 +1,30 @@
+{
+  "outboundHeaders": {
+    "content-type": "application/json",
+    "content-length": "7",
+    "accept": "*/*",
+    "user-agent": "node",
+    "authorization": "Bearer sk-QAREALKEY-0002",
+    "host": "127.0.0.1:20101"
+  },
+  "outboundBody": "{\"a\":1}",
+  "logRecord": {
+    "binding": "hmac",
+    "caller_identity": "agent-5",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "qa-cred-openai",
+    "duration_ms": 0,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/openai/v1/chat/completions",
+    "received_at": "2026-11-04T10:19:34.310598Z",
+    "request_id": "01a1a612-3826-71b2-b998-5eb3f6eba58a",
+    "route": null,
+    "status": 201,
+    "upstream": "openai",
+    "usage": null
+  },
+  "note": "x-correlation-id forwarded? false"
+}

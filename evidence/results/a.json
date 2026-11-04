@@ -1,0 +1,76 @@
+[
+  {
+    "id": "D1",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D1-sdk-transcript.json"
+    ],
+    "note": "Stock @anthropic-ai/sdk with only baseURL=/anthropic and apiKey=caller identity token succeeded; returned the upstream message identical to a direct call; upstream saw the pool key. (Upstream is a mock at base_url; real upstream not contacted.)"
+  },
+  {
+    "id": "D2",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D2-calls-and-status.json"
+    ],
+    "note": "One call through each of /anthropic,/openai,/openrouter reached only its own configured base_url mock and returned its response; status lists upstreams [\"anthropic\",\"openai\",\"openrouter\"]."
+  },
+  {
+    "id": "D3",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D3-rewrite.json"
+    ],
+    "note": "Upstream received '/v1/messages?beta=true&k=v' (prefix stripped, query kept); log upstream=anthropic method=POST path=/anthropic/v1/messages"
+  },
+  {
+    "id": "D4",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D4-recording-upstream.json"
+    ],
+    "note": "At the recording upstreams: anthropic API key carried as x-api-key (sk-ant-QAREALKEY-0001); openai and openrouter carry Authorization: Bearer <pool key> (Bearer sk-QAREALKEY-0002 / Bearer sk-or-QAREALKEY-0003); Anthropic OAuth credential (.credentials.json) carried as Authorization: Bearer <access token> (no x-api-key, refresh token not sent); pool key bytes present and the caller token (whole, claims part, signature part) absent from URL, all headers and body. Live-vendor acceptance is out of scope per spec."
+  },
+  {
+    "id": "D5",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D5-outbound.json"
+    ],
+    "note": "Outbound headers: content-type,content-length,accept,user-agent,authorization,host; no identity material, x-sandbox-secret absent, content-type present. correlation header forwarded=false (spec leaves open); log correlation_id=null."
+  },
+  {
+    "id": "D6",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D6-library-build-outbound.txt"
+    ],
+    "note": "Scratch crate with a custom UpstreamImpl whose forwarding allowlist wrongly includes the identity header: build_outbound returned Err(SubstitutionError::IdentityLeak{location}) for x-api-key, authorization and basic-password cases; stock allowlist control built a request with pool key and no caller token. (With no identity presented, i.e. method none, a request is built - nothing to assert.)"
+  },
+  {
+    "id": "D7",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D7-compare.json",
+      "evidence/artifacts/a/D7-D9-upstream-429-401.json"
+    ],
+    "note": "Status, body bytes (incl. non-UTF8 binary) and headers through Janus identical to calling the mock directly for 200/404/500/binary; no extra headers or body fields. Upstream 429 and 401 also relayed with identical status/body."
+  },
+  {
+    "id": "D8",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D8-streaming.json"
+    ],
+    "note": "SSE upstream emits an event every 500ms for ~2.5s; first byte via Janus at 4ms (total 3007ms), 6 separate chunks, byte-identical stream, for all three upstreams."
+  },
+  {
+    "id": "D9",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/a/D9-responses.json",
+      "evidence/artifacts/a/D7-D9-upstream-429-401.json"
+    ],
+    "note": "Inspected headers+bodies of 7 caller-visible responses (success, 4 identity denials, upstream 500/401, upstream connection killed, unknown prefix): credential bytes/credential_ref leaks=[]; success response indistinguishable from direct upstream call=true. Statuses: success=201 deniedBadToken=401 deniedNoToken=401 deniedExpired=401 upstream500=500 upstreamKilled=502 unknownPrefix=404"
+  }
+]

@@ -1,0 +1,2 @@
+status=200
+{"binding":"jwt","caller_identity":"jwt-user-1","claimed_identity":null,"correlation_id":null,"credential_ref":"a1","duration_ms":2,"error":null,"method":"POST","outcome":"forwarded","path":"/anthropic/v1/x","received_at":"2026-11-04T10:19:39.734954Z","request_id":"01a1a612-4d56-734e-b3b6-8f78a169dc92","route":null,"status":200,"upstream":"anthropic","usage":null}

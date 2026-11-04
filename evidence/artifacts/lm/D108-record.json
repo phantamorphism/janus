@@ -1,0 +1,18 @@
+{
+  "binding": "opaque",
+  "caller_identity": "live-agent",
+  "claimed_identity": null,
+  "correlation_id": null,
+  "credential_ref": "or1",
+  "duration_ms": 0,
+  "error": null,
+  "method": "POST",
+  "outcome": "forwarded",
+  "path": "/openrouter/v1/chat/completions",
+  "received_at": "2026-11-04T10:20:37.927948Z",
+  "request_id": "01a1a613-30a7-7546-8e7c-201b5b69c119",
+  "route": null,
+  "status": 200,
+  "upstream": "openrouter",
+  "usage": null
+}

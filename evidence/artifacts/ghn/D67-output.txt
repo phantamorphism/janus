@@ -1,0 +1,1 @@
+D67 PASS first=Allowed { used: 8, limit: 10 } counts=(8,8); exceeded=Exceeded { used: 8, limit: 10 } counts=(8,8); repeat r1=Allowed { used: 8, limit: 10 } counts=(8,8); repeat exceeded r2=Exceeded { used: 8, limit: 10 }

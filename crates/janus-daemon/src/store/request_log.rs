@@ -54,8 +54,11 @@ pub const OUTCOMES: [&str; 7] = [
     "abandoned",
 ];
 
-/// Records queued for the writer before `submit` waits.
+/// Records queued for the writer before further records are dropped.
 const QUEUE_CAPACITY: usize = 4096;
+/// How long [`RequestLog::flush`] waits for the writer before giving up, so
+/// a stalled writer cannot hold up shutdown.
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(10);
 /// Records committed in one transaction at most.
 const BATCH: usize = 256;
 /// Live-tail events buffered per subscriber before it lags.
@@ -150,6 +153,8 @@ pub struct RequestLogStats {
     pub retain: Duration,
     /// Rows currently in the table.
     pub rows: u64,
+    /// Records dropped since start because the writer's queue was full.
+    pub dropped: u64,
 }
 
 /// Position of a row in newest-first order; the cursor's content.
@@ -191,6 +196,8 @@ pub struct RequestLog {
     queue: Option<mpsc::Sender<Command>>,
     tail: broadcast::Sender<Arc<RequestRecord>>,
     rows: Arc<AtomicU64>,
+    /// Records dropped because the queue was full or the writer had stopped.
+    dropped: AtomicU64,
 }
 
 impl fmt::Debug for RequestLog {
@@ -212,11 +219,21 @@ impl RequestLog {
         reader: Connection,
         writer: Connection,
     ) -> Result<Self, StoreError> {
+        Self::start_with_capacity(enabled, retain, reader, writer, QUEUE_CAPACITY)
+    }
+
+    fn start_with_capacity(
+        enabled: bool,
+        retain: Duration,
+        reader: Connection,
+        writer: Connection,
+        capacity: usize,
+    ) -> Result<Self, StoreError> {
         let count: i64 = reader.query_row("SELECT COUNT(*) FROM requests", [], |r| r.get(0))?;
         let rows = Arc::new(AtomicU64::new(count.max(0) as u64));
         let (tail, _) = broadcast::channel(TAIL_CAPACITY);
         let queue = if enabled {
-            let (tx, rx) = mpsc::channel(QUEUE_CAPACITY);
+            let (tx, rx) = mpsc::channel(capacity);
             let (tail, rows) = (tail.clone(), Arc::clone(&rows));
             std::thread::Builder::new()
                 .name("janus-request-log".into())
@@ -236,6 +253,7 @@ impl RequestLog {
             queue,
             tail,
             rows,
+            dropped: AtomicU64::new(0),
         })
     }
 
@@ -247,8 +265,24 @@ impl RequestLog {
         self.retain
     }
 
-    /// Queue a finished request's record. Waits only if the writer is
-    /// [`QUEUE_CAPACITY`] records behind; a no-op when disabled.
+    /// Queue a finished request's record without waiting. When the writer is
+    /// [`QUEUE_CAPACITY`] records behind (or has stopped) the record is
+    /// dropped and counted in [`RequestLogStats::dropped`]: the data plane
+    /// never holds memory or a task for a stalled writer. A no-op when
+    /// disabled.
+    pub fn try_submit(&self, record: RequestRecord) {
+        let Some(queue) = &self.queue else { return };
+        if let Err(e) = queue.try_send(Command::Record(Box::new(record))) {
+            if self.dropped.fetch_add(1, Ordering::Relaxed) == 0 {
+                tracing::error!(
+                    error = %e,
+                    "request-log writer is behind or stopped; dropping records (counted in /v1/status)"
+                );
+            }
+        }
+    }
+
+    /// [`Self::try_submit`] that waits for room instead of dropping.
     pub async fn submit(&self, record: RequestRecord) {
         let Some(queue) = &self.queue else { return };
         if queue.send(Command::Record(Box::new(record))).await.is_err() {
@@ -257,14 +291,19 @@ impl RequestLog {
     }
 
     /// Wait until every record submitted before this call is committed (or
-    /// has failed to commit). Used at shutdown.
+    /// has failed to commit), for at most [`FLUSH_TIMEOUT`]. Used at
+    /// shutdown.
     pub async fn flush(&self) {
-        if let Some(queue) = &self.queue {
+        let Some(queue) = &self.queue else { return };
+        let wait = async {
             let (done, wait) = oneshot::channel();
             if queue.send(Command::Flush(done)).await.is_ok() {
                 // An error means the writer exited; nothing is left to wait for.
                 let _ = wait.await;
             }
+        };
+        if tokio::time::timeout(FLUSH_TIMEOUT, wait).await.is_err() {
+            tracing::error!("request-log writer did not drain in time; queued records may be lost");
         }
     }
 
@@ -394,6 +433,7 @@ impl RequestLog {
             enabled: self.enabled,
             retain: self.retain,
             rows: self.rows.load(Ordering::Relaxed),
+            dropped: self.dropped.load(Ordering::Relaxed),
         }
     }
 
@@ -1136,5 +1176,48 @@ mod tests {
         let mut late = log.subscribe();
         write(log, [rec("after", 3_000, Outcome::Forwarded)]).await;
         assert_eq!(late.recv().await.expect("event").request_id, "after");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn stalled_writer_drops_and_counts_without_spawning_tasks() {
+        let (dir, store) = open_store();
+        drop(store);
+        let path = dir.path().join("janus.db");
+        let log = RequestLog::start_with_capacity(
+            true,
+            Duration::from_secs(3600),
+            crate::store::db::connect(&path).expect("reader"),
+            crate::store::db::connect(&path).expect("writer"),
+            4,
+        )
+        .expect("log");
+
+        // Another connection holds the write lock, so the writer stalls.
+        let blocker = Connection::open(&path).expect("blocker");
+        blocker.execute_batch("BEGIN IMMEDIATE").expect("lock");
+
+        let tasks = tokio::runtime::Handle::current()
+            .metrics()
+            .num_alive_tasks();
+        const SENT: u64 = 2000;
+        for i in 0..SENT {
+            log.try_submit(rec(&format!("r{i}"), i as i64, Outcome::Forwarded));
+        }
+        // Nothing was spawned and nothing waited: the bound is the queue.
+        assert_eq!(
+            tokio::runtime::Handle::current()
+                .metrics()
+                .num_alive_tasks(),
+            tasks
+        );
+        let dropped = log.stats().dropped;
+        // The queue holds 4 and the writer may have taken one batch.
+        assert!(dropped >= SENT - 4 - BATCH as u64 - 1, "dropped {dropped}");
+
+        // Unstalled, whatever was accepted is committed.
+        blocker.execute_batch("COMMIT").expect("unlock");
+        log.flush().await;
+        assert_eq!(log.stats().rows + log.stats().dropped, SENT);
+        assert_eq!(raw_count(&dir) as u64, log.stats().rows);
     }
 }

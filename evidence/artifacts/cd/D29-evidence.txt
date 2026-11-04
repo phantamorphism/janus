@@ -1,0 +1,54 @@
+{
+  "rB": 200,
+  "rA": 200,
+  "lB": {
+    "binding": "hmac",
+    "caller_identity": "idB",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "acct-b",
+    "duration_ms": 1,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:35.542775Z",
+    "request_id": "01a1a612-3cf6-711b-bc6f-28a7f6c101df",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "usage": {
+        "input_tokens": 11,
+        "output_tokens": 7
+      }
+    }
+  },
+  "lA": {
+    "binding": "hmac",
+    "caller_identity": "idA",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "acct-a",
+    "duration_ms": 0,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:35.544120Z",
+    "request_id": "01a1a612-3cf8-7483-94c4-13321f300a88",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "usage": {
+        "input_tokens": 11,
+        "output_tokens": 7
+      }
+    }
+  },
+  "upstreamSawKeys": [
+    "sk-ant-BBB",
+    "sk-ant-AAA"
+  ]
+}

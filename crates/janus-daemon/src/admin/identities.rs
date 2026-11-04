@@ -100,24 +100,30 @@ pub(crate) struct IdentityList {
 pub(crate) async fn list(
     State(state): State<AdminState>,
     Query(params): Query<ListParams>,
-) -> Json<IdentityList> {
+) -> Result<Json<IdentityList>, ApiError> {
     let filter = IdentityFilter {
         identity: params.identity,
         include_revoked: params.include_revoked,
         include_expired: params.include_expired,
     };
-    Json(IdentityList {
-        identities: state.deps.registry.list(&filter, Utc::now()),
-    })
+    let registry = state.deps.registry.clone();
+    let identities =
+        blocking(move || Ok::<_, ApiError>(registry.list(&filter, Utc::now()))).await?;
+    Ok(Json(IdentityList { identities }))
 }
 
 pub(crate) async fn show(
     State(state): State<AdminState>,
     PathParam(id): PathParam,
 ) -> Result<Json<IdentityRecord>, ApiError> {
-    state.deps.registry.get(&id).map(Json).ok_or_else(|| {
-        ApiError::not_found("identity_not_found", format!("no identity with id {id:?}"))
-    })
+    let registry = state.deps.registry.clone();
+    let key = id.clone();
+    blocking(move || Ok::<_, ApiError>(registry.get(&key)))
+        .await?
+        .map(Json)
+        .ok_or_else(|| {
+            ApiError::not_found("identity_not_found", format!("no identity with id {id:?}"))
+        })
 }
 
 /// Immediate and idempotent: the next lookup of the token is rejected.

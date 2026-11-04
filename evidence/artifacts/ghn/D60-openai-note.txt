@@ -1,0 +1,1 @@
+request status 502: OAuth (Codex) credentials are sent to the vendor Codex host, not the mock base_url, so under the deny-external-network sandbox the forward itself cannot succeed; the pre-use refresh is what is asserted

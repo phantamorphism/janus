@@ -144,7 +144,7 @@ export interface RequestQuery extends RequestFilter {
 }
 
 export interface RequestPage {
-  records: RequestRecord[]
+  requests: RequestRecord[]
   /** Cursor for the next (older) page; null on the last one. */
   next: string | null
   /** `request_log.enabled = false`: empty by configuration. */
@@ -176,6 +176,8 @@ export interface PluginStatus {
   last_ok_at: Timestamp | null
   client_cert_expires_at?: Timestamp | null
   server_cert_expires_at?: Timestamp | null
+  /** `Notify` events dropped since start (queue full); the operator's only sign of lost settlement. */
+  dropped_events: number
 }
 
 export type CheckStepKind =
@@ -209,37 +211,62 @@ export interface ChannelCheck {
 
 // ---- status ----------------------------------------------------------------
 
-/**
- * `GET /v1/status` as the UI uses it, after `normalizeStatus`. The docs name
- * the fields (version, build, started_at, listeners, upstreams with their
- * binding method, request log size and retention, plugin) but not the
- * nesting of listeners/upstreams/request_log, so those are read tolerantly.
- */
+/** `GET /v1/status` (daemon `admin/status.rs`), exactly as served. */
 export interface DaemonStatus {
   version: string
   build: string
-  started_at: Timestamp | null
-  listeners: ListenerInfo[]
-  upstreams: UpstreamInfo[]
-  request_log: RequestLogInfo | null
+  started_at: Timestamp
+  listeners: Listeners
+  upstreams: UpstreamSummary[]
+  data_plane: DataPlaneSummary
+  request_log: RequestLogSummary
+  credentials: PoolSummary
   plugin: PluginStatus
 }
 
-export interface ListenerInfo {
-  name: string
+export interface Listeners {
+  admin_socket: string
+  admin_tcp: TcpListenerInfo | null
+  ui: TcpListenerInfo | null
+  data_plane: string
+}
+
+export interface TcpListenerInfo {
   address: string
-  tls: boolean | null
+  tls: boolean
+  url: string
 }
 
-export interface UpstreamInfo {
-  name: string
-  path_prefix: string | null
+export interface RouteSummary {
+  path: string
+  binding: string
+}
+
+export interface UpstreamSummary {
+  name: UpstreamKind
+  path_prefix: string
+  base_url: string
+  /** The upstream-wide binding method; null when none resolves. */
   binding: string | null
+  routes: RouteSummary[]
 }
 
-export interface RequestLogInfo {
+export interface DataPlaneSummary {
+  /** Connections closed unanswered since start for being over `data_plane.max_connections`. */
+  refused_connections: number
+}
+
+export interface RequestLogSummary {
   enabled: boolean
-  /** As sent: a humantime string ("30d") or a number of seconds. */
-  retain: string | null
-  rows: number | null
+  /** Human-readable, e.g. `30days`. */
+  retain: string
+  retain_seconds: number
+  rows: number
+  /** Records dropped since start because the writer's queue was full. */
+  dropped_records: number
+}
+
+export interface PoolSummary {
+  total: number
+  by_status: Record<CredentialStatus, number>
 }

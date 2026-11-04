@@ -1,0 +1,8 @@
+{
+  "stat": "drwxr-xr-x@ 8 michaelhancock  wheel  256 Nov  4 12:19 /tmp/qa-ijk/run/adm/data\nsrw-------@ 1 michaelhancock  wheel    0 Nov  4 12:19 /tmp/qa-ijk/run/adm/data/admin.sock\n",
+  "curl": "200",
+  "other_user_probe": {
+    "status": 1,
+    "stderr": "sudo: a password is required\n"
+  }
+}

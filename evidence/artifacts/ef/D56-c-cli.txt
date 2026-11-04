@@ -1,0 +1,8 @@
+plugin tls https://localhost:23161/: FAILED
+  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's
+  ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)
+  FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certificate without requiring one
+
+janus: the plugin channel check did not pass
+
+rc=1

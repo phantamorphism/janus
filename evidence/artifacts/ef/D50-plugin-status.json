@@ -1,0 +1,49 @@
+{
+  "before": {
+    "mode": "unix",
+    "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock",
+    "health": "unknown",
+    "last_error": null,
+    "last_ok_at": null,
+    "dropped_events": 0
+  },
+  "after": {
+    "mode": "unix",
+    "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock",
+    "health": "unreachable",
+    "last_error": "cannot connect to plugin socket /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock: No such file or directory (os error 2)",
+    "last_ok_at": null,
+    "dropped_events": 0
+  },
+  "ok": {
+    "mode": "unix",
+    "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock",
+    "health": "ok",
+    "last_error": "cannot connect to plugin socket /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock: No such file or directory (os error 2)",
+    "last_ok_at": "2026-11-04T10:19:35.457936Z",
+    "dropped_events": 0
+  },
+  "firstResponse": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"plugin_unreachable\",\"message\":\"the policy plugin could not be consulted (plugin_unreachable)\",\"type\":\"janus_error\"},\"type\":\"error\"}"
+  },
+  "firstLog": {
+    "binding": "hmac",
+    "caller_identity": "agent-50",
+    "claimed_identity": null,
+    "class": "plugin_unreachable",
+    "correlation_id": null,
+    "credential_ref": null,
+    "duration_ms": 0,
+    "error": "plugin_unreachable: cannot connect to plugin socket /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock: No such file or directory (os error 2)",
+    "method": "POST",
+    "outcome": "plugin_failed",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:35.447711Z",
+    "request_id": "01a1a612-3c97-74cf-a22e-d2b3f7828739",
+    "route": null,
+    "status": null,
+    "upstream": "anthropic",
+    "usage": null
+  }
+}

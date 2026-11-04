@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useApi } from '@/api/context'
-import { CREDENTIAL_STATUSES, MAX_LIMIT, OUTCOMES, type CredentialMetadata } from '@/api/types'
+import { CREDENTIAL_STATUSES, MAX_LIMIT, OUTCOMES, type CredentialMetadata, type DaemonStatus, type PoolSummary } from '@/api/types'
 import { Badge } from '@/components/Badge'
 import { PageHeader, Section } from '@/components/PageHeader'
 import { PluginFacts } from '@/components/PluginFacts'
 import { ErrorNotice, Loading } from '@/components/States'
 import { Time } from '@/components/Time'
-import { formatCount, formatRetain, words } from '@/lib/format'
+import { formatCount, words } from '@/lib/format'
 import { loadTraffic, MAX_PAGES, type Traffic } from '@/lib/traffic'
 import { credentialTone, outcomeTone } from '@/lib/tone'
 import { useResource } from '@/lib/useResource'
@@ -23,8 +23,42 @@ function perMinute(n: number, minutes: number): string {
   return rate >= 10 ? rate.toFixed(0) : rate >= 1 ? rate.toFixed(1) : rate.toFixed(2)
 }
 
-function CredentialHealth({ creds }: { creds: CredentialMetadata[] }) {
-  const counts = CREDENTIAL_STATUSES.map((s) => ({ s, n: creds.filter((c) => c.status === s).length }))
+interface ListenerRow {
+  name: string
+  address: string
+  tls: boolean | null
+}
+
+/** The data plane, the admin socket, and the TCP listeners that are bound. */
+function listenerRows(l: DaemonStatus['listeners']): ListenerRow[] {
+  const rows: ListenerRow[] = [
+    { name: 'data_plane', address: l.data_plane, tls: null },
+    { name: 'admin_socket', address: l.admin_socket, tls: null },
+  ]
+  if (l.admin_tcp) rows.push({ name: 'admin_tcp', address: l.admin_tcp.url, tls: l.admin_tcp.tls })
+  if (l.ui) rows.push({ name: 'ui', address: l.ui.url, tls: l.ui.tls })
+  return rows
+}
+
+function Counter({ label, value, hint }: { label: string; value: number; hint: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className={`tabular-nums ${value > 0 ? 'text-bad' : ''}`} aria-label={label}>
+        {formatCount(value)}
+        {value > 0 && <span className="ml-2 text-muted">since start: {hint}</span>}
+      </dd>
+    </div>
+  )
+}
+
+function CredentialHealth({ creds, pool }: { creds: CredentialMetadata[]; pool: PoolSummary | undefined }) {
+  // Counts come from `/v1/status` (`credentials.by_status`); the list only
+  // names the ones needing attention.
+  const counts = CREDENTIAL_STATUSES.map((s) => ({
+    s,
+    n: pool ? pool.by_status[s] : creds.filter((c) => c.status === s).length,
+  }))
   const attention = creds.filter((c) => c.status !== 'active')
   return (
     <>
@@ -187,28 +221,24 @@ export function Overview() {
 
           <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
             <Section title="Listeners">
-              {s.listeners.length === 0 ? (
-                <p className="text-sm text-muted">The status document lists no listeners.</p>
-              ) : (
-                <table className="data-table" aria-label="Listeners">
-                  <thead>
-                    <tr>
-                      <th scope="col">Listener</th>
-                      <th scope="col">Address</th>
-                      <th scope="col">TLS</th>
+              <table className="data-table" aria-label="Listeners">
+                <thead>
+                  <tr>
+                    <th scope="col">Listener</th>
+                    <th scope="col">Address</th>
+                    <th scope="col">TLS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listenerRows(s.listeners).map((l) => (
+                    <tr key={l.name}>
+                      <td>{words(l.name)}</td>
+                      <td className="mono break-all">{l.address}</td>
+                      <td>{l.tls === null ? <span className="text-muted">—</span> : l.tls ? 'yes' : 'no'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {s.listeners.map((l) => (
-                      <tr key={`${l.name}:${l.address}`}>
-                        <td>{words(l.name)}</td>
-                        <td className="mono break-all">{l.address}</td>
-                        <td>{l.tls === null ? <span className="text-muted">—</span> : l.tls ? 'yes' : 'no'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </Section>
             <Section title="Upstreams">
               {s.upstreams.length === 0 ? (
@@ -219,15 +249,31 @@ export function Overview() {
                     <tr>
                       <th scope="col">Upstream</th>
                       <th scope="col">Path prefix</th>
+                      <th scope="col">Base URL</th>
                       <th scope="col">Identity binding</th>
+                      <th scope="col">Routes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {s.upstreams.map((u) => (
                       <tr key={u.name}>
                         <td>{u.name}</td>
-                        <td className="mono">{u.path_prefix ?? <span className="text-muted">—</span>}</td>
-                        <td className="mono">{u.binding ?? <span className="text-muted">—</span>}</td>
+                        <td className="mono">{u.path_prefix}</td>
+                        <td className="mono break-all">{u.base_url}</td>
+                        <td className="mono">{u.binding ?? <span className="text-muted">none</span>}</td>
+                        <td className="mono">
+                          {u.routes.length === 0 ? (
+                            <span className="text-muted">—</span>
+                          ) : (
+                            <ul>
+                              {u.routes.map((r) => (
+                                <li key={r.path}>
+                                  {r.path} <span className="text-muted">→</span> {r.binding}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -244,7 +290,7 @@ export function Overview() {
 
       <Section title="Credential health">
         {creds.error !== undefined && <ErrorNotice error={creds.error} what="credentials" onRetry={creds.reload} />}
-        {creds.data === undefined ? creds.loading && <Loading what="credentials" /> : <CredentialHealth creds={creds.data} />}
+        {creds.data === undefined ? creds.loading && <Loading what="credentials" /> : <CredentialHealth creds={creds.data} pool={s?.credentials} />}
       </Section>
 
       <Section
@@ -266,12 +312,17 @@ export function Overview() {
           <ErrorNotice error={traffic.error} what="request counts" onRetry={traffic.reload} />
         )}
         {traffic.data === undefined ? traffic.loading && <Loading what="request counts" /> : <TrafficPanel t={traffic.data} />}
-        {s?.request_log && (
+        {s && (
           <p className="mt-4 text-xs text-muted">
-            Request log {s.request_log.enabled ? 'on' : 'off'}
-            {s.request_log.rows !== null && `, ${formatCount(s.request_log.rows)} records stored`}
-            {s.request_log.retain && `, kept for ${formatRetain(s.request_log.retain)}`}.
+            Request log {s.request_log.enabled ? 'on' : 'off'}, {formatCount(s.request_log.rows)} records stored,
+            kept for {s.request_log.retain}.
           </p>
+        )}
+        {s && (
+          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+            <Counter label="Dropped log records" value={s.request_log.dropped_records} hint="the writer's queue was full; those requests are missing from the log" />
+            <Counter label="Refused connections" value={s.data_plane.refused_connections} hint="closed unanswered for being over data_plane.max_connections" />
+          </dl>
         )}
       </Section>
     </>

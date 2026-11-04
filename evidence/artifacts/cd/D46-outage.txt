@@ -1,0 +1,32 @@
+{
+  "status": 503,
+  "body": "{\"error\":{\"code\":\"plugin_unreachable\",\"message\":\"the policy plugin could not be consulted (plugin_unreachable)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u46out",
+    "claimed_identity": null,
+    "class": "plugin_unreachable",
+    "correlation_id": null,
+    "credential_ref": null,
+    "duration_ms": 0,
+    "error": "plugin_unreachable: cannot connect to plugin socket /Users/michaelhancock/hancock_industries/apps/janus/evidence/.run-cd/a.sock: No such file or directory (os error 2)",
+    "method": "POST",
+    "outcome": "plugin_failed",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:45.386771Z",
+    "request_id": "01a1a612-636a-7774-bd01-9c7250f441be",
+    "route": null,
+    "status": null,
+    "upstream": "anthropic",
+    "usage": null
+  },
+  "pluginStatus": {
+    "dropped_events": 0,
+    "endpoint": "unix:///Users/michaelhancock/hancock_industries/apps/janus/evidence/.run-cd/a.sock",
+    "health": "unreachable",
+    "last_error": "cannot connect to plugin socket /Users/michaelhancock/hancock_industries/apps/janus/evidence/.run-cd/a.sock: No such file or directory (os error 2)",
+    "last_ok_at": "2026-11-04T10:19:44.577186Z",
+    "mode": "unix"
+  },
+  "forwarded": 0
+}

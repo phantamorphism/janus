@@ -1,0 +1,32 @@
+[
+  {
+    "name": "call crossing the limit completes (200)",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "next call denied",
+    "ok": true,
+    "detail": "403"
+  },
+  {
+    "name": "log records denial as outcome=denied",
+    "ok": true,
+    "detail": "denied,denied,denied,forwarded"
+  },
+  {
+    "name": "no metering endpoint exists (all 404-class)",
+    "ok": true,
+    "detail": "{\"/v1/meters\":404,\"/v1/metering\":404,\"/v1/usage\":404,\"/v1/quotas\":404,\"/v1/counters\":404,\"/v1/budgets\":404,\"/v1/limits\":404}"
+  },
+  {
+    "name": "status has no metering fields",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no-plugin daemon never denies on its own (60/60 forwarded)",
+    "ok": true,
+    "detail": "200"
+  }
+]

@@ -1,0 +1,2 @@
+status=401 fwd=false
+{"binding":"opaque","caller_identity":"","claimed_identity":null,"correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"identity material invalid: unknown opaque token","kind":"invalid","method":"POST","outcome":"rejected_identity","path":"/openai/v1/models","received_at":"2026-11-04T10:19:41.254056Z","request_id":"01a1a612-5346-7744-9f5d-69079d854724","route":"/v1/models","status":null,"upstream":"openai","usage":null}

@@ -1,0 +1,9 @@
+{
+  "sessionStorage_keys": [
+    "janus.admin-token"
+  ],
+  "sessionStorage_has_token": true,
+  "localStorage_entries": 0,
+  "cookie": "",
+  "url": "http://127.0.0.1:26004/"
+}

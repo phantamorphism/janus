@@ -2,13 +2,13 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { eventStream, json, mockApi, type Call } from '@/test/http'
-import { record } from '@/test/fixtures'
+import { record, requestPage } from '@/test/fixtures'
 import { renderWithApi, TOKEN } from '@/test/render'
 import type { RequestRecord } from '@/api/types'
 import { Requests } from './Requests'
 
 function sse(r: RequestRecord) {
-  return `event: request\nid: ${r.request_id}\ndata: ${JSON.stringify(r)}\n\n`
+  return `event: request\ndata: ${JSON.stringify(r)}\n\n`
 }
 
 function rows() {
@@ -20,18 +20,21 @@ function rows() {
 }
 
 /** A daemon with a log and a live tail the test drives. */
-function daemon(initial: RequestRecord[] = [record()]) {
-  const streams: { call: Call; send: (t: string) => void }[] = []
+function daemon(initial: RequestRecord[] = [record()], gap: RequestRecord[] = []) {
+  const streams: { call: Call; send: (t: string) => void; close: () => void }[] = []
   const http = mockApi({
+    // A query with `since` is a gap query (the page load sends none).
     'GET /v1/requests': (c: Call) =>
-      json({
-        records: initial.filter((r) => !c.query.get('credential') || r.credential_ref === c.query.get('credential')),
-        next: null,
-        disabled: false,
-      }),
+      json(
+        requestPage(
+          (c.query.get('since') ? gap : initial).filter(
+            (r) => !c.query.get('credential') || r.credential_ref === c.query.get('credential'),
+          ),
+        ),
+      ),
     'GET /v1/requests/stream': (call: Call) => {
       const s = eventStream(call.signal)
-      streams.push({ call, send: s.send })
+      streams.push({ call, send: s.send, close: s.close })
       return s.response
     },
     'GET /v1/requests/req-1': json(record({ usage: { input_tokens: 99 } })),
@@ -44,8 +47,8 @@ describe('Requests view', () => {
     const http = mockApi({
       'GET /v1/requests': (c: Call) =>
         c.query.get('outcome') === 'denied'
-          ? json({ records: [record({ request_id: 'd1', outcome: 'denied', reason: 'over budget' })], next: null, disabled: false })
-          : json({ records: [record(), record({ request_id: 'req-2', caller_identity: '', claimed_identity: 'sb-9', outcome: 'rejected_identity', kind: 'revoked', status: null })], next: null, disabled: false }),
+          ? json({ requests: [record({ request_id: 'd1', outcome: 'denied', reason: 'over budget' })], next: null, disabled: false })
+          : json({ requests: [record(), record({ request_id: 'req-2', caller_identity: '', claimed_identity: 'sb-9', outcome: 'rejected_identity', kind: 'revoked', status: null })], next: null, disabled: false }),
     })
     renderWithApi(<Requests />)
     await screen.findByRole('table', { name: 'Request log' })
@@ -77,8 +80,8 @@ describe('Requests view', () => {
     const http = mockApi({
       'GET /v1/requests': (c: Call) =>
         c.query.get('before') === 'cur-1'
-          ? json({ records: [record({ request_id: 'old-1' })], next: null, disabled: false })
-          : json({ records: [record({ request_id: 'new-1' })], next: 'cur-1', disabled: false }),
+          ? json({ requests: [record({ request_id: 'old-1' })], next: null, disabled: false })
+          : json({ requests: [record({ request_id: 'new-1' })], next: 'cur-1', disabled: false }),
     })
     renderWithApi(<Requests />)
     await userEvent.click(await screen.findByRole('button', { name: 'Load older requests' }))
@@ -171,8 +174,78 @@ describe('Requests view', () => {
     expect(rows()).toEqual(['held-2', 'held-1', 'req-1'])
   })
 
+  it('closes the gap with GET /v1/requests?since= after a lagged event, without duplicating rows', async () => {
+    const gapRec = record({ request_id: 'gap-1', received_at: '2026-11-03T10:30:00Z' })
+    const { http, streams } = daemon([record()], [gapRec, record({ request_id: 'live-1' })])
+    renderWithApi(<Requests />)
+    await screen.findByRole('table', { name: 'Request log' })
+    await userEvent.selectOptions(screen.getByLabelText('Upstream'), 'openai')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply filters' }))
+    await userEvent.click(screen.getByRole('button', { name: /Live tail/ }))
+    await waitFor(() => expect(streams).toHaveLength(1))
+    act(() => {
+      streams[0].send('event: ping\ndata: {"at":"2026-11-03T10:00:00Z"}\n\n')
+      streams[0].send(sse(record({ request_id: 'live-1' })))
+    })
+    await waitFor(() => expect(rows()).toContain('live-1'))
+    expect(http.calls.filter((c) => c.path === '/v1/requests' && c.query.get('since'))).toHaveLength(0)
+
+    act(() => {
+      streams[0].send('event: lagged\ndata: {"missed":7}\n\n')
+    })
+    await waitFor(() => expect(rows()).toContain('gap-1'))
+    expect(rows().filter((id) => id === 'live-1')).toHaveLength(1)
+    const [gapQuery] = http.calls.filter((c) => c.path === '/v1/requests' && c.query.get('since'))
+    expect(gapQuery.query.get('upstream')).toBe('openai')
+    expect(gapQuery.query.get('limit')).toBe('1000')
+    expect(Date.now() - new Date(gapQuery.query.get('since')!).getTime()).toBeLessThan(10_000)
+  })
+
+  it('backfills after a reconnect, once the new stream has pinged', async () => {
+    const { http, streams } = daemon([record()], [record({ request_id: 'missed-1' })])
+    renderWithApi(<Requests />)
+    await screen.findByRole('table', { name: 'Request log' })
+    await userEvent.click(screen.getByRole('button', { name: /Live tail/ }))
+    await waitFor(() => expect(streams).toHaveLength(1))
+    act(() => streams[0].send('event: ping\ndata: {}\n\n'))
+    act(() => streams[0].close())
+    expect(await screen.findByText(/Connection lost/)).toBeInTheDocument()
+    await waitFor(() => expect(streams).toHaveLength(2), { timeout: 5000 })
+    const gapQueries = () => http.calls.filter((c) => c.path === '/v1/requests' && c.query.get('since'))
+    expect(gapQueries()).toHaveLength(0)
+    act(() => streams[1].send('event: ping\ndata: {}\n\n'))
+    await waitFor(() => expect(rows()).toContain('missed-1'))
+    expect(gapQueries()).toHaveLength(1)
+    // A later ping with nothing missing does not query again.
+    act(() => streams[1].send('event: ping\ndata: {}\n\n'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(gapQueries()).toHaveLength(1)
+  })
+
+  it('stops the tail and explains it on a disabled event, without reconnecting', async () => {
+    const { streams } = daemon()
+    renderWithApi(<Requests />)
+    await screen.findByRole('table', { name: 'Request log' })
+    await userEvent.click(screen.getByRole('button', { name: /Live tail/ }))
+    await waitFor(() => expect(streams).toHaveLength(1))
+    act(() => {
+      streams[0].send('event: disabled\ndata: {"disabled":true}\n\n')
+      streams[0].close()
+    })
+    expect(await screen.findByText('The request log is off')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Live tail/ })).toBeDisabled()
+    await new Promise((r) => setTimeout(r, 100))
+    expect(streams).toHaveLength(1)
+  })
+
+  it('shows an error instead of an empty list when the page has the wrong shape', async () => {
+    mockApi({ 'GET /v1/requests': json({ records: [], next: null, disabled: false }) })
+    renderWithApi(<Requests />)
+    expect(await screen.findByText(/unexpected response shape/)).toBeInTheDocument()
+  })
+
   it('explains a disabled request log and offers no live tail', async () => {
-    mockApi({ 'GET /v1/requests': { records: [], next: null, disabled: true } })
+    mockApi({ 'GET /v1/requests': requestPage([], null, true) })
     renderWithApi(<Requests />)
     expect(await screen.findByText('The request log is off')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Live tail/ })).toBeDisabled()

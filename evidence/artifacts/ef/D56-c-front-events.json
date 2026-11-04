@@ -1,0 +1,57 @@
+[
+  {
+    "event": "listening",
+    "t": 1793787589.480339
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.668619
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.6727328
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": null,
+    "t": 1793787589.6741881
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.6820962
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.6838322
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": null,
+    "t": 1793787589.684937
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
+    "t": 1793787589.687551
+  },
+  {
+    "event": "handshake_rejected",
+    "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
+    "t": 1793787589.689041
+  },
+  {
+    "event": "handshake_ok",
+    "version": "TLSv1.3",
+    "client_cert_sha256": null,
+    "t": 1793787589.690151
+  }
+]

@@ -1,0 +1,2 @@
+exit=1
+custom-build: config: plugin: this build links a plugin but config has no [plugin] block with linked = true

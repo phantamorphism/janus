@@ -1,0 +1,12 @@
+$ exit=2
+--- stdout
+
+--- stderr
+error: unexpected argument '--token' found
+
+  tip: a similar argument exists: '--token-file'
+
+Usage: janus status --token-file <PATH>
+
+For more information, try '--help'.
+

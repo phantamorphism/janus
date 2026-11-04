@@ -1,0 +1,85 @@
+{
+ "resolve": 19,
+ "events": [
+  {
+   "t": "call_completed",
+   "id": "01a1a612-3823-740b-8e95-d7f834586655"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-3829-71e6-ab4a-d889a16ccef2"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-382b-76f7-acc5-17abe918c2f9"
+  },
+  {
+   "t": "credential_invalid",
+   "id": "01a1a612-382c-748c-b33b-ffe04d89b521"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-382c-748c-b33b-ffe04d89b521"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-382d-70d8-a03e-f4a416eb84f6"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-3a55-73f4-80c2-588b5cc19ce8"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-3cbf-734e-8936-ce1e9f5d34ed"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-3f1d-7335-a5d4-d6f4a1ecb4f2"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-4178-72d9-9f9a-eca0ab447f31"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-43d6-761a-bdbd-7b0c628e5a93"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-bc23-7359-ad96-0e9b887113e0"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-be50-7455-a945-a75b1196af52"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-c059-7179-90a0-8dba8050b855"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a612-c05d-7002-90ff-6117955e6b23"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a612-c05f-7427-b799-e8214bcccd8f"
+  },
+  {
+   "t": "call_completed",
+   "id": "01a1a613-5a1d-7744-b1a2-a34bfe6e40f0"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a613-5bb0-75d6-9c59-94819235a3e3"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a613-5d43-7339-93de-becccfd9aa92"
+  },
+  {
+   "t": "call_abandoned",
+   "id": "01a1a613-5ed7-747d-984d-71d5482619ab"
+  }
+ ]
+}

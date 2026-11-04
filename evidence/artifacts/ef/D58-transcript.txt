@@ -1,0 +1,8 @@
+OK   (a) stock binary with linked=true exits non-zero (exit=1)
+OK   (a) refused for the linkage disagreement, not for a bind failure (so before binding the data plane): janus-daemon: config: plugin.linked: config selects a linked plugin but this build links none; refusing to start as an open pass-through proxy
+OK   (a) no admin socket created / no open pass-through
+OK   (b) custom build with a linked plugin and endpoint config exits non-zero (exit=1)
+OK   (b) refused before binding the data plane: custom-build: config: plugin.endpoint: config names a plugin endpoint and this build also links a plugin; ambiguous
+OK   (b) no admin socket created / no open pass-through
+OK   (extra) custom build with a linked plugin but no [plugin] block also refuses (exit=1): custom-build: config: plugin: this build links a plugin but config has no [plugin] block with linked = true
+stock --version: janus-daemon 0.1.0

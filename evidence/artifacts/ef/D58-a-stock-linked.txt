@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin.linked: config selects a linked plugin but this build links none; refusing to start as an open pass-through proxy

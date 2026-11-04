@@ -1,0 +1,14 @@
+[
+  {
+    "status": 200,
+    "body": "{\"ok\":true,\"path\":\"/v1/messages\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7},\"id\":\"msg_mock\"}"
+  },
+  {
+    "status": 200,
+    "body": "{\"ok\":true,\"path\":\"/v1/messages\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7},\"id\":\"msg_mock\"}"
+  },
+  {
+    "status": 200,
+    "body": "{\"ok\":true,\"path\":\"/v1/messages\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7},\"id\":\"msg_mock\"}"
+  }
+]

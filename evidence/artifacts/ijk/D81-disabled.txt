@@ -1,0 +1,11 @@
+{
+  "list": "{\"requests\":[],\"next\":null,\"disabled\":true}",
+  "status": {
+    "dropped_records": 0,
+    "enabled": false,
+    "retain": "30days",
+    "retain_seconds": 2592000,
+    "rows": 0
+  },
+  "cli": ""
+}

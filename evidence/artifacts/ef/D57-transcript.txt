@@ -1,0 +1,7 @@
+OK   identity x is denied (HTTP 403) body={"error":{"code":"denied","message":"x is not allowed","type":"janus_error"},"type":"error"}
+OK   request log outcome for x = denied
+OK   identity y forwarded via default chain (HTTP 200, outcome=forwarded, credential_ref=k1)
+OK   exactly one request (y) reached the upstream (1)
+OK   /v1/status plugin.mode = linked
+OK   settlement event call_completed for y reached the linked notify (call_abandoned,call_completed)
+OK   no call_completed for the denied request x

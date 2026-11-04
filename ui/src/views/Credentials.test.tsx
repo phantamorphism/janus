@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { apiError, json, mockApi } from '@/test/http'
-import { credential } from '@/test/fixtures'
+import { credential, credentialList } from '@/test/fixtures'
 import { renderWithApi } from '@/test/render'
 import type { CredentialMetadata } from '@/api/types'
 import { Credentials } from './Credentials'
@@ -17,7 +17,7 @@ function pool(initial: CredentialMetadata[]) {
   const routes: Record<string, unknown> = {
     'GET /v1/credentials': (c: { query: URLSearchParams }) => {
       const u = c.query.get('upstream')
-      return json(u ? creds.filter((x) => x.upstream === u) : creds)
+      return json(credentialList(u ? creds.filter((x) => x.upstream === u) : creds))
     },
   }
   for (const c of initial) {
@@ -69,7 +69,7 @@ describe('Credentials view', () => {
 
   it('refreshes a credential and shows the daemon’s error when a refresh fails', async () => {
     const http = mockApi({
-      'GET /v1/credentials': [credential()],
+      'GET /v1/credentials': credentialList([credential()]),
       'POST /v1/credentials/team-a/refresh': apiError(502, 'refresh_failed', 'token endpoint returned 400'),
     })
     renderWithApi(<Credentials />)
@@ -108,7 +108,7 @@ describe('Credentials view', () => {
   it('shows a load failure with a retry', async () => {
     let fail = true
     mockApi({
-      'GET /v1/credentials': () => (fail ? apiError(500, 'internal', 'pool directory unreadable') : json([credential()])),
+      'GET /v1/credentials': () => (fail ? apiError(500, 'internal', 'pool directory unreadable') : json(credentialList([credential()]))),
     })
     renderWithApi(<Credentials />)
     expect(await screen.findByText(/pool directory unreadable/)).toBeInTheDocument()

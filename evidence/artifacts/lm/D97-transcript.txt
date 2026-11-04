@@ -1,0 +1,265 @@
+### no flags, JANUS_DATA_DIR
+$ janus status  env=JANUS_DATA_DIR
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### no flags, $HOME/.janus default
+$ janus status  env=HOME
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### --config data_dir
+$ janus status --config /tmp/qa-lm/run/config.toml  env=HOME
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### JANUS_ADMIN=unix://
+$ janus status  env=HOME,JANUS_ADMIN
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### TCP + --token-file
+$ janus status --admin http://127.0.0.1:26002 --token-file /tmp/qa-lm/run/data/admin-token  env=HOME
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### TCP + JANUS_ADMIN_TOKEN
+$ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_ADMIN_TOKEN
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### TCP + <data_dir>/admin-token (JANUS_DATA_DIR)
+$ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_DATA_DIR
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### TCP via JANUS_ADMIN env
+$ janus status  env=HOME,JANUS_ADMIN,JANUS_DATA_DIR
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+
+
+### TCP + wrong token
+$ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_ADMIN_TOKEN
+$ exit=1
+--- stdout
+
+--- stderr
+janus: the admin token is not valid; this listener requires the admin token: pass --token-file <path> (or set JANUS_TOKEN_FILE or JANUS_ADMIN_TOKEN), or run on the daemon's host where <data_dir>/admin-token is read (unauthorized, HTTP 401)
+
+
+### TCP + no token source at all
+$ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_DATA_DIR
+$ exit=1
+--- stdout
+
+--- stderr
+janus: this listener requires the admin token as `Authorization: Bearer <token>`; this listener requires the admin token: pass --token-file <path> (or set JANUS_TOKEN_FILE or JANUS_ADMIN_TOKEN), or run on the daemon's host where <data_dir>/admin-token is read (unauthorized, HTTP 401)
+
+
+### unreachable unix
+exit=3
+janus: cannot reach the admin surface at unix:///tmp/qa-lm/does-not-exist.sock: No such file or directory (os error 2) (is janus-daemon running over this data directory? Point the CLI elsewhere with --admin, JANUS_ADMIN, --config or JANUS_DATA_DIR)
+
+### unreachable tcp (identity create)
+exit=3
+janus: cannot reach the admin surface at http://127.0.0.1:26999/: error sending request for url (http://127.0.0.1:26999/v1/identities): client error (Connect): tcp connect error: Connection refused (os error 61) (is the daemon's admin listener (admin.bind) up at this address?)

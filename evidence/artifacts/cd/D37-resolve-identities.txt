@@ -1,0 +1,21 @@
+[
+  "u28a",
+  "u28b",
+  "u28c",
+  "u28d",
+  "idB",
+  "idA",
+  "u30",
+  "u31",
+  "u33b",
+  "u33c",
+  "u40",
+  "u34a",
+  "u34b",
+  "u34ok",
+  "m-ok",
+  "m-deny",
+  "m-credfail",
+  "m-timeout",
+  "m-noref"
+]
