@@ -54,7 +54,30 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: test-${{ matrix.os }}
+      # Tests that bind a plugin unix socket need a temp dir whose ancestors are
+      # not group/other-writable. The default /tmp (mode 1777) is refused by the
+      # daemon's socket-path check; the runner's own temp dir is private.
       - run: cargo test --workspace --all-features
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+  # The declared rust-version floor (Cargo.toml) must keep compiling. The env
+  # var beats rust-toolchain.toml, which pins "stable".
+  msrv:
+    name: MSRV (Rust 1.89)
+    runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.89.0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - run: cargo check --workspace --locked
 
   ui:
     name: UI (lint, typecheck, test, build)
@@ -103,7 +126,7 @@ jobs:
   ci-ok:
     name: CI ok
     if: always()
-    needs: [rust-lint, rust-test, ui, repo-gates]
+    needs: [rust-lint, rust-test, msrv, ui, repo-gates]
     runs-on: ubuntu-latest
     steps:
       - name: All required jobs succeeded
