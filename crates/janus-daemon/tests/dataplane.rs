@@ -1388,14 +1388,23 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
         };
         tasks.spawn(async move {
             let exchange = async {
-                let mut response = request.send().await.ok()?;
+                let mut response = match request.send().await {
+                    Ok(r) => r,
+                    Err(e) => return format!("senderr {e:?}"),
+                };
+                let status = response.status();
                 while let Ok(Some(_)) = response.chunk().await {}
-                Some(())
+                format!("done {status}")
             };
-            let _ = tokio::time::timeout(abort_after, exchange).await;
+            let out = tokio::time::timeout(abort_after, exchange).await;
+            format!("patient={} {}", abort_after.as_secs() > 0, out.unwrap_or_else(|_| "aborted".into()))
         });
     }
-    while tasks.join_next().await.is_some() {}
+    let mut diag = std::collections::BTreeMap::<String, usize>::new();
+    while let Some(r) = tasks.join_next().await {
+        *diag.entry(r.unwrap()).or_default() += 1;
+    }
+    eprintln!("DIAG {diag:#?}");
 
     let recorder = &plugin.recorder;
     let settled = |request_id: &str| {
