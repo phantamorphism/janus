@@ -1397,14 +1397,17 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
                 format!("done {status}")
             };
             let out = tokio::time::timeout(abort_after, exchange).await;
-            format!("patient={} {}", abort_after.as_secs() > 0, out.unwrap_or_else(|_| "aborted".into()))
+            format!(
+                "patient={} {}",
+                abort_after.as_secs() > 0,
+                out.unwrap_or_else(|_| "aborted".into())
+            )
         });
     }
     let mut diag = std::collections::BTreeMap::<String, usize>::new();
     while let Some(r) = tasks.join_next().await {
         *diag.entry(r.unwrap()).or_default() += 1;
     }
-    eprintln!("DIAG {diag:#?}");
 
     let recorder = &plugin.recorder;
     let settled = |request_id: &str| {
@@ -1475,7 +1478,7 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     assert!(
         kinds.get("call_completed").is_some_and(|n| *n > 0)
             && kinds.get("call_abandoned").is_some_and(|n| *n > 0),
-        "the run exercised both endings (seed {seed}): {kinds:?}"
+        "the run exercised both endings (seed {seed}): {kinds:?} outcomes {diag:?}"
     );
     rt.stop().await;
 }
