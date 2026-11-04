@@ -1368,6 +1368,18 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     eprintln!("seed {seed}");
     let mut rng = Lcg(seed);
     let caller = token("alice");
+    // Warm the daemon's plugin connection first. A cold gRPC connect plus 200
+    // simultaneous callers can take longer than the 120 ms abort window on a
+    // loaded runner, and then no request would ever reach the plugin.
+    let warm = client()
+        .post(rt.url("/anthropic/v1/messages"))
+        .header("x-api-key", &caller)
+        .body("{}")
+        .send()
+        .await
+        .expect("warm-up request");
+    assert!(warm.status().is_success(), "warm-up: {}", warm.status());
+    let _ = warm.bytes().await;
     let mut tasks = tokio::task::JoinSet::new();
     for _ in 0..REQUESTS {
         // Abort anywhere from before the head is sent to mid-stream.
@@ -1430,7 +1442,7 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     let resolved = recorder.resolved();
     assert!(
         resolved.len() as u64 > REQUESTS / 4,
-        "enough requests reached the plugin (seed {seed}): {}",
+        "enough requests reached the plugin (seed {seed}): {} outcomes {diag:?}",
         resolved.len()
     );
     let ids: std::collections::HashSet<_> = resolved.iter().map(|r| r.request_id.clone()).collect();
