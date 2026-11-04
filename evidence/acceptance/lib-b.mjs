@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Shared harness for the group-b acceptance script (black-box: runs built binaries only).
 import { spawn, spawnSync, execSync } from 'node:child_process';
 import http from 'node:http';
@@ -6,7 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 
-export const REPO = '<repo>';
+export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const SCRATCH = '/tmp/qa-b/run';
 export const BIN = process.env.JANUS_BIN_DIR ||
   (fs.existsSync(`${REPO}/target/release/janus-daemon`) ? `${REPO}/target/release` : '/tmp/qa-target-b/release');

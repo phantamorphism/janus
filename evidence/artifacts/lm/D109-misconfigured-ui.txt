@@ -11,7 +11,7 @@ tlsgRPC over mutual TLS
 Endpoint
 https://localhost:26020/
 Last successful call
-2026-11-04 12:20:409 s ago
+2026-11-05 00:04:109 s ago
 Dropped notify events
 0
 Daemon client certificate expires

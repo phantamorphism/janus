@@ -1,3 +1,3 @@
-create(--json)={"claims":{"tenant":"acme"},"created_at":"2026-11-04T10:19:34.185745Z","expires_at":null,"id":"01a1a612-37a9-756d-8fd9-2ffa6fb282f1","identity":"agent-7","label":null,"last_seen_at":null,"revoked_at":null,"token":"36lk3x436GACMfv1fbOL8HwlmcIVtgFr4WR9gj6SK-g"}
-human create: exit=0 stdout="Q-COd_42qNdNzM1Ey1ru_tegRlmro4pU5epeZ44E_-k\n" stderr=created identity 01a1a612-37ad-724a-be0a-5cd641e2d62e for "agent-7b" (expires -); the token below is shown once and cannot be retrieved again
+create(--json)={"claims":{"tenant":"acme"},"created_at":"2026-11-04T22:03:03.065567Z","expires_at":null,"id":"01a1a896-4619-7104-9a7c-90350811b4fc","identity":"agent-7","label":null,"last_seen_at":null,"revoked_at":null,"token":"yKDjU8Ev52cF5mIrB1XS2VcGOXBLzLTzDKZ_fF9Gfys"}
+human create: exit=0 stdout="_yVmxfhFflhJzBDh7lnIVcJeQOAS1dnr2ioH5SMudXU\n" stderr=created identity 01a1a896-461e-7699-97ca-93d525f3bbb9 for "agent-7b" (expires -); the token below is shown once and cannot be retrieved again
 

@@ -7,16 +7,15 @@ tags: [janus, decisions]
 
 # Decision records
 
-The questions in this document were open in
-<ref target="docs/status">status</ref> and are now resolved. The designs that
-came out of them live in the design docs; this document records *why* — the
-decision, how it was reached, and for the contested ones, the options that were
-considered and the verdicts on them. It exists so a later reader can tell a
-settled choice from an accident.
+This document records the main design choices in Janus and *why* they were made:
+the decision, its rationale, and for the contested ones, the options that were
+considered and why each was kept or set aside. The designs themselves live in
+the design docs; it exists so a later reader can tell a settled choice from an
+accident. What is built is in <ref target="docs/status">status</ref>.
 
-## How decisions were made {#method}
+## How decisions are made {#method}
 
-Every question was judged against the same two things: the project goal in
+Every question is judged against the same two things: the project goal in
 <ref target="docs/index#goals">goals</ref>, and what the two users of Janus
 would expect — the **end user** (the operator deploying the gateway, and the
 callers whose traffic crosses it) and the **plugin author** (someone
@@ -25,13 +24,11 @@ integrate their own policy). The criterion is correctness — well fitted to the
 goal and the users — over ease of implementation, with the counterweight that
 nothing is added without a user need behind it.
 
-Where one answer was clearly right, it was taken and justified. Where credible
-alternatives existed, each was developed in isolation into a full proposal
-(mechanism, configuration, failure modes, operator and author experience, prior
-art, and its own weaknesses), the proposals were anonymized, and independent
-reviewers who saw only the goal, the users and the proposals ranked them and
-said whether a hybrid was more correct than any one. The decision was taken from
-those reviews.
+Where one answer is clearly right, it is taken and justified. Where credible
+alternatives exist, each is developed into a full proposal (mechanism,
+configuration, failure modes, operator and author experience, prior art, and its
+own weaknesses) and weighed against the goal and the users; a hybrid is taken
+when it is more correct than any one alternative.
 
 ## Plugin endpoint discovery {#plugin-discovery}
 
@@ -62,7 +59,7 @@ whose infrastructure (a service mesh) authenticates both ends.
 There is no shared-secret or bearer mode. Design:
 <ref target="docs/plugin-contract#channel-security">securing the channel</ref>.
 
-**Contested.** Three proposals were developed and reviewed blind:
+**Contested.** Three alternatives were weighed:
 
 - **Mutual TLS, transport-tiered** — the design adopted.
 - **Bearer token in gRPC metadata plus server-only TLS** — a static secret from
@@ -72,13 +69,12 @@ There is no shared-secret or bearer mode. Design:
   daemon to the plugin left to a mesh, network policy, or an optional client
   certificate, with no requirement that it happen.
 
-Both reviewers ranked the infrastructure-delegated proposal last, for the same
-reason: it leaves the plugin's `Notify` stream and `ResolveRoute` endpoint open
-to forgery unless the operator opts in, and the metering primitives in
-`janus-core` make budget enforcement depend on exactly those messages. A design
-whose safety rests on documentation rather than enforcement fails goal 2. The
-reviewers split between the other two at the top, and each proposed a hybrid.
-Their common ground decided it:
+The infrastructure-delegated alternative ranks last: it leaves the plugin's
+`Notify` stream and `ResolveRoute` endpoint open to forgery unless the operator
+opts in, and the metering primitives in `janus-core` make budget enforcement
+depend on exactly those messages. A design whose safety rests on documentation
+rather than enforcement fails goal 2. The other two are close, and each has a
+case for a hybrid. The points they share decide it:
 
 - Both directions must be authenticated, and Janus must enforce as much of it as
   it can. Mutual TLS is the one mechanism where the daemon can *detect* a plugin
@@ -96,13 +92,13 @@ Their common ground decided it:
   hands the bearer to whichever local process bound the port while the plugin
   was down. The same-host answer is the socket.
 
-The two costs the reviewers charged against mutual TLS are each answered with a
-specific piece: the PKI burden on a small operator by `janus plugin tls init`
-(following the precedent of Janus generating its own admin token — a channel
-credential, not a caller identity), and the mesh operator's double encryption by
-the explicit `allow_plaintext` opt-in, modelled on `admin.allow_non_loopback`
-and on the `trusted_header` method: correct in exactly one topology, named
-loudly in config, never reached by default.
+The two costs charged against mutual TLS are each answered with a specific
+piece: the PKI burden on a small operator by `janus plugin tls init` (following
+the precedent of Janus generating its own admin token — a channel credential,
+not a caller identity), and the mesh operator's double encryption by the
+explicit `allow_plaintext` opt-in, modelled on `admin.allow_non_loopback` and on
+the `trusted_header` method: correct in exactly one topology, named loudly in
+config, never reached by default.
 
 ## The metering store {#metering-store}
 
@@ -119,7 +115,7 @@ first plugin that needs it. Design:
 <ref target="docs/plugin-contract#metering-primitives">metering
 primitives</ref>.
 
-**Contested.** Three proposals, reviewed blind:
+**Contested.** Three alternatives were weighed:
 
 - **Memory only; the trait is the deliverable** — fix the trait, ship no second
   backend, let each author implement durability or replication over their own
@@ -129,22 +125,22 @@ primitives</ref>.
 - **Memory plus a Redis store** — one shared backend covering both restart
   durability and replicas.
 
-Both reviewers ranked SQLite first and Redis last. The deciding argument was
-that the settled design already contains a durability requirement: `Total` is
-specified as *never resets*, and goal 2 names credit checks. A library whose
-only shipped store resets every `Total` budget on deploy ships a type that is
-untrue, so "nothing currently needs it" was wrong for single-process durability
-— the design's own semantics need it. Redis answers that need only by asking a
-single-host operator to run and correctly configure a stateful service, against
-the standalone-by-default goal; memory-only answers it by handing every author
-the hardest part (atomicity) that the primitives exist to remove. Both reviewers
-also found the same two defects in the documented two-phase design — a phase-2
-cost sent through `charge` is dropped when it crosses the limit, and a refund
-computed from the current time lands in the wrong window after a period boundary
-— which the redesigned trait fixes with an unconditional `record` and a
-store-held ledger keyed by `request_id`.
+SQLite ranks first and Redis last. The deciding argument is that the settled
+design already contains a durability requirement: `Total` is specified as *never
+resets*, and goal 2 names credit checks. A library whose only shipped store
+resets every `Total` budget on deploy ships a type that is untrue, so "nothing
+currently needs it" was wrong for single-process durability — the design's own
+semantics need it. Redis answers that need only by asking a single-host operator
+to run and correctly configure a stateful service, against the
+standalone-by-default goal; memory-only answers it by handing every author the
+hardest part (atomicity) that the primitives exist to remove. The original
+two-phase design also had two defects — a phase-2 cost sent through `charge` is
+dropped when it crosses the limit, and a refund computed from the current time
+lands in the wrong window after a period boundary — which the redesigned trait
+fixes with an unconditional `record` and a store-held ledger keyed by
+`request_id`.
 
-The adopted design is the SQLite proposal's trait and store with three things
+The adopted design is the SQLite alternative's trait and store with three things
 taken from the others: the store's self-declared `durability()` and the startup
 refusal of `Total` on a volatile store; a non-atomic `check` for cost meters
 whose figure is only known after the call; and batches scoped to one
@@ -206,9 +202,9 @@ separate listener, the socket as default) and from the users: an operator needs
 to see pool health and traffic and to act on both; a host embedding Janus needs
 the peek and the log; the opaque method needs its registry operations. Three
 scope lines within it were judgement calls rather than consequences. They were
-taken on the reasoning below without the multi-proposal review the contested
-questions had, because each leaves the smaller surface and can be widened later
-without changing anything already built:
+taken on the reasoning below without the multi-alternative comparison the
+contested questions had, because each leaves the smaller surface and can be
+widened later without changing anything already built:
 
 - The UI leaves material entry to the CLI, because material comes from a file on
   the operator's host and a browser form would be a second path for the most
@@ -222,15 +218,15 @@ without changing anything already built:
   that made it is the purpose of the proxy but not every operator wants a record
   kept.
 
-## Embedded callers of the prior gateway {#embedded-callers}
+## Embedded callers {#embedded-callers}
 
-**Decision.** Resolved by the admin surface: credential inspection becomes
+**Decision.** Served by the admin surface: credential inspection becomes
 `GET /v1/credentials` and `GET /v1/credentials/default`, log viewing becomes
 `GET /v1/requests` and its stream, reached over the admin socket on the same
-host or the TLS admin listener from another. One further embedded use — the
-host's own tap on upstream response bytes — stays with the host, because it is
-response inspection, which Janus does not do. Recorded in
+host or the TLS admin listener from another. One further embedded use — a host's
+own tap on upstream response bytes — stays with the host, because it is response
+inspection, which Janus does not do. Recorded in
 <ref target="docs/scope#inprocess-gap">scope: embedded callers</ref>.
 
 **Clear-cut.** These are consumers of endpoints the surface needs for its own
-users anyway; the only question was whether they exist, and they now do.
+users anyway; the admin surface provides them.

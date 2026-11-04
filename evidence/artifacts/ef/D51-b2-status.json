@@ -8,7 +8,7 @@
     "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51/good/p.sock",
     "health": "unreachable",
     "last_error": "plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51/good is writable by others (mode 0757)",
-    "last_ok_at": "2026-11-04T10:19:36.078558Z",
+    "last_ok_at": "2026-11-04T22:03:04.793608Z",
     "dropped_events": 0
   }
 }

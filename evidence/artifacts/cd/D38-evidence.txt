@@ -2,12 +2,12 @@
   "status": 200,
   "events": [
     {
-      "t": 1793787581338,
+      "t": 1793829790272,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-5399-71c5-9178-ab3583d0b92b",
+        "request_id": "01a1a896-623f-75ca-94d5-1c0e119d1ce5",
         "correlation_id": "corr38",
-        "payload_json": "{\"caller_identity\":\"u38\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+        "payload_json": "{\"caller_identity\":\"u38\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
       }
     }
   ],
@@ -17,13 +17,13 @@
     "claimed_identity": null,
     "correlation_id": "corr38",
     "credential_ref": "acct-a",
-    "duration_ms": 0,
+    "duration_ms": 1,
     "error": null,
     "method": "POST",
     "outcome": "forwarded",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:41.337958Z",
-    "request_id": "01a1a612-5399-71c5-9178-ab3583d0b92b",
+    "received_at": "2026-11-04T22:03:10.271386Z",
+    "request_id": "01a1a896-623f-75ca-94d5-1c0e119d1ce5",
     "route": null,
     "status": 200,
     "upstream": "anthropic",

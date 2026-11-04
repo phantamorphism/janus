@@ -47,7 +47,7 @@
   {
     "name": "UI Credentials view lists credentials",
     "ok": true,
-    "detail": "- generic [ref=e1] clickable [onclick]\n  - link \"Skip to content\" [ref=e5]\n  - complementary\n    - StaticText \"Janus\"\n  "
+    "detail": "- generic [ref=e1] clickable [onclick]\n  - link \"Skip to content\" [ref=e5]\n  - complementary\n    - generic\n      - Stati"
   },
   {
     "name": "no secret in any UI view text",

@@ -71,7 +71,7 @@
       "evidence/artifacts/cd/D34-a-grpc-error.txt",
       "evidence/artifacts/cd/D34-b-empty-response.txt"
     ],
-    "note": "5/5 checks passed. NOTES: (b) observed log: {\"binding\":\"hmac\",\"caller_identity\":\"u34b\",\"claimed_identity\":null,\"class\":\"plugin_error\",\"correlation_id\":null,\"credential_ref\":null,\"duration_ms\":0,\"error\":\"plugin_error: ResolveRouteResponse has no outcome set\",\"method\":\"POST\",\"outcome\":\"plugin_failed\",\"path\":\"/anthropic/v1/messages\",\"received_at\":\"2026-11-04T10:19:38.990676Z\",\"request_id\":\"01a1a612-4a6e-7193-99ca-48e167bfb1bb\",\"route\":null,\"status\":null,\"upstream\":\"anthropic\",\"usage\":null}"
+    "note": "5/5 checks passed. NOTES: (b) observed log: {\"binding\":\"hmac\",\"caller_identity\":\"u34b\",\"claimed_identity\":null,\"class\":\"plugin_error\",\"correlation_id\":null,\"credential_ref\":null,\"duration_ms\":1,\"error\":\"plugin_error: ResolveRouteResponse has no outcome set\",\"method\":\"POST\",\"outcome\":\"plugin_failed\",\"path\":\"/anthropic/v1/messages\",\"received_at\":\"2026-11-04T22:03:07.904400Z\",\"request_id\":\"01a1a896-5900-74be-ac2a-53d1340df187\",\"route\":null,\"status\":null,\"upstream\":\"anthropic\",\"usage\":null}"
   },
   {
     "id": "D35",

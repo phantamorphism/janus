@@ -412,6 +412,6 @@ service; because both tables want indexed queries and the request log wants
 retention by deletion, which a flat file does badly; and because the file is
 inspectable with stock tooling if the admin surface is ever not enough. The
 credential pool is *not* in this database — it stays directory-per-slot on the
-filesystem, as described in <ref target="docs/scope#extractable">what carries
-over</ref>, so that credential material and operational records have different
-permissions and different backup stories.
+filesystem, as described in <ref target="docs/scope#extractable">what janus-core
+provides</ref>, so that credential material and operational records have
+different permissions and different backup stories.

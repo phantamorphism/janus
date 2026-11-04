@@ -14,13 +14,13 @@
       "claimed_identity": null,
       "correlation_id": null,
       "credential_ref": "k1",
-      "duration_ms": 0,
+      "duration_ms": 2,
       "error": null,
       "method": "POST",
       "outcome": "forwarded",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:49.952529Z",
-      "request_id": "01a1a612-7540-7314-b0b6-73e2b9820cea",
+      "received_at": "2026-11-04T22:03:18.334958Z",
+      "request_id": "01a1a896-81be-77b3-83a6-8500e0567b2b",
       "route": null,
       "status": 200,
       "upstream": "anthropic",
@@ -38,8 +38,8 @@
       "outcome": "denied",
       "path": "/anthropic/v1/messages",
       "reason": "x is not allowed",
-      "received_at": "2026-11-04T10:19:49.951977Z",
-      "request_id": "01a1a612-753f-7206-9234-6472f1076e9e",
+      "received_at": "2026-11-04T22:03:18.333510Z",
+      "request_id": "01a1a896-81bd-7362-af6f-150fa6ebab55",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -71,7 +71,7 @@
       "endpoint": null,
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:49.952539Z",
+      "last_ok_at": "2026-11-04T22:03:18.334969Z",
       "mode": "linked"
     },
     "request_log": {
@@ -81,7 +81,7 @@
       "retain_seconds": 2592000,
       "rows": 2
     },
-    "started_at": "2026-11-04T10:19:49.823469Z",
+    "started_at": "2026-11-04T22:03:18.225287Z",
     "upstreams": [
       {
         "base_url": "http://127.0.0.1:23002/",
@@ -97,12 +97,12 @@
     {
       "event_type": "call_abandoned",
       "payload": "{\"caller_identity\":\"x\",\"stage\":\"resolve\",\"reason\":\"denied by the plugin: x is not allowed\"}",
-      "request_id": "01a1a612-753f-7206-9234-6472f1076e9e"
+      "request_id": "01a1a896-81bd-7362-af6f-150fa6ebab55"
     },
     {
       "event_type": "call_completed",
-      "payload": "{\"caller_identity\":\"y\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"k1\",\"duration_ms\":0,\"usage\":null}",
-      "request_id": "01a1a612-7540-7314-b0b6-73e2b9820cea"
+      "payload": "{\"caller_identity\":\"y\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"k1\",\"duration_ms\":2,\"usage\":null}",
+      "request_id": "01a1a896-81be-77b3-83a6-8500e0567b2b"
     }
   ]
 }

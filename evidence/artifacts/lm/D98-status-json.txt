@@ -44,7 +44,7 @@ $ exit=0
     "retain_seconds": 2592000,
     "rows": 0
   },
-  "started_at": "2026-11-04T10:19:34.565159Z",
+  "started_at": "2026-11-04T22:03:03.432539Z",
   "upstreams": [
     {
       "base_url": "http://127.0.0.1:26010/",

@@ -1,9 +1,9 @@
 {
   "error": "{\"error\":{\"code\":\"credential_not_found\",\"message\":\"no credential \\\"does-not-exist\\\"\"}}",
   "log_lines": [
-    "2026-11-04T10:19:53.753767Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/aud-1\" outcome=\"ok\"",
-    "2026-11-04T10:19:53.778755Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/aud-2\" outcome=\"ok\"",
-    "2026-11-04T10:19:53.789660Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.disable\" resource=\"credential/aud-1\" outcome=\"ok\"",
-    "2026-11-04T10:19:53.799663Z  INFO janus::admin::audit: admin mutation principal=\"admin_tcp\" action=\"credential.disable\" resource=\"credential/aud-2\" outcome=\"ok\""
+    "2026-11-04T22:03:23.055604Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/aud-1\" outcome=\"ok\"",
+    "2026-11-04T22:03:23.075641Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/aud-2\" outcome=\"ok\"",
+    "2026-11-04T22:03:23.084699Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.disable\" resource=\"credential/aud-1\" outcome=\"ok\"",
+    "2026-11-04T22:03:23.093683Z  INFO janus::admin::audit: admin mutation principal=\"admin_tcp\" action=\"credential.disable\" resource=\"credential/aud-2\" outcome=\"ok\""
   ]
 }

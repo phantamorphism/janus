@@ -36,7 +36,7 @@
     }
   },
   "upstreamSaw": {
-    "t": 1793787574186,
+    "t": 1793829783109,
     "url": "/v1/messages",
     "method": "POST",
     "headers": {
@@ -101,8 +101,8 @@
     "method": "POST",
     "outcome": "forwarded",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:34.185238Z",
-    "request_id": "01a1a612-37a9-745e-aa3b-340617061fd3",
+    "received_at": "2026-11-04T22:03:03.108470Z",
+    "request_id": "01a1a896-4644-75c5-b93e-d281cfc550f7",
     "route": null,
     "status": 200,
     "upstream": "anthropic",

@@ -1,2 +1,2 @@
 status=200 fwd=true
-{"binding":"opaque","caller_identity":"opaque-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/models","received_at":"2026-11-04T10:19:41.249814Z","request_id":"01a1a612-5341-7395-92d9-5cd8c86bc7d2","route":"/v1/models","status":200,"upstream":"openai","usage":null}
+{"binding":"opaque","caller_identity":"opaque-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/models","received_at":"2026-11-04T22:03:10.258767Z","request_id":"01a1a896-6232-7493-ba2b-d22b8f5198a7","route":"/v1/models","status":200,"upstream":"openai","usage":null}

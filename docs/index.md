@@ -1,7 +1,7 @@
 ---
 title: Janus
 type: overview
-status: draft
+status: accepted
 tags: [janus, overview]
 ---
 
@@ -11,8 +11,8 @@ Janus is a standalone, open-source proxy that sits between a caller and the
 authenticated services it needs to reach, so the caller never has to hold the
 real credentials for those services.
 
-The motivating caller is an agent running in a sandbox. Such an agent needs to
-call APIs that are gated by API keys, OAuth tokens, or signed headers — but the
+The typical caller is an agent running in a sandbox. Such an agent needs to call
+APIs that are gated by API keys, OAuth tokens, or signed headers — but the
 sandbox is exactly the place those secrets should not live. Janus resolves that
 tension: an agent holds its own identity, presents that identity to Janus, and
 makes ordinary requests against the upstream's own API shape. Janus substitutes
@@ -39,9 +39,8 @@ proxy occupies.
 
 ## First upstreams {#first-upstreams}
 
-The first upstreams Janus implements are the LLM APIs: Anthropic, OpenAI, and
-OpenRouter. That is where the need is concrete today, and there is existing
-proxy code for those three that Janus builds on (see
+Janus ships with the LLM APIs as its upstreams: Anthropic, OpenAI, and
+OpenRouter. That is where the need is concrete today (see
 <ref target="docs/scope">scope and non-goals</ref>).
 
 Those three are the first implementation, not the definition. Nothing about
@@ -90,10 +89,11 @@ around that general point; the LLM upstreams are the first proof of it.
 - <ref target="docs/admin-surface">Admin surface, CLI and UI</ref> — the
   operator's control channel: endpoints, the `janus` command set, what the UI
   shows, the request log, and the daemon's own storage.
-- <ref target="docs/scope">Scope and non-goals</ref> — which existing proxy code
-  carries over into Janus, and what is deliberately left out.
-- <ref target="docs/decisions">Decision records</ref> — how the formerly open
-  design questions were resolved, with the options considered where there were
-  several.
-- <ref target="docs/status">Status</ref> — current build status and whatever is
-  still open.
+- <ref target="docs/scope">Scope and non-goals</ref> — what janus-core provides,
+  what is deliberately left out, and how embedded callers move to the admin
+  surface.
+- <ref target="docs/decisions">Decision records</ref> — the design choices that
+  shaped Janus, with their rationale and the alternatives considered where there
+  were several.
+- <ref target="docs/status">Status</ref> — current build status and what is
+  deliberately not built.

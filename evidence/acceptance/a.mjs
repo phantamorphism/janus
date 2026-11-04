@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const BIN = path.join(ROOT, 'target/release');
+const BIN = process.env.JANUS_BIN_DIR || path.join(ROOT, 'target/release');
 const ART = path.join(ROOT, 'evidence/artifacts/a');
 const RES = path.join(ROOT, 'evidence/results/a.json');
 const WORK = '/tmp/qa-a/run';
@@ -239,7 +239,7 @@ async function main() {
   try {
     const crate = path.join(WORK, 'd6'); fs.mkdirSync(path.join(crate, 'src'), { recursive: true });
     const here = path.dirname(fileURLToPath(import.meta.url));
-    fs.writeFileSync(path.join(crate, 'Cargo.toml'), fs.readFileSync(path.join(here, 'a-d6/Cargo.toml'), 'utf8').replace('<repo>', ROOT));
+    fs.writeFileSync(path.join(crate, 'Cargo.toml'), fs.readFileSync(path.join(here, 'a-d6/Cargo.toml'), 'utf8').replace('../../../', ROOT + '/'));
     fs.copyFileSync(path.join(here, 'a-d6/src/main.rs'), path.join(crate, 'src/main.rs'));
     const r = spawnSync('cargo', ['run', '-q'], { cwd: crate, encoding: 'utf8', env: { ...process.env, CARGO_TARGET_DIR: '/tmp/qa-target-a' }, timeout: 500000 });
     const out = r.stdout + '\n--stderr--\n' + r.stderr;

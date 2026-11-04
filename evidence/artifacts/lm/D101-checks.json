@@ -57,12 +57,12 @@
   {
     "name": "tail printed the new matching records (2 agent-2 forwarded)",
     "ok": true,
-    "detail": "2026-11-04T10:19:42Z  01a1a612-5834-70c6-8824-860a7fe19779  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1\n2026-11-04T10:19:42Z  01a1a612-5837-7423-b64b-fe0a56383da5  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1\n"
+    "detail": "2026-11-04T22:03:11Z  01a1a896-6698-74f7-8ce2-25e914924260  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0\n2026-11-04T22:03:11Z  01a1a896-669a-72bf-9427-67bb58297e66  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0\n"
   },
   {
     "name": "tail printed no non-matching records",
     "ok": true,
-    "detail": "2026-11-04T10:19:42Z  01a1a612-5834-70c6-8824-860a7fe19779  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1\n2026-11-04T10:19:42Z  01a1a612-5837-7423-b64b-fe0a56383da5  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1\n"
+    "detail": "2026-11-04T22:03:11Z  01a1a896-6698-74f7-8ce2-25e914924260  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0\n2026-11-04T22:03:11Z  01a1a896-669a-72bf-9427-67bb58297e66  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0\n"
   },
   {
     "name": "tail did not replay old agent-2 record (only new)",

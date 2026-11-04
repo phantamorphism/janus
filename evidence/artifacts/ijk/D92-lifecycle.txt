@@ -8,7 +8,7 @@
     "status": "invalid",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:54.390720Z",
+    "last_used_at": "2026-11-04T22:03:23.687073Z",
     "request_count": 1,
     "error_count": 1,
     "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
@@ -22,7 +22,7 @@
     "status": "active",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:54.390720Z",
+    "last_used_at": "2026-11-04T22:03:23.687073Z",
     "request_count": 1,
     "error_count": 1,
     "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
@@ -36,7 +36,7 @@
     "status": "disabled",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:54.424676Z",
+    "last_used_at": "2026-11-04T22:03:23.718486Z",
     "request_count": 2,
     "error_count": 1,
     "last_error": "rejected by the upstream: 401 Unauthorized: invalid_request_error: Incorrect API key provided"
@@ -50,7 +50,7 @@
     "status": "active",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:54.471436Z",
+    "last_used_at": "2026-11-04T22:03:23.756910Z",
     "request_count": 4,
     "error_count": 0,
     "last_error": null
@@ -58,8 +58,8 @@
   "plugin_disabled_ref": {
     "status": 503,
     "outcome": {
-      "request_id": "01a1a612-86fa-75b9-a01b-f335010e9f00",
-      "received_at": "2026-11-04T10:19:54.490104Z",
+      "request_id": "01a1a896-96fb-7147-9ed8-779edaa4a4ed",
+      "received_at": "2026-11-04T22:03:23.771157Z",
       "duration_ms": 0,
       "upstream": "openai",
       "route": null,

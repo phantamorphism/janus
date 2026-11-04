@@ -1,4 +1,4 @@
 status=200
-log={"binding":"hmac","caller_identity":"src-user","claimed_identity":null,"correlation_id":null,"credential_ref":"a1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/anthropic/v1/m","received_at":"2026-11-04T10:19:40.869867Z","request_id":"01a1a612-51c5-70b1-ab98-830dbe68b5ab","route":null,"status":200,"upstream":"anthropic","usage":null}
+log={"binding":"hmac","caller_identity":"src-user","claimed_identity":null,"correlation_id":null,"credential_ref":"a1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/anthropic/v1/m","received_at":"2026-11-04T22:03:09.828750Z","request_id":"01a1a896-6084-71d2-bd17-5620afbab5cf","route":null,"status":200,"upstream":"anthropic","usage":null}
 outbound url=/v1/m
 outbound headers={"x-api-key":"sk-src-a","accept":"*/*","host":"127.0.0.1:21103","transfer-encoding":"chunked"}

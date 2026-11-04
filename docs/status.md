@@ -11,6 +11,10 @@ This document is a plain statement of what is built, what is not, and anything
 still genuinely undecided — not a place to invent answers to make the picture
 look more finished than it is.
 
+Janus is pre-1.0. Version 0.1.0 is not yet tagged: the workspace and UI carry
+the version number `0.1.0`, and the changelog lists its contents under
+Unreleased.
+
 ## Current build status {#build-status}
 
 Built and running:
@@ -44,8 +48,8 @@ Built and running:
 
 ## Decided, and where the design lives {#decided}
 
-These were open questions in an earlier revision of this document. They are
-answered now, and the answers live in the design docs rather than here:
+These design questions are settled. The answers live in the design docs rather
+than here:
 
 - **Caller identity.** Janus does not mint identities; it extracts and verifies
   what the deployment's own provisioner issued, via a configured extractor per
@@ -62,10 +66,9 @@ answered now, and the answers live in the design docs rather than here:
   ship in `janus-core` for plugins to link.
   <ref target="docs/plugin-contract#metering-primitives">Metering
   primitives</ref>.
-- **The correlation field's name.** `conversation_id` was an LLM-ism and is
-  gone. The contract now carries a Janus-assigned `request_id` and a separate,
-  possibly-untrusted `correlation_id` — two things the old single field was
-  conflating.
+- **The correlation field.** The contract carries a Janus-assigned `request_id`
+  and a separate, possibly-untrusted `correlation_id`: two different things that
+  a single field would conflate.
   <ref target="docs/plugin-contract#resolve-route">ResolveRoute</ref>.
 - **How the admin surface is kept away from callers.** Separate listeners, with
   a unix socket as the default admin address.
@@ -102,9 +105,9 @@ answered now, and the answers live in the design docs rather than here:
   on/off setting and retention; the admin token on every TCP listener and TLS
   off loopback. <ref target="docs/admin-surface">Admin surface, CLI and
   UI</ref>.
-- **Embedded callers of the prior gateway.** Served by the admin endpoints; the
-  host's response-bytes tap stays with the host.
-  <ref target="docs/scope#inprocess-gap">Scope: embedded callers</ref>.
+- **Embedded callers.** Served by the admin endpoints; the host's response-bytes
+  tap stays with the host. <ref target="docs/scope#inprocess-gap">Scope:
+  embedded gateways</ref>.
 
 ## Open questions {#open-questions}
 

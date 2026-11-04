@@ -15,8 +15,8 @@
       "method": "POST",
       "outcome": "plugin_failed",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:56.303833Z",
-      "request_id": "01a1a612-8e0f-717b-9857-5e41e1c9099a",
+      "received_at": "2026-11-04T22:03:25.001727Z",
+      "request_id": "01a1a896-9bc9-7649-acdf-0a2b829086e0",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -40,8 +40,8 @@
     "endpoint": null,
     "health": "ok",
     "last_error": "linked plugin panicked: linked plugin deliberately panics",
-    "last_ok_at": "2026-11-04T10:19:56.318410Z",
+    "last_ok_at": "2026-11-04T22:03:25.018241Z",
     "mode": "linked"
   },
-  "daemonLog": "\nthread 'tokio-rt-worker' (49046112) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nthread 'tokio-rt-worker' (49046111) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\n"
+  "daemonLog": "\nthread 'tokio-rt-worker' (51153280) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nthread 'tokio-rt-worker' (51153269) panicked at src/main.rs:14:13:\nlinked plugin deliberately panics\n"
 }

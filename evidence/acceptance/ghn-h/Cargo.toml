@@ -3,7 +3,7 @@ name = "qa-h"
 version = "0.1.0"
 edition = "2021"
 [dependencies]
-janus-core = { path = "<repo>/crates/janus-core", features = ["sqlite","testing"] }
+janus-core = { path = "../../../crates/janus-core", features = ["sqlite","testing"] }
 tokio = { version = "1", features = ["full"] }
 [workspace]
 [dev-dependencies]

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Environment for group lm: mock upstream, mock TLS gRPC plugin, daemon lifecycle.
 import http from 'node:http';
 import http2 from 'node:http2';
@@ -5,8 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 
-export const REPO = '<repo>';
-export const BIN = `${REPO}/target/release`;
+export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+export const BIN = process.env.JANUS_BIN_DIR || `${REPO}/target/release`;
 export const W = '/tmp/qa-lm/run';
 export const P = { dp: 26001, admin: 26002, ui: 26003, up: 26010, plugin: 26020 };
 

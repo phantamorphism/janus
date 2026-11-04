@@ -8,7 +8,7 @@
       "health": "tls_error",
       "last_error": "TLS handshake with plugin at localhost:23130 failed: invalid peer certificate: UnknownIssuer",
       "last_ok_at": null,
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0
     },
     "log": {
@@ -18,13 +18,13 @@
       "class": "plugin_tls_error",
       "correlation_id": null,
       "credential_ref": null,
-      "duration_ms": 5,
+      "duration_ms": 3,
       "error": "plugin_tls_error: TLS handshake with plugin at localhost:23130 failed: invalid peer certificate: UnknownIssuer",
       "method": "POST",
       "outcome": "plugin_failed",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:37.729187Z",
-      "request_id": "01a1a612-4581-7139-847a-a94526cee27b",
+      "received_at": "2026-11-04T22:03:06.175464Z",
+      "request_id": "01a1a896-523f-73c3-b2c5-4d963c240721",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -40,7 +40,7 @@
       "health": "tls_error",
       "last_error": "TLS handshake with plugin at localhost:23132 failed: invalid peer certificate: certificate not valid for name \"localhost\"; certificate is only valid for DnsName(\"other.test\")",
       "last_ok_at": null,
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0
     },
     "log": {
@@ -55,8 +55,8 @@
       "method": "POST",
       "outcome": "plugin_failed",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:37.899991Z",
-      "request_id": "01a1a612-462b-7159-8b3b-640d32902bbc",
+      "received_at": "2026-11-04T22:03:06.326938Z",
+      "request_id": "01a1a896-52d6-73ab-b2ea-33e21e05d844",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -69,16 +69,16 @@
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578045
+        "at": 1793829786498
       },
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578047
+        "at": 1793829786503
       }
     ],
     "st": {
@@ -86,9 +86,9 @@
       "endpoint": "https://localhost:23134/",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:38.045461Z",
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
-      "server_cert_expires_at": "2027-11-04T10:19:33Z",
+      "last_ok_at": "2026-11-04T22:03:06.499774Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
+      "server_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0
     }
   },
@@ -98,16 +98,16 @@
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578188
+        "at": 1793829786655
       },
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578190
+        "at": 1793829786657
       }
     ]
   },
@@ -120,7 +120,7 @@
       "health": "tls_error",
       "last_error": "TLS handshake with plugin at localhost:23140 failed: received fatal alert: ProtocolVersion",
       "last_ok_at": null,
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0
     },
     "conns": [],
@@ -135,16 +135,16 @@
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578631
+        "at": 1793829787094
       },
       {
         "authorized": true,
         "authError": null,
-        "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+        "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
         "protocol": "TLSv1.3",
-        "at": 1793787578634
+        "at": 1793829787097
       }
     ],
     "st": {
@@ -152,9 +152,9 @@
       "endpoint": "https://localhost:23142/",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:38.631729Z",
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
-      "server_cert_expires_at": "2027-11-04T10:19:33Z",
+      "last_ok_at": "2026-11-04T22:03:07.095264Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
+      "server_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0
     }
   }

@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-janus-daemon = { path = "<repo>/crates/janus-daemon" }
-janus-core = { path = "<repo>/crates/janus-core" }
+janus-daemon = { path = "../../../crates/janus-daemon" }
+janus-core = { path = "../../../crates/janus-core" }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = "0.14"

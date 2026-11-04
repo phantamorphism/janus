@@ -32,7 +32,7 @@
     "endpoint": "https://localhost:26020/",
     "health": "ok",
     "last_error": null,
-    "last_ok_at": "2026-11-04T10:20:04.417053Z",
+    "last_ok_at": "2026-11-04T22:03:33.993355Z",
     "mode": "tls",
     "server_cert_expires_at": "2027-11-04T00:00:00Z"
   },
@@ -43,7 +43,7 @@
     "retain_seconds": 2592000,
     "rows": 24
   },
-  "started_at": "2026-11-04T10:19:34.565159Z",
+  "started_at": "2026-11-04T22:03:03.432539Z",
   "upstreams": [
     {
       "base_url": "http://127.0.0.1:26010/",

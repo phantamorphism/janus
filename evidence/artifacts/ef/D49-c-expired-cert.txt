@@ -1,3 +1,3 @@
 exit=1
-2026-11-04T10:19:35.286785Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d49-c-expired-cert/data/credentials credentials=0
+2026-11-04T22:03:04.023937Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d49-c-expired-cert/data/credentials credentials=0
 janus-daemon: plugin: plugin.tls.client_cert: /tmp/qa-ef/run/pki/client-expired.pem expired at 2020-02-01 00:00:00 UTC

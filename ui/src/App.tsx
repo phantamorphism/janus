@@ -85,7 +85,8 @@ export default function App() {
         >
           Skip to content
         </a>
-        <aside className="border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
+        <aside className="border-b border-line bg-surface md:border-r md:border-b-0">
+          <div className="md:sticky md:top-0">
           <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
             <JanusMark className="h-7 w-7 text-brass" />
             <span className="font-serif text-2xl leading-none">Janus</span>
@@ -114,6 +115,7 @@ export default function App() {
             <button type="button" className="btn btn-quiet -ml-2 text-muted" onClick={() => signOut(null)}>
               <LogOut size={14} aria-hidden="true" /> Forget token
             </button>
+          </div>
           </div>
         </aside>
         <main id="main" className="min-w-0 px-5 py-8 md:px-10">

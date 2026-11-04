@@ -15,7 +15,7 @@ const BIN = process.env.JANUS_BIN_DIR || (fs.existsSync(path.join(REPO, 'target/
 const ART = path.join(REPO, 'evidence/artifacts/ijk');
 const RES = path.join(REPO, 'evidence/results/ijk.json');
 const ROOT = '/tmp/qa-ijk/run';
-const PLUG_DIR = path.join(os.homedir(), '.janus-qa-ijk-plug');
+const PLUG_DIR = path.join(REPO, 'evidence/.run-ijk'); // 0700, outside world-writable /tmp: the daemon refuses sockets under those
 const UI_ASSETS = path.join(REPO, 'ui/dist');
 const OA = 25090, OR = 25091;
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;

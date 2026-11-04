@@ -3,7 +3,7 @@ $ exit=0
 plugin               tls
 endpoint             https://localhost:26020/
 health               ok
-last ok              2026-11-04T10:19:42Z
+last ok              2026-11-04T22:03:11Z
 last error           -
 client cert expires  2027-11-04T00:00:00Z
 server cert expires  2027-11-04T00:00:00Z
@@ -19,7 +19,7 @@ $ exit=0
   "endpoint": "https://localhost:26020/",
   "health": "ok",
   "last_error": null,
-  "last_ok_at": "2026-11-04T10:19:42.520397Z",
+  "last_ok_at": "2026-11-04T22:03:11.386920Z",
   "mode": "tls",
   "server_cert_expires_at": "2027-11-04T00:00:00Z"
 }

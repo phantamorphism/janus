@@ -66,10 +66,24 @@ export function localInputToIso(value: string): string | undefined {
 
 /** `request_log.retain` as sent: a humantime string is shown as is, seconds are converted. */
 export function formatRetain(retain: string): string {
-  if (!/^\d+$/.test(retain)) return retain
+  if (!/^\d+$/.test(retain)) return retain.replace(/(\d)([a-zA-Z])/g, '$1 $2')
   const secs = Number(retain)
   if (secs % 86_400 === 0) return `${secs / 86_400}d`
   if (secs % 3600 === 0) return `${secs / 3600}h`
   if (secs % 60 === 0) return `${secs / 60}m`
   return `${secs}s`
+}
+
+const ISO_TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/g
+
+/**
+ * A credential's `last_error` for display. The pool records a rate limit as
+ * "rate limited until <RFC 3339>"; while the credential is still rate limited
+ * that repeats the "until" line, so it is dropped. Any other embedded raw
+ * timestamp is shown as a local time.
+ */
+export function credentialErrorText(c: { status: string; last_error: string | null }): string | null {
+  if (!c.last_error) return null
+  if (c.status === 'rate_limited' && /^rate limited until \S+$/.test(c.last_error.trim())) return null
+  return c.last_error.replace(ISO_TIMESTAMP, (m) => formatTime(m))
 }

@@ -1,5 +1,5 @@
 {
-  "ms": 254,
+  "ms": 252,
   "status": 503,
   "body": "{\"error\":{\"code\":\"plugin_timeout\",\"message\":\"the policy plugin could not be consulted (plugin_timeout)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
   "pluginStatus": {
@@ -7,7 +7,7 @@
     "endpoint": "unix://<repo>/evidence/.run-cd/a.sock",
     "health": "timeout",
     "last_error": "plugin did not answer ResolveRoute within 250 ms",
-    "last_ok_at": "2026-11-04T10:19:36.405129Z",
+    "last_ok_at": "2026-11-04T22:03:05.312788Z",
     "mode": "unix"
   },
   "log": {
@@ -17,13 +17,13 @@
     "class": "plugin_timeout",
     "correlation_id": null,
     "credential_ref": null,
-    "duration_ms": 252,
+    "duration_ms": 251,
     "error": "plugin_timeout: plugin did not answer ResolveRoute within 250 ms",
     "method": "POST",
     "outcome": "plugin_failed",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:36.833867Z",
-    "request_id": "01a1a612-4201-7271-990c-f68fa9b0682f",
+    "received_at": "2026-11-04T22:03:05.728367Z",
+    "request_id": "01a1a896-5080-70f3-aa26-64c66b352a36",
     "route": null,
     "status": null,
     "upstream": "anthropic",

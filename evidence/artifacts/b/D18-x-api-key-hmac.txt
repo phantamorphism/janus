@@ -1,2 +1,2 @@
 status=200 fwd=true
-{"binding":"hmac","caller_identity":"prec-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/chat","received_at":"2026-11-04T10:19:41.241779Z","request_id":"01a1a612-5339-758e-a161-115cd9962bd5","route":null,"status":200,"upstream":"openai","usage":null}
+{"binding":"hmac","caller_identity":"prec-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/chat","received_at":"2026-11-04T22:03:10.245780Z","request_id":"01a1a896-6225-7519-a600-b6b93377e6a5","route":null,"status":200,"upstream":"openai","usage":null}

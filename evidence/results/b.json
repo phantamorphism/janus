@@ -120,7 +120,7 @@
     "artifacts": [
       "evidence/artifacts/b/D21-transcript.txt"
     ],
-    "note": "ok: 401 returned while the (endless) body was still being sent: HTTP/1.1 401 Unauthorized after 0ms; ok: plugin saw zero ResolveRoute and zero Notify; ok: upstream saw no request/connection; ok: credential request_count (3->3) / last_used_at unchanged"
+    "note": "ok: 401 returned while the (endless) body was still being sent: HTTP/1.1 401 Unauthorized after 1ms; ok: plugin saw zero ResolveRoute and zero Notify; ok: upstream saw no request/connection; ok: credential request_count (3->3) / last_used_at unchanged"
   },
   {
     "id": "D22",

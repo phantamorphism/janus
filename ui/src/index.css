@@ -113,6 +113,10 @@ h3 {
     opacity: 0.5;
     cursor: not-allowed;
   }
+  .btn-sm {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+  }
   .btn-primary {
     background: var(--color-ink);
     border-color: var(--color-ink);
@@ -156,14 +160,22 @@ h3 {
     text-align: left;
     font-weight: 600;
     color: var(--color-muted);
-    padding: 0.45rem 0.75rem;
+    padding: 0.45rem 0.6rem;
     border-bottom: 1px solid var(--color-line-strong);
     white-space: nowrap;
   }
   .data-table td {
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.6rem;
     border-bottom: 1px solid var(--color-line);
     vertical-align: top;
+  }
+  /* Row actions stay visible while the table scrolls sideways inside its frame. */
+  .data-table th:last-child:has(.sr-only),
+  .data-table td.actions {
+    position: sticky;
+    right: 0;
+    background: var(--color-surface);
+    box-shadow: -1px 0 0 var(--color-line);
   }
   .data-table tbody tr:last-child td {
     border-bottom: 0;

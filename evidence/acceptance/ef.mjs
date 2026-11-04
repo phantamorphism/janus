@@ -26,7 +26,7 @@ const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 // ---------------------------------------------------------------- build / binaries
 function binDir() {
-  const repoRel = path.join(ROOT, 'target/release');
+  const repoRel = process.env.JANUS_BIN_DIR || path.join(ROOT, 'target/release');
   if (fs.existsSync(path.join(repoRel, 'janus-daemon')) && fs.existsSync(path.join(repoRel, 'janus'))) return repoRel;
   return path.join(TARGET, 'release');
 }

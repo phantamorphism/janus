@@ -1,5 +1,5 @@
 {
-  "ms": 1004,
+  "ms": 1002,
   "status": 503,
   "body": "{\"error\":{\"code\":\"plugin_timeout\",\"message\":\"the policy plugin could not be consulted (plugin_timeout)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
   "pluginStatus": {
@@ -17,13 +17,13 @@
     "class": "plugin_timeout",
     "correlation_id": null,
     "credential_ref": null,
-    "duration_ms": 1003,
+    "duration_ms": 1001,
     "error": "plugin_timeout: plugin did not answer ResolveRoute within 1000 ms",
     "method": "POST",
     "outcome": "plugin_failed",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:51.244632Z",
-    "request_id": "01a1a612-7a4c-7796-a137-bc53398f56b8",
+    "received_at": "2026-11-04T22:03:20.048723Z",
+    "request_id": "01a1a896-8870-7009-b3c2-33caa4c01414",
     "route": null,
     "status": null,
     "upstream": "anthropic",

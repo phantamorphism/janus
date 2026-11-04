@@ -2,7 +2,7 @@
   "baseline_ms": 2,
   "locked_ms": [
     1,
-    1,
+    2,
     1
   ],
   "out": "locked\nreleased\n",

@@ -8,7 +8,7 @@ import { ConfirmAction } from '@/components/ConfirmAction'
 import { PageHeader } from '@/components/PageHeader'
 import { ActionNotice, Empty, ErrorNotice, Loading } from '@/components/States'
 import { Time } from '@/components/Time'
-import { formatCount, words } from '@/lib/format'
+import { credentialErrorText, formatCount, words } from '@/lib/format'
 import { credentialTone } from '@/lib/tone'
 import { useResource } from '@/lib/useResource'
 
@@ -120,41 +120,49 @@ export function Credentials() {
               </tr>
             </thead>
             <tbody>
-              {list.data.map((c) => (
+              {list.data.map((c) => {
+                const lastError = credentialErrorText(c)
+                return (
                 <tr key={c.ref} aria-label={c.ref}>
-                  <td>
-                    <div className="mono font-medium">{c.ref}</div>
-                    {c.label && <div className="text-xs text-ink-soft">{c.label}</div>}
+                  <td className="min-w-44">
+                    <div className="mono max-w-60 truncate font-medium" title={c.ref}>
+                      {c.ref}
+                    </div>
+                    {c.label && (
+                      <div className="max-w-60 truncate text-xs text-ink-soft" title={c.label}>
+                        {c.label}
+                      </div>
+                    )}
                     <div className="text-xs text-muted">
                       {kindLabel[c.kind] ?? c.kind}, {sourceLabel[c.source] ?? c.source}
                     </div>
                   </td>
-                  <td>{c.upstream}</td>
+                  <td className="whitespace-nowrap">{c.upstream}</td>
                   <td>
                     <Badge tone={credentialTone(c.status)}>{words(c.status)}</Badge>
                     {c.status === 'rate_limited' && c.rate_limited_until && (
                       <div className="mt-1 text-xs text-muted">
-                        until <Time value={c.rate_limited_until} />
+                        until <Time value={c.rate_limited_until} stacked />
                       </div>
                     )}
-                    {c.last_error && (
-                      <div className="mt-1 max-w-64 text-xs break-words text-bad">{c.last_error}</div>
+                    {lastError && (
+                      <div className="mt-1 max-w-44 text-xs break-words text-bad">{lastError}</div>
                     )}
                   </td>
                   <td>
-                    <Time value={c.expires_at} empty="does not expire" />
+                    <Time value={c.expires_at} empty="never" stacked />
                   </td>
                   <td>
-                    <Time value={c.last_used_at} empty="never" />
+                    <Time value={c.last_used_at} empty="never" stacked />
                   </td>
                   <td className="text-right tabular-nums">{formatCount(c.request_count)}</td>
                   <td className="text-right tabular-nums">{formatCount(c.error_count)}</td>
-                  <td>
-                    <div className="flex justify-end gap-2">
+                  <td className="actions">
+                    <div className="flex justify-end gap-1.5">
                       {c.status === 'disabled' ? (
                         <button
                           type="button"
-                          className="btn"
+                          className="btn btn-sm"
                           disabled={busy === c.ref}
                           onClick={() => act(c, 'enable')}
                         >
@@ -163,7 +171,7 @@ export function Credentials() {
                       ) : (
                         <button
                           type="button"
-                          className="btn"
+                          className="btn btn-sm"
                           disabled={busy === c.ref}
                           onClick={() => act(c, 'disable')}
                         >
@@ -172,7 +180,7 @@ export function Credentials() {
                       )}
                       <button
                         type="button"
-                        className="btn"
+                        className="btn btn-sm"
                         disabled={busy === c.ref}
                         onClick={() => act(c, 'refresh')}
                       >
@@ -180,6 +188,7 @@ export function Credentials() {
                       </button>
                       {c.source === 'pool' ? (
                         <ConfirmAction
+                          compact
                           label="Remove"
                           confirmLabel={`Remove ${c.ref}`}
                           consequence="Deletes the pool slot and its material."
@@ -189,7 +198,7 @@ export function Credentials() {
                       ) : (
                         <button
                           type="button"
-                          className="btn btn-danger"
+                          className="btn btn-sm btn-danger"
                           disabled
                           title="Defined in the daemon config; remove it there."
                         >
@@ -199,7 +208,8 @@ export function Credentials() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

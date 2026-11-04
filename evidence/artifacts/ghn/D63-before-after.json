@@ -22,7 +22,7 @@
     "status": "active",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:34.315832Z",
+    "last_used_at": "2026-11-04T22:03:03.318298Z",
     "request_count": 3,
     "error_count": 0,
     "last_error": null
@@ -36,7 +36,7 @@
     "status": "invalid",
     "rate_limited_until": null,
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:34.316625Z",
+    "last_used_at": "2026-11-04T22:03:03.319146Z",
     "request_count": 1,
     "error_count": 1,
     "last_error": "rejected by the upstream: 401 Unauthorized: 401: User not found."
@@ -48,12 +48,12 @@
     "label": null,
     "source": "pool",
     "status": "rate_limited",
-    "rate_limited_until": "2026-11-04T10:21:34.317675Z",
+    "rate_limited_until": "2026-11-04T22:05:03.320142Z",
     "expires_at": null,
-    "last_used_at": "2026-11-04T10:19:34.317459Z",
+    "last_used_at": "2026-11-04T22:03:03.319894Z",
     "request_count": 1,
     "error_count": 1,
-    "last_error": "rate limited until 2026-11-04T10:21:34.317675+00:00"
+    "last_error": "rate limited until 2026-11-04T22:05:03.320142+00:00"
   },
   "statuses": {
     "good": [

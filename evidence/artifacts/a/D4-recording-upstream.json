@@ -40,7 +40,7 @@
   },
   "anthropic_oauth": {
     "addExit": 0,
-    "addOut": "added credential qa-cred-anthropic-oauth\nref                 qa-cred-anthropic-oauth\nupstream            anthropic\nkind                oauth\nlabel               -\nsource              pool\nstatus              active\nrate limited until  -\nexpires             2026-11-04T16:19:34Z\nlast used           -\nrequests            0\nerrors              0\nlast error          -\n",
+    "addOut": "added credential qa-cred-anthropic-oauth\nref                 qa-cred-anthropic-oauth\nupstream            anthropic\nkind                oauth\nlabel               -\nsource              pool\nstatus              active\nrate limited until  -\nexpires             2026-11-05T04:03:03Z\nlast used           -\nrequests            0\nerrors              0\nlast error          -\n",
     "callerStatus": 200,
     "headers": {
       "content-type": "application/json",

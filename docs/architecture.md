@@ -39,11 +39,10 @@ process lifecycle of its own. Its responsibilities:
 
 - **Caller identity extraction.** The stage that turns the material a caller
   presented into a verified identity: the `IdentityExtractor` trait, the four
-  shipped verification methods (including the HMAC primitives carried over from
-  the existing gateway code — see <ref target="docs/scope#extractable">what
-  carries over</ref>), and the config-driven bindings that select one per
-  request type. Fully designed in <ref target="docs/caller-identity">caller
-  identity extraction</ref>.
+  shipped verification methods (including the HMAC primitives; see
+  <ref target="docs/scope#extractable">what janus-core provides</ref>), and the
+  config-driven bindings that select one per request type. Fully designed in
+  <ref target="docs/caller-identity">caller identity extraction</ref>.
 - **The credential pool.** Storage and lookup of real upstream credentials,
   detection of what kind each one is, and refreshing the ones that expire. This
   is the only component with read access to credential material; nothing above

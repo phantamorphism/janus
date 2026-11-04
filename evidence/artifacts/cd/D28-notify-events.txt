@@ -1,10 +1,10 @@
 [
   [
     {
-      "t": 1793787575015,
+      "t": 1793829783894,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-3ae1-7406-a94d-c7f134c0e9f1",
+        "request_id": "01a1a896-4950-7031-b759-26cb18bfc63c",
         "correlation_id": "sessX",
         "payload_json": "{\"caller_identity\":\"u28a\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":4,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
       }
@@ -12,30 +12,30 @@
   ],
   [
     {
-      "t": 1793787575016,
+      "t": 1793829783895,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-3ae6-71cd-9e7b-3ad08fbf7339",
+        "request_id": "01a1a896-4955-7144-8d3b-bf33f4a5fb67",
         "payload_json": "{\"caller_identity\":\"u28b\",\"upstream\":\"openai\",\"status\":200,\"credential_ref\":\"oa-1\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
       }
     }
   ],
   [
     {
-      "t": 1793787575017,
+      "t": 1793829783896,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-3ae8-7446-a007-b11d062f9518",
+        "request_id": "01a1a896-4957-7208-ad32-d8e92c4404c0",
         "payload_json": "{\"caller_identity\":\"u28c\",\"upstream\":\"openrouter\",\"status\":200,\"credential_ref\":\"or-1\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
       }
     }
   ],
   [
     {
-      "t": 1793787575017,
+      "t": 1793829783897,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-3ae9-710c-b8ba-11481a542bad",
+        "request_id": "01a1a896-4958-7177-8b5a-da901f81da74",
         "payload_json": "{\"caller_identity\":\"u28d\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
       }
     }

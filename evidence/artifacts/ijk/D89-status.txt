@@ -42,7 +42,7 @@
       "retain_seconds": 2592000,
       "rows": 1279
     },
-    "started_at": "2026-11-04T10:19:49.074990Z",
+    "started_at": "2026-11-04T22:03:18.288236Z",
     "upstreams": [
       {
         "base_url": "http://127.0.0.1:25090/",
@@ -75,7 +75,7 @@
     "endpoint": "https://localhost:25061/",
     "health": "ok",
     "last_error": null,
-    "last_ok_at": "2026-11-04T10:20:02.031837Z",
+    "last_ok_at": "2026-11-04T22:03:31.313622Z",
     "mode": "tls",
     "server_cert_expires_at": "2026-12-04T00:00:00Z"
   },
@@ -84,7 +84,7 @@
     "endpoint": "https://localhost:25061/",
     "health": "ok",
     "last_error": null,
-    "last_ok_at": "2026-11-04T10:20:02.031837Z",
+    "last_ok_at": "2026-11-04T22:03:31.313622Z",
     "client_cert_expires_at": "2026-12-04T00:00:00Z",
     "server_cert_expires_at": "2026-12-04T00:00:00Z",
     "dropped_events": 0

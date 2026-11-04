@@ -4,7 +4,7 @@ OK   http://127.0.0.1:7000 without allow_plaintext (no loopback exception): refu
 OK   ftp://x: refuses to start (exit=1) -> janus-daemon: config: plugin.endpoint: scheme "ftp" is not accepted: use unix://, https:// or http://
 OK   http:// + allow_plaintext=true starts; /v1/plugin mode=plaintext
 OK   /v1/status plugin.mode=plaintext
-OK   startup log carries a warning about plaintext: 2026-11-04T10:19:34.118792Z  WARN janus_daemon::plugin::grpc: plugin.allow_plaintext is set: the plugin channel is NEITHER encrypted NOR authenticated by Janus; this is correct only inside a service mesh that secures both ends endpoint=http://policy:7000/
+OK   startup log carries a warning about plaintext: 2026-11-04T22:03:03.040812Z  WARN janus_daemon::plugin::grpc: plugin.allow_plaintext is set: the plugin channel is NEITHER encrypted NOR authenticated by Janus; this is correct only inside a service mesh that secures both ends endpoint=http://policy:7000/
 OK   unix:// -> mode=unix
 OK   https:// with [plugin.tls] -> mode=tls
 OK   linked (custom build) -> mode=linked

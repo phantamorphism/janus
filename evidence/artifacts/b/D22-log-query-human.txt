@@ -1,13 +1,13 @@
 exit=0
 RECEIVED              REQUEST ID                            UPSTREAM   METHOD  PATH                         IDENTITY  OUTCOME                             STATUS  MS
-2026-11-04T10:19:35Z  01a1a612-3e22-71c6-afec-f9342cdd519f  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(wrong_namespace)  -       0
-2026-11-04T10:19:35Z  01a1a612-3e1b-71d1-a01f-a18458910cfa  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
-2026-11-04T10:19:35Z  01a1a612-3e13-70ca-9ed9-58c8886d54de  openai     POST    /openai/v1/chat/completions  -         rejected_identity(invalid)          -       0
-2026-11-04T10:19:35Z  01a1a612-3e09-71d5-8cac-18c7c6f5c8e2  openai     POST    /openai/v1/chat/completions  -         rejected_identity(expired)          -       0
-2026-11-04T10:19:34Z  01a1a612-37b8-7226-bd16-1d7988c46543  openai     POST    /openai/v1/chat/completions  -         rejected_identity(revoked)          -       0
-2026-11-04T10:19:34Z  01a1a612-37a1-7091-af01-50a02a05bef6  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(no_material)      -       0
-2026-11-04T10:19:34Z  01a1a612-379c-76d1-b319-85a922df8648  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(wrong_namespace)  -       0
-2026-11-04T10:19:34Z  01a1a612-372c-71fd-a079-850678c20f63  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(expired)          -       0
-2026-11-04T10:19:34Z  01a1a612-3726-7643-98b8-91fa7282b298  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
-2026-11-04T10:19:34Z  01a1a612-3720-745c-adf1-2473ce522d9b  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
+2026-11-04T22:03:04Z  01a1a896-4c93-73d3-af21-757be134130f  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(wrong_namespace)  -       0
+2026-11-04T22:03:04Z  01a1a896-4c8d-740d-b835-67b196aef2fa  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
+2026-11-04T22:03:04Z  01a1a896-4c84-7057-baa7-8bde55e6e88e  openai     POST    /openai/v1/chat/completions  -         rejected_identity(invalid)          -       0
+2026-11-04T22:03:04Z  01a1a896-4c7a-72d3-b20f-fb2c615d0463  openai     POST    /openai/v1/chat/completions  -         rejected_identity(expired)          -       0
+2026-11-04T22:03:03Z  01a1a896-462a-77b5-a36b-68b8965fc1d2  openai     POST    /openai/v1/chat/completions  -         rejected_identity(revoked)          -       0
+2026-11-04T22:03:03Z  01a1a896-4610-7756-ae96-1efada616420  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(no_material)      -       0
+2026-11-04T22:03:03Z  01a1a896-460b-725f-ae84-5c5fddd9fa12  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(wrong_namespace)  -       0
+2026-11-04T22:03:03Z  01a1a896-4606-70e0-a4ee-c9e9d79b4510  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(expired)          -       0
+2026-11-04T22:03:03Z  01a1a896-4600-716f-b789-94d22f77a6ff  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
+2026-11-04T22:03:03Z  01a1a896-45fa-7286-84b1-72d2c6a05d35  anthropic  POST    /anthropic/v1/messages       -         rejected_identity(invalid)          -       0
 

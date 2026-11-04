@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Tone } from '@/lib/tone'
+import { statusTone, type Tone } from '@/lib/tone'
 
 const toneClass: Record<Tone, string> = {
   ok: 'bg-ok-soft text-ok',
@@ -23,6 +23,15 @@ export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
     >
       <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClass[tone]}`} />
       {children}
+    </span>
+  )
+}
+
+/** An upstream HTTP status code, coloured by its class (2xx, 3xx, 4xx, 5xx). */
+export function StatusBadge({ code }: { code: number }) {
+  return (
+    <span title={`Upstream replied ${code}`}>
+      <Badge tone={statusTone(code)}>{code}</Badge>
     </span>
   )
 }

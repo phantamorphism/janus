@@ -6,12 +6,13 @@
   "headers": {
     "content-type": "text/html",
     "accept-ranges": "bytes",
-    "last-modified": "Wed, 04 Nov 2026 10:18:40 GMT",
+    "last-modified": "Wed, 04 Nov 2026 21:44:11 GMT",
+    "etag": "\"6aeba72b.1db77f93-1c7\"",
     "content-length": "455",
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
     "referrer-policy": "no-referrer",
-    "date": "Wed, 04 Nov 2026 10:19:48 GMT"
+    "date": "Wed, 04 Nov 2026 22:03:17 GMT"
   }
 }
 ## API /v1/status
@@ -24,22 +25,23 @@
     "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
     "referrer-policy": "no-referrer",
     "content-length": "1070",
-    "date": "Wed, 04 Nov 2026 10:19:49 GMT"
+    "date": "Wed, 04 Nov 2026 22:03:18 GMT"
   }
 }
-## asset /assets/index-WCiKb-YO.css
+## asset /assets/index-Bkf5jk6l.css
 {
-  "url": "/assets/index-WCiKb-YO.css",
+  "url": "/assets/index-Bkf5jk6l.css",
   "status": 200,
   "headers": {
     "content-type": "text/css",
     "accept-ranges": "bytes",
-    "last-modified": "Wed, 04 Nov 2026 10:18:40 GMT",
-    "content-length": "22420",
+    "last-modified": "Wed, 04 Nov 2026 21:44:11 GMT",
+    "etag": "\"6aeba72b.1db666f8-5878\"",
+    "content-length": "22648",
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
     "referrer-policy": "no-referrer",
-    "date": "Wed, 04 Nov 2026 10:19:48 GMT"
+    "date": "Wed, 04 Nov 2026 22:03:17 GMT"
   }
 }
 
@@ -47,12 +49,13 @@
 HTTP/1.1 200 OK
 content-type: text/html
 accept-ranges: bytes
-last-modified: Wed, 04 Nov 2026 10:18:40 GMT
+last-modified: Wed, 04 Nov 2026 21:44:11 GMT
+etag: "6aeba72b.1db77f93-1c7"
 content-length: 455
 x-content-type-options: nosniff
 content-security-policy: default-src 'self'; frame-ancestors 'none'
 referrer-policy: no-referrer
-date: Wed, 04 Nov 2026 10:19:58 GMT
+date: Wed, 04 Nov 2026 22:03:27 GMT
 
 # curl /v1/status with token (headers)
 HTTP/1.1 200 OK
@@ -61,4 +64,4 @@ x-content-type-options: nosniff
 content-security-policy: default-src 'self'; frame-ancestors 'none'
 referrer-policy: no-referrer
 content-length: 1070
-date: Wed, 04 Nov 2026 10:19:58 GMT
+date: Wed, 04 Nov 2026 22:03:27 GMT

@@ -11,6 +11,7 @@ export function ConfirmAction({
   onConfirm,
   disabled,
   busy,
+  compact,
 }: {
   label: string
   confirmLabel: string
@@ -18,11 +19,13 @@ export function ConfirmAction({
   onConfirm: () => void
   disabled?: boolean
   busy?: boolean
+  /** Use the small button size, for dense table rows. */
+  compact?: boolean
 }) {
   const [asking, setAsking] = useState(false)
   if (!asking) {
     return (
-      <button type="button" className="btn btn-danger" disabled={disabled || busy} onClick={() => setAsking(true)}>
+      <button type="button" className={`btn btn-danger${compact ? ' btn-sm' : ''}`} disabled={disabled || busy} onClick={() => setAsking(true)}>
         {label}
       </button>
     )

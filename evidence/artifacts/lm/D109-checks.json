@@ -12,7 +12,7 @@
   {
     "name": "button calls POST /v1/plugin/check with the token",
     "ok": true,
-    "detail": "{\"method\":\"POST\",\"url\":\"/v1/plugin/check\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787646309}"
+    "detail": "{\"method\":\"POST\",\"url\":\"/v1/plugin/check\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793829856016}"
   },
   {
     "name": "healthy: UI displays each probe result matching `janus plugin check`",

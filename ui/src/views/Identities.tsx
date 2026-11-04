@@ -122,10 +122,18 @@ export function Identities() {
                 const claims = Object.entries(r.claims ?? {})
                 return (
                   <tr key={r.id} aria-label={`${r.identity} ${r.id}`}>
-                    <td>
-                      <div className="mono font-medium">{r.identity}</div>
-                      {r.label && <div className="text-xs text-ink-soft">{r.label}</div>}
-                      <div className="mono text-xs text-muted">id {r.id}</div>
+                    <td className="min-w-48">
+                      <div className="mono max-w-64 truncate font-medium" title={r.identity}>
+                        {r.identity}
+                      </div>
+                      {r.label && (
+                        <div className="max-w-64 truncate text-xs text-ink-soft" title={r.label}>
+                          {r.label}
+                        </div>
+                      )}
+                      <div className="mono max-w-64 truncate text-xs text-muted" title={r.id}>
+                        id {r.id}
+                      </div>
                     </td>
                     <td>
                       {claims.length === 0 ? (
@@ -144,20 +152,20 @@ export function Identities() {
                       <Badge tone={state.tone}>{state.label}</Badge>
                       {r.revoked_at && (
                         <div className="mt-1 text-xs text-muted">
-                          <Time value={r.revoked_at} />
+                          <Time value={r.revoked_at} stacked />
                         </div>
                       )}
                     </td>
                     <td>
-                      <Time value={r.created_at} />
+                      <Time value={r.created_at} stacked />
                     </td>
                     <td>
-                      <Time value={r.expires_at} empty="never" />
+                      <Time value={r.expires_at} empty="never" stacked />
                     </td>
                     <td>
-                      <Time value={r.last_seen_at} empty="not yet" />
+                      <Time value={r.last_seen_at} empty="not yet" stacked />
                     </td>
-                    <td className="text-right">
+                    <td className="actions text-right">
                       {!r.revoked_at && (
                         <ConfirmAction
                           label="Revoke"

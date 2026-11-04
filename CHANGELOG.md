@@ -16,18 +16,8 @@ contract; they are called out under **Changed**.
 
 ## [Unreleased]
 
-### Added
-
-- Open-source project files: contribution guide, security policy, code of
-  conduct, governance, issue and pull-request templates, code owners, and a
-  development guide (`docs/development.md`).
-- Crate and UI package metadata: description, license, repository, homepage,
-  readme, keywords, categories and a declared minimum supported Rust version
-  (1.89).
-
-## [0.1.0] - Unreleased
-
-First tagged version. What is built, as described in `docs/status.md`:
+Version 0.1.0 is the first release and has not been tagged yet; everything below
+will ship in it. What is built is described in `docs/status.md`.
 
 ### Added
 
@@ -53,10 +43,19 @@ First tagged version. What is built, as described in `docs/status.md`:
   channel, and `check-config`. Connects over the admin socket, or over TCP with
   a token and an optional CA file.
 - **UI**: Overview, Credentials, Identities, Requests (live tail and detail
-  drawer) and Plugin views, behind an admin-token prompt.
+  drawer) and Plugin views, behind an admin-token prompt. The request log shows
+  the upstream's HTTP status as a badge coloured by class; the Overview counts
+  forwarded requests whose upstream replied 4xx or 5xx separately from
+  `upstream_error`, which means no reply was obtained.
 - **Documentation**: the design corpus in `docs/` (checked with Schematic), the
   acceptance deliverables in `evidence/DELIVERABLES.md` with a blind-QA harness
   and recorded results, and independent review reports in `reviews/`.
+- Open-source project files: contribution guide, security policy, code of
+  conduct, governance, issue and pull-request templates, code owners, and a
+  development guide (`docs/development.md`).
+- Crate and UI package metadata: description, license, repository, homepage,
+  readme, keywords, categories and a declared minimum supported Rust version
+  (1.89).
 
 ### Not built
 
@@ -67,5 +66,4 @@ First tagged version. What is built, as described in `docs/status.md`:
   substitution, and non-HTTP transports are out of scope
   (`docs/architecture.md`).
 
-[Unreleased]: https://github.com/phantamorphism/janus/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/phantamorphism/janus/releases/tag/v0.1.0
+[Unreleased]: https://github.com/phantamorphism/janus/commits/main

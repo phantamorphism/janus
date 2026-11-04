@@ -20,23 +20,23 @@
       "ui": null
     },
     "plugin": {
-      "client_cert_expires_at": "2027-11-04T10:19:33Z",
+      "client_cert_expires_at": "2027-11-04T22:03:02Z",
       "dropped_events": 0,
       "endpoint": "https://localhost:23146/",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:38.938740Z",
+      "last_ok_at": "2026-11-04T22:03:07.412238Z",
       "mode": "tls",
-      "server_cert_expires_at": "2027-11-04T10:19:33Z"
+      "server_cert_expires_at": "2027-11-04T22:03:02Z"
     },
     "request_log": {
       "dropped_records": 0,
       "enabled": true,
       "retain": "30days",
       "retain_seconds": 2592000,
-      "rows": 1
+      "rows": 0
     },
-    "started_at": "2026-11-04T10:19:38.800220Z",
+    "started_at": "2026-11-04T22:03:07.281150Z",
     "upstreams": [
       {
         "base_url": "http://127.0.0.1:23002/",
@@ -53,9 +53,9 @@
     "endpoint": "https://localhost:23146/",
     "health": "ok",
     "last_error": null,
-    "last_ok_at": "2026-11-04T10:19:38.938740Z",
-    "client_cert_expires_at": "2027-11-04T10:19:33Z",
-    "server_cert_expires_at": "2027-11-04T10:19:33Z",
+    "last_ok_at": "2026-11-04T22:03:07.412238Z",
+    "client_cert_expires_at": "2027-11-04T22:03:02Z",
+    "server_cert_expires_at": "2027-11-04T22:03:02Z",
     "dropped_events": 0
   },
   "stAfter": {
@@ -63,90 +63,90 @@
     "endpoint": "https://localhost:23146/",
     "health": "ok",
     "last_error": null,
-    "last_ok_at": "2026-11-04T10:19:43.276573Z",
-    "client_cert_expires_at": "2027-11-04T10:19:33Z",
-    "server_cert_expires_at": "2027-11-04T10:19:33Z",
+    "last_ok_at": "2026-11-04T22:03:11.742972Z",
+    "client_cert_expires_at": "2027-11-04T22:03:02Z",
+    "server_cert_expires_at": "2027-11-04T22:03:02Z",
     "dropped_events": 0
   },
   "conns": [
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787578937
+      "at": 1793829787411
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787578942
+      "at": 1793829787416
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787579251
+      "at": 1793829787722
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "0D:4B:E6:95:71:93:2A:2D:E5:05:F9:5B:AE:58:0A:F7:64:78:4F:0C:A7:E3:7E:E2:8A:07:5E:01:1D:88:A6:D5",
+      "clientFp": "FB:1C:8F:9B:88:BB:A9:62:71:66:07:BD:D4:23:C6:D6:67:36:E3:FD:CA:DC:56:66:E9:BB:E5:29:2E:04:C9:15",
       "protocol": "TLSv1.3",
-      "at": 1793787581263
+      "at": 1793829789730
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "0D:4B:E6:95:71:93:2A:2D:E5:05:F9:5B:AE:58:0A:F7:64:78:4F:0C:A7:E3:7E:E2:8A:07:5E:01:1D:88:A6:D5",
+      "clientFp": "FB:1C:8F:9B:88:BB:A9:62:71:66:07:BD:D4:23:C6:D6:67:36:E3:FD:CA:DC:56:66:E9:BB:E5:29:2E:04:C9:15",
       "protocol": "TLSv1.3",
-      "at": 1793787581265
+      "at": 1793829789734
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787581767
+      "at": 1793829790237
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787581769
+      "at": 1793829790240
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787583275
+      "at": 1793829791742
     },
     {
       "authorized": true,
       "authError": null,
-      "clientFp": "45:03:5C:10:79:DA:14:39:3F:29:68:28:3A:D7:90:09:04:E1:A9:DF:91:16:D1:9E:DE:F5:DA:40:40:51:A2:53",
+      "clientFp": "34:9F:22:9D:2C:6B:9A:5F:9A:9D:61:EA:AE:D3:F9:29:64:46:CA:E0:B2:A5:CE:33:EC:ED:C3:F2:11:32:B1:4A",
       "protocol": "TLSv1.3",
-      "at": 1793787584788
+      "at": 1793829793250
     }
   ],
   "logTail": [
-    "2026-11-04T10:19:38.799996Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d54/data/credentials credentials=0",
-    "2026-11-04T10:19:38.805290Z  INFO janus_daemon::admin::token: generated the admin token path=/tmp/qa-ef/run/d54/data/admin-token",
-    "2026-11-04T10:19:38.805877Z  INFO janus_daemon::admin: admin socket ready socket=/tmp/qa-ef/run/d54/data/admin.sock",
-    "2026-11-04T10:19:38.805883Z  INFO janus_daemon::run: janus-daemon started data_plane=127.0.0.1:23147 data_dir=/tmp/qa-ef/run/d54/data plugin=tls",
-    "2026-11-04T10:19:38.929998Z  INFO janus_core::pool: credential added to the pool credential=k1 upstream=anthropic",
-    "2026-11-04T10:19:38.930043Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/k1\" outcome=\"ok\"",
-    "2026-11-04T10:19:40.803783Z  INFO janus_daemon::plugin::grpc: plugin TLS material reloaded endpoint=https://localhost:23146/",
-    "2026-11-04T10:19:41.264674Z  INFO janus_daemon::plugin::grpc: plugin TLS material reloaded endpoint=https://localhost:23146/",
-    "2026-11-04T10:19:41.264680Z  INFO janus_daemon::run: SIGHUP: plugin TLS material re-read",
-    "2026-11-04T10:19:41.768428Z ERROR janus_daemon::run: SIGHUP: plugin TLS reload failed; keeping the last good material error=plugin.tls.client_cert: /tmp/qa-ef/run/d54-live/client.pem contains no certificate",
-    "2026-11-04T10:19:42.803992Z  WARN janus_daemon::plugin::grpc: plugin TLS material changed on disk but does not load; keeping the last good material: plugin.tls.client_cert: /tmp/qa-ef/run/d54-live/client.pem contains no certificate endpoint=https://localhost:23146/",
-    "2026-11-04T10:19:43.279792Z  WARN janus_daemon::plugin::grpc: plugin Notify stream failed, reopening in 100 ms: plugin connection failed: peer closed connection without sending TLS close_notify: https://docs.rs/rustls/latest/rustls/manual/_03_howto/index.html#unexpected-eof endpoint=https://localhost:23146/ class=plugin_unreachable possibly_lost=2",
-    "2026-11-04T10:19:43.279999Z ERROR janus_daemon::run: SIGHUP: plugin TLS reload failed; keeping the last good material error=plugin.tls.client_key: /tmp/qa-ef/run/d54-live/client-key.pem is not a PEM private key: no items found",
+    "2026-11-04T22:03:07.280664Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d54/data/credentials credentials=0",
+    "2026-11-04T22:03:07.289805Z  INFO janus_daemon::admin::token: generated the admin token path=/tmp/qa-ef/run/d54/data/admin-token",
+    "2026-11-04T22:03:07.295627Z  INFO janus_daemon::admin: admin socket ready socket=/tmp/qa-ef/run/d54/data/admin.sock",
+    "2026-11-04T22:03:07.295651Z  INFO janus_daemon::run: janus-daemon started data_plane=127.0.0.1:23147 data_dir=/tmp/qa-ef/run/d54/data plugin=tls",
+    "2026-11-04T22:03:07.406825Z  INFO janus_core::pool: credential added to the pool credential=k1 upstream=anthropic",
+    "2026-11-04T22:03:07.406841Z  INFO janus::admin::audit: admin mutation principal=\"socket\" action=\"credential.add\" resource=\"credential/k1\" outcome=\"ok\"",
+    "2026-11-04T22:03:09.284481Z  INFO janus_daemon::plugin::grpc: plugin TLS material reloaded endpoint=https://localhost:23146/",
+    "2026-11-04T22:03:09.733103Z  INFO janus_daemon::plugin::grpc: plugin TLS material reloaded endpoint=https://localhost:23146/",
+    "2026-11-04T22:03:09.733115Z  INFO janus_daemon::run: SIGHUP: plugin TLS material re-read",
+    "2026-11-04T22:03:10.239266Z ERROR janus_daemon::run: SIGHUP: plugin TLS reload failed; keeping the last good material error=plugin.tls.client_cert: /tmp/qa-ef/run/d54-live/client.pem contains no certificate",
+    "2026-11-04T22:03:11.283366Z  WARN janus_daemon::plugin::grpc: plugin TLS material changed on disk but does not load; keeping the last good material: plugin.tls.client_cert: /tmp/qa-ef/run/d54-live/client.pem contains no certificate endpoint=https://localhost:23146/",
+    "2026-11-04T22:03:11.744056Z  WARN janus_daemon::plugin::grpc: plugin Notify stream failed, reopening in 100 ms: plugin connection failed: peer closed connection without sending TLS close_notify: https://docs.rs/rustls/latest/rustls/manual/_03_howto/index.html#unexpected-eof endpoint=https://localhost:23146/ class=plugin_unreachable possibly_lost=2",
+    "2026-11-04T22:03:11.744074Z ERROR janus_daemon::run: SIGHUP: plugin TLS reload failed; keeping the last good material error=plugin.tls.client_key: /tmp/qa-ef/run/d54-live/client-key.pem is not a PEM private key: no items found",
     ""
   ]
 }

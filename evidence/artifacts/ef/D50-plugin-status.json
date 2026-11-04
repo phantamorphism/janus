@@ -20,7 +20,7 @@
     "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock",
     "health": "ok",
     "last_error": "cannot connect to plugin socket /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d50/p.sock: No such file or directory (os error 2)",
-    "last_ok_at": "2026-11-04T10:19:35.457936Z",
+    "last_ok_at": "2026-11-04T22:03:04.192384Z",
     "dropped_events": 0
   },
   "firstResponse": {
@@ -39,8 +39,8 @@
     "method": "POST",
     "outcome": "plugin_failed",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:35.447711Z",
-    "request_id": "01a1a612-3c97-74cf-a22e-d2b3f7828739",
+    "received_at": "2026-11-04T22:03:04.183663Z",
+    "request_id": "01a1a896-4a77-747b-8870-af673aaaf2ff",
     "route": null,
     "status": null,
     "upstream": "anthropic",

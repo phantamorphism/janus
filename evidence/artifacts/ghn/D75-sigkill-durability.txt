@@ -1,1 +1,1 @@
-writer acknowledged 92 committed charges (printed after each returned) before SIGKILL; after reopen the Total counter is 92 (expected >= 92, <= 94); -wal file present after kill: false
+writer acknowledged 145 committed charges (printed after each returned) before SIGKILL; after reopen the Total counter is 145 (expected >= 145, <= 147); -wal file present after kill: false

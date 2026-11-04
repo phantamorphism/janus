@@ -33,3 +33,11 @@ export function outcomeTone(o: OutcomeName): Tone {
       return 'warn'
   }
 }
+
+/** An upstream HTTP status by class: 2xx ok, 3xx idle, 4xx warn, 5xx and anything odd bad. */
+export function statusTone(code: number): Tone {
+  if (code >= 200 && code < 300) return 'ok'
+  if (code >= 300 && code < 400) return 'idle'
+  if (code >= 400 && code < 500) return 'warn'
+  return 'bad'
+}

@@ -62,7 +62,7 @@
   {
     "name": "rate_limited_until in future",
     "ok": true,
-    "detail": "2026-11-04T10:21:34.317675Z"
+    "detail": "2026-11-04T22:05:03.320142Z"
   },
   {
     "name": "rate-limited request_count>=1",

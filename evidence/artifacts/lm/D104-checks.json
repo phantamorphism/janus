@@ -67,12 +67,12 @@
   {
     "name": "UI document carries X-Content-Type-Options: nosniff and a Referrer-Policy",
     "ok": true,
-    "detail": "{\"content-type\":\"text/html\",\"accept-ranges\":\"bytes\",\"last-modified\":\"Wed, 04 Nov 2026 10:18:40 GMT\",\"content-length\":\"455\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"date\":\"Wed, 04 Nov 2026 10:19:48 GMT\"}"
+    "detail": "{\"content-type\":\"text/html\",\"accept-ranges\":\"bytes\",\"last-modified\":\"Wed, 04 Nov 2026 21:44:11 GMT\",\"etag\":\"\\\"6aeba72b.1db77f93-1c7\\\"\",\"content-length\":\"455\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"dat"
   },
   {
     "name": "API responses on the UI listener carry the same security headers",
     "ok": true,
-    "detail": "{\"content-type\":\"application/json\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"content-length\":\"1070\",\"date\":\"Wed, 04 Nov 2026 10:19:49 GMT\"}"
+    "detail": "{\"content-type\":\"application/json\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"content-length\":\"1070\",\"date\":\"Wed, 04 Nov 2026 22:03:18 GMT\"}"
   },
   {
     "name": "no CSP violations or JS errors in the browser console while the UI works end to end",

@@ -3,28 +3,29 @@
 - generic [ref=e1] clickable [onclick]
   - link "Skip to content" [ref=e5]
   - complementary
-    - StaticText "Janus"
-    - navigation "Views" [ref=e6]
-      - list
-        - listitem [level=1]
-          - link "Overview" [ref=e23]
-        - listitem [level=1]
-          - link "Credentials" [ref=e24]
-        - listitem [level=1]
-          - link "Identities" [ref=e25]
-        - listitem [level=1]
-          - link "Requests" [ref=e26]
-        - listitem [level=1]
-          - link "Plugin" [ref=e27]
-    - button "Forget token" [ref=e13]
+    - generic
+      - StaticText "Janus"
+      - navigation "Views" [ref=e12]
+        - list
+          - listitem [level=1]
+            - link "Overview" [ref=e61]
+          - listitem [level=1]
+            - link "Credentials" [ref=e62]
+          - listitem [level=1]
+            - link "Identities" [ref=e63]
+          - listitem [level=1]
+            - link "Requests" [ref=e64]
+          - listitem [level=1]
+            - link "Plugin" [ref=e65]
+      - button "Forget token" [ref=e21]
   - main
     - sectionheader
-      - heading "Overview" [level=1, ref=e14]
+      - heading "Overview" [level=1, ref=e13]
       - paragraph
         - StaticText "What this Janus daemon is, where it listens, and how its traffic and credentials are doing."
-      - button "Reload" [ref=e15]
-    - region "Daemon" [ref=e7]
-      - heading "Daemon" [level=2, ref=e16]
+      - button "Reload" [ref=e14]
+    - region "Daemon" [ref=e6]
+      - heading "Daemon" [level=2, ref=e15]
       - DescriptionList
         - term "Version"
         - definition
@@ -35,9 +36,9 @@
         - term "Started"
         - definition
           - time
-            - StaticText "2026-11-04 12:19:331 min ago"
-    - region "Listeners" [ref=e8]
-      - heading "Listeners" [level=2, ref=e17]
+            - StaticText "2026-11-05 00:03:021 min ago"
+    - region "Listeners" [ref=e7]
+      - heading "Listeners" [level=2, ref=e16]
       - table "Listeners"
         - rowgroup
           - row
@@ -45,19 +46,19 @@
             - columnheader "Address" [ref=e67]
             - columnheader "TLS" [ref=e68]
         - row
-          - cell "data plane" [ref=e28]
-          - cell "127.0.0.1:24001" [ref=e29]
-          - cell "—" [ref=e30]
+          - cell "data plane" [ref=e23]
+          - cell "127.0.0.1:24001" [ref=e24]
+          - cell "—" [ref=e25]
         - row
-          - cell "admin socket" [ref=e31]
-          - cell "/tmp/qa-ghn/run/A/data/admin.sock" [ref=e32]
-          - cell "—" [ref=e33]
+          - cell "admin socket" [ref=e26]
+          - cell "/tmp/qa-ghn/run/A/data/admin.sock" [ref=e27]
+          - cell "—" [ref=e28]
         - row
-          - cell "ui" [ref=e34]
-          - cell "http://127.0.0.1:24002/" [ref=e35]
-          - cell "no" [ref=e36]
-    - region "Upstreams" [ref=e9]
-      - heading "Upstreams" [level=2, ref=e18]
+          - cell "ui" [ref=e29]
+          - cell "http://127.0.0.1:24002/" [ref=e30]
+          - cell "no" [ref=e31]
+    - region "Upstreams" [ref=e8]
+      - heading "Upstreams" [level=2, ref=e17]
       - table "Upstreams"
         - rowgroup
           - row
@@ -67,25 +68,25 @@
             - columnheader "Identity binding" [ref=e72]
             - columnheader "Routes" [ref=e73]
         - row
-          - cell "openai" [ref=e37]
-          - cell "/openai" [ref=e38]
+          - cell "openai" [ref=e32]
+          - cell "/openai" [ref=e33]
+          - cell "http://127.0.0.1:24090/" [ref=e34]
+          - cell "opaque" [ref=e35]
+          - cell "—" [ref=e36]
+        - row
+          - cell "anthropic" [ref=e37]
+          - cell "/anthropic" [ref=e38]
           - cell "http://127.0.0.1:24090/" [ref=e39]
           - cell "opaque" [ref=e40]
           - cell "—" [ref=e41]
         - row
-          - cell "anthropic" [ref=e42]
-          - cell "/anthropic" [ref=e43]
+          - cell "openrouter" [ref=e42]
+          - cell "/openrouter" [ref=e43]
           - cell "http://127.0.0.1:24090/" [ref=e44]
           - cell "opaque" [ref=e45]
           - cell "—" [ref=e46]
-        - row
-          - cell "openrouter" [ref=e47]
-          - cell "/openrouter" [ref=e48]
-          - cell "http://127.0.0.1:24090/" [ref=e49]
-          - cell "opaque" [ref=e50]
-          - cell "—" [ref=e51]
-    - region "Plugin" [ref=e10]
-      - heading "Plugin" [level=2, ref=e19]
+    - region "Plugin" [ref=e9]
+      - heading "Plugin" [level=2, ref=e18]
       - DescriptionList
         - term "Health"
         - definition
@@ -99,12 +100,12 @@
         - term "Last successful call"
         - definition
           - time
-            - StaticText "2026-11-04 12:20:0931 s ago"
+            - StaticText "2026-11-05 00:03:3831 s ago"
         - term "Dropped notify events"
         - definition "Dropped notify events"
           - StaticText "0"
-    - region "Credential health" [ref=e11]
-      - heading "Credential health" [level=2, ref=e20]
+    - region "Credential health" [ref=e10]
+      - heading "Credential health" [level=2, ref=e19]
       - list "Credentials by status"
         - listitem [level=1]
           - StaticText "15"
@@ -120,11 +121,11 @@
           - StaticText "disabled"
       - list "Credentials needing attention"
         - listitem [level=1]
-          - StaticText "or-rl (openrouter) rate limited: rate limited until 2026-11-04T10:21:34.317675+00:00"
+          - StaticText "or-rl (openrouter) rate limited"
         - listitem [level=1]
           - StaticText "or-dis (openrouter) disabled"
-    - region "Traffic" [ref=e12]
-      - heading "Traffic" [level=2, ref=e21]
+    - region "Traffic" [ref=e11]
+      - heading "Traffic" [level=2, ref=e20]
       - LabelText
         - StaticText "Window"
         - combobox "Window" [expanded=false, ref=e22]: Last hour
@@ -154,28 +155,37 @@
             - columnheader "Outcome" [ref=e77]
             - columnheader "Count" [ref=e78]
         - row
-          - cell "forwarded" [ref=e52]
-          - cell "9" [ref=e53]
+          - cell "forwarded" [ref=e47]
+          - cell "9" [ref=e48]
         - row
-          - cell "rejected identity" [ref=e54]
-          - cell "1" [ref=e55]
+          - cell "rejected identity" [ref=e49]
+          - cell "1" [ref=e50]
         - row
-          - cell "denied" [ref=e56]
-          - cell "1" [ref=e57]
+          - cell "denied" [ref=e51]
+          - cell "1" [ref=e52]
         - row
-          - cell "plugin failed" [ref=e58]
-          - cell "0" [ref=e59]
+          - cell "plugin failed" [ref=e53]
+          - cell "0" [ref=e54]
         - row
-          - cell "credential unavailable" [ref=e60]
-          - cell "4" [ref=e61]
+          - cell "credential unavailable" [ref=e55]
+          - cell "4" [ref=e56]
         - row
-          - cell "upstream error" [ref=e62]
-          - cell "1" [ref=e63]
+          - cell "upstream error" [ref=e57]
+          - cell "1" [ref=e58]
         - row
-          - cell "abandoned" [ref=e64]
-          - cell "0" [ref=e65]
+          - cell "abandoned" [ref=e59]
+          - cell "0" [ref=e60]
       - paragraph
-        - StaticText "Request log on, 16 records stored, kept for 30days."
+        - StaticText "Upstream error means Janus got no reply from the upstream (it was unreachable or the connection failed). An upstream that replied with an error status is counted as forwarded, with its status shown on the request."
+      - DescriptionList "Forwarded requests by upstream reply"
+        - term "Upstream replied 4xx"
+        - definition "Upstream 4xx replies"
+          - StaticText "3"
+        - term "Upstream replied 5xx"
+        - definition "Upstream 5xx replies"
+          - StaticText "0"
+      - paragraph
+        - StaticText "Request log on, 16 records stored, kept for 30 days."
       - DescriptionList
         - term "Dropped log records"
         - definition "Dropped log records"
@@ -188,20 +198,21 @@
 - generic [ref=e1] clickable [onclick]
   - link "Skip to content" [ref=e5]
   - complementary
-    - StaticText "Janus"
-    - navigation "Views" [ref=e6]
-      - list
-        - listitem [level=1]
-          - link "Overview" [ref=e23]
-        - listitem [level=1]
-          - link "Credentials" [ref=e24]
-        - listitem [level=1]
-          - link "Identities" [ref=e25]
-        - listitem [level=1]
-          - link "Requests" [ref=e26]
-        - listitem [level=1]
-          - link "Plugin" [ref=e27]
-    - button "Forget token" [ref=e13]
+    - generic
+      - StaticText "Janus"
+      - navigation "Views" [ref=e12]
+        - list
+          - listitem [level=1]
+            - link "Overview" [ref=e61]
+          - listitem [level=1]
+            - link "Credentials" [ref=e62]
+          - listitem [level=1]
+            - link "Identities" [ref=e63]
+          - listitem [level=1]
+            - link "Requests" [ref=e64]
+          - listitem [level=1]
+            - link "Plugin" [ref=e65]
+      - button "Forget token" [ref=e21]
   - main
     - sectionheader
       - heading "Credentials" [level=1, ref=e79]
@@ -235,7 +246,7 @@
             - StaticText "API key, config (env)"
         - cell "openrouter" [ref=e83]
         - cell "active" [ref=e84]
-        - cell "does not expire" [ref=e85]
+        - cell "never" [ref=e85]
         - cell "never" [ref=e86]
         - cell "0" [ref=e87]
         - cell "0" [ref=e88]
@@ -250,7 +261,7 @@
             - StaticText "API key, config (file)"
         - cell "openrouter" [ref=e91]
         - cell "active" [ref=e92]
-        - cell "does not expire" [ref=e93]
+        - cell "never" [ref=e93]
         - cell "never" [ref=e94]
         - cell "0" [ref=e95]
         - cell "0" [ref=e96]
@@ -265,9 +276,10 @@
             - StaticText "OAuth, pool slot"
         - cell "anthropic" [ref=e99]
         - cell "active" [ref=e100]
-        - cell "2027-11-04 12:19:32in 364 d" [ref=e101]
+        - cell "2027-11-05 00:03:02 in 364 d" [ref=e101]
           - time
-            - StaticText "2027-11-04 12:19:32in 364 d"
+            - StaticText "2027-11-05 00:03:02"
+            - StaticText "in 364 d"
         - cell "never" [ref=e102]
         - cell "0" [ref=e103]
         - cell "0" [ref=e104]
@@ -282,7 +294,7 @@
             - StaticText "OAuth, pool slot"
         - cell "openai" [ref=e107]
         - cell "active" [ref=e108]
-        - cell "does not expire" [ref=e109]
+        - cell "never" [ref=e109]
         - cell "never" [ref=e110]
         - cell "0" [ref=e111]
         - cell "0" [ref=e112]
@@ -297,7 +309,7 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e115]
         - cell "active" [ref=e116]
-        - cell "does not expire" [ref=e117]
+        - cell "never" [ref=e117]
         - cell "never" [ref=e118]
         - cell "0" [ref=e119]
         - cell "0" [ref=e120]
@@ -312,10 +324,11 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e123]
         - cell "active" [ref=e124]
-        - cell "does not expire" [ref=e125]
-        - cell "2026-11-04 12:20:0933 s ago" [ref=e126]
+        - cell "never" [ref=e125]
+        - cell "2026-11-05 00:03:38 33 s ago" [ref=e126]
           - time
-            - StaticText "2026-11-04 12:20:0933 s ago"
+            - StaticText "2026-11-05 00:03:38"
+            - StaticText "33 s ago"
         - cell "4" [ref=e127]
         - cell "0" [ref=e128]
         - cell "Disable Refresh Remove" [ref=e129]
@@ -329,9 +342,10 @@
             - StaticText "OAuth, pool slot"
         - cell "anthropic" [ref=e131]
         - cell "active" [ref=e132]
-        - cell "2027-11-04 12:19:33in 364 d" [ref=e133]
+        - cell "2027-11-05 00:03:02 in 364 d" [ref=e133]
           - time
-            - StaticText "2027-11-04 12:19:33in 364 d"
+            - StaticText "2027-11-05 00:03:02"
+            - StaticText "in 364 d"
         - cell "never" [ref=e134]
         - cell "0" [ref=e135]
         - cell "0" [ref=e136]
@@ -346,7 +360,7 @@
             - StaticText "OAuth, pool slot"
         - cell "openai" [ref=e139]
         - cell "active" [ref=e140]
-        - cell "does not expire" [ref=e141]
+        - cell "never" [ref=e141]
         - cell "never" [ref=e142]
         - cell "0" [ref=e143]
         - cell "0" [ref=e144]
@@ -363,10 +377,11 @@
         - cell "active rejected by the upstream: 401 Unauthorized: 401: User not found." [ref=e148]
           - StaticText "active"
           - StaticText "rejected by the upstream: 401 Unauthorized: 401: User not found."
-        - cell "does not expire" [ref=e149]
-        - cell "2026-11-04 12:20:0933 s ago" [ref=e150]
+        - cell "never" [ref=e149]
+        - cell "2026-11-05 00:03:38 33 s ago" [ref=e150]
           - time
-            - StaticText "2026-11-04 12:20:0933 s ago"
+            - StaticText "2026-11-05 00:03:38"
+            - StaticText "33 s ago"
         - cell "2" [ref=e151]
         - cell "1" [ref=e152]
         - cell "Disable Refresh Remove" [ref=e153]
@@ -379,17 +394,18 @@
           - generic
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e155]
-        - cell "rate limited until 2026-11-04 12:21:34in 51 s rate limited until 2026-11-04T10:21:34.317675+00:00" [ref=e156]
+        - cell "rate limited until 2026-11-05 00:05:03 in 51 s" [ref=e156]
           - StaticText "rate limited"
           - generic
             - StaticText "until "
             - time
-              - StaticText "2026-11-04 12:21:34in 51 s"
-          - StaticText "rate limited until 2026-11-04T10:21:34.317675+00:00"
-        - cell "does not expire" [ref=e157]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e158]
+              - StaticText "2026-11-05 00:05:03"
+              - StaticText "in 51 s"
+        - cell "never" [ref=e157]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e158]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "1" [ref=e159]
         - cell "1" [ref=e160]
         - cell "Disable Refresh Remove" [ref=e161]
@@ -403,10 +419,11 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e163]
         - cell "active" [ref=e164]
-        - cell "does not expire" [ref=e165]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e166]
+        - cell "never" [ref=e165]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e166]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "1" [ref=e167]
         - cell "0" [ref=e168]
         - cell "Disable Refresh Remove" [ref=e169]
@@ -422,9 +439,10 @@
         - cell "active refresh failed: credential refresh failed: error sending request: operation timed out" [ref=e172]
           - StaticText "active"
           - StaticText "refresh failed: credential refresh failed: error sending request: operation timed out"
-        - cell "2026-11-04 11:19:351 h ago" [ref=e173]
+        - cell "2026-11-04 23:03:04 1 h ago" [ref=e173]
           - time
-            - StaticText "2026-11-04 11:19:351 h ago"
+            - StaticText "2026-11-04 23:03:04"
+            - StaticText "1 h ago"
         - cell "never" [ref=e174]
         - cell "0" [ref=e175]
         - cell "3" [ref=e176]
@@ -439,7 +457,7 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e179]
         - cell "disabled" [ref=e180]
-        - cell "does not expire" [ref=e181]
+        - cell "never" [ref=e181]
         - cell "never" [ref=e182]
         - cell "0" [ref=e183]
         - cell "0" [ref=e184]
@@ -454,12 +472,14 @@
             - StaticText "OAuth, pool slot"
         - cell "anthropic" [ref=e187]
         - cell "active" [ref=e188]
-        - cell "2026-11-04 14:20:08in 1 h" [ref=e189]
+        - cell "2026-11-05 02:03:37 in 1 h" [ref=e189]
           - time
-            - StaticText "2026-11-04 14:20:08in 1 h"
-        - cell "2026-11-04 12:20:0834 s ago" [ref=e190]
+            - StaticText "2026-11-05 02:03:37"
+            - StaticText "in 1 h"
+        - cell "2026-11-05 00:03:37 34 s ago" [ref=e190]
           - time
-            - StaticText "2026-11-04 12:20:0834 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "34 s ago"
         - cell "1" [ref=e191]
         - cell "0" [ref=e192]
         - cell "Disable Refresh Remove" [ref=e193]
@@ -473,12 +493,14 @@
             - StaticText "OAuth, pool slot"
         - cell "openai" [ref=e195]
         - cell "active" [ref=e196]
-        - cell "2026-11-04 14:20:08in 1 h" [ref=e197]
+        - cell "2026-11-05 02:03:37 in 1 h" [ref=e197]
           - time
-            - StaticText "2026-11-04 14:20:08in 1 h"
-        - cell "2026-11-04 12:20:0834 s ago" [ref=e198]
+            - StaticText "2026-11-05 02:03:37"
+            - StaticText "in 1 h"
+        - cell "2026-11-05 00:03:37 34 s ago" [ref=e198]
           - time
-            - StaticText "2026-11-04 12:20:0834 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "34 s ago"
         - cell "1" [ref=e199]
         - cell "0" [ref=e200]
         - cell "Disable Refresh Remove" [ref=e201]
@@ -492,7 +514,7 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e203]
         - cell "active" [ref=e204]
-        - cell "does not expire" [ref=e205]
+        - cell "never" [ref=e205]
         - cell "never" [ref=e206]
         - cell "0" [ref=e207]
         - cell "0" [ref=e208]
@@ -507,7 +529,7 @@
             - StaticText "API key, pool slot"
         - cell "openrouter" [ref=e211]
         - cell "active" [ref=e212]
-        - cell "does not expire" [ref=e213]
+        - cell "never" [ref=e213]
         - cell "never" [ref=e214]
         - cell "0" [ref=e215]
         - cell "0" [ref=e216]
@@ -520,20 +542,21 @@
 - generic [ref=e1] clickable [onclick]
   - link "Skip to content" [ref=e5]
   - complementary
-    - StaticText "Janus"
-    - navigation "Views" [ref=e6]
-      - list
-        - listitem [level=1]
-          - link "Overview" [ref=e23]
-        - listitem [level=1]
-          - link "Credentials" [ref=e24]
-        - listitem [level=1]
-          - link "Identities" [ref=e25]
-        - listitem [level=1]
-          - link "Requests" [ref=e26]
-        - listitem [level=1]
-          - link "Plugin" [ref=e27]
-    - button "Forget token" [ref=e13]
+    - generic
+      - StaticText "Janus"
+      - navigation "Views" [ref=e12]
+        - list
+          - listitem [level=1]
+            - link "Overview" [ref=e61]
+          - listitem [level=1]
+            - link "Credentials" [ref=e62]
+          - listitem [level=1]
+            - link "Identities" [ref=e63]
+          - listitem [level=1]
+            - link "Requests" [ref=e64]
+          - listitem [level=1]
+            - link "Plugin" [ref=e65]
+      - button "Forget token" [ref=e21]
   - main
     - sectionheader
       - heading "Identities" [level=1, ref=e281]
@@ -557,220 +580,244 @@
           - columnheader "Last seen" [ref=e389]
           - columnheader "Actions" [ref=e390]
             - StaticText "Actions"
-      - row "ref:oa-exp 01a1a612-be4e-74d9-a4cb-d0f03407a321"
-        - cell "ref:oa-exp id 01a1a612-be4e-74d9-a4cb-d0f03407a321" [ref=e286]
+      - row "ref:oa-exp 01a1a896-cd41-746e-b621-82db8d60e576"
+        - cell "ref:oa-exp id 01a1a896-cd41-746e-b621-82db8d60e576" [ref=e286]
           - StaticText "ref:oa-exp"
           - generic
-            - StaticText "id 01a1a612-be4e-74d9-a4cb-d0f03407a321"
+            - StaticText "id 01a1a896-cd41-746e-b621-82db8d60e576"
         - cell "none" [ref=e287]
         - cell "active" [ref=e288]
-        - cell "2026-11-04 12:20:0835 s ago" [ref=e289]
+        - cell "2026-11-05 00:03:37 35 s ago" [ref=e289]
           - time
-            - StaticText "2026-11-04 12:20:0835 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "35 s ago"
         - cell "never" [ref=e290]
-        - cell "2026-11-04 12:20:0835 s ago" [ref=e291]
+        - cell "2026-11-05 00:03:37 35 s ago" [ref=e291]
           - time
-            - StaticText "2026-11-04 12:20:0835 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "35 s ago"
         - cell "Revoke" [ref=e292]
           - button "Revoke" [ref=e391]
-      - row "ref:an-exp2 01a1a612-bc21-75ed-bec4-1da629ff58ff"
-        - cell "ref:an-exp2 id 01a1a612-bc21-75ed-bec4-1da629ff58ff" [ref=e293]
+      - row "ref:an-exp2 01a1a896-cb09-7071-9f63-307062b1928d"
+        - cell "ref:an-exp2 id 01a1a896-cb09-7071-9f63-307062b1928d" [ref=e293]
           - StaticText "ref:an-exp2"
           - generic
-            - StaticText "id 01a1a612-bc21-75ed-bec4-1da629ff58ff"
+            - StaticText "id 01a1a896-cb09-7071-9f63-307062b1928d"
         - cell "none" [ref=e294]
         - cell "active" [ref=e295]
-        - cell "2026-11-04 12:20:0836 s ago" [ref=e296]
+        - cell "2026-11-05 00:03:37 36 s ago" [ref=e296]
           - time
-            - StaticText "2026-11-04 12:20:0836 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "36 s ago"
         - cell "never" [ref=e297]
-        - cell "2026-11-04 12:20:0836 s ago" [ref=e298]
+        - cell "2026-11-05 00:03:37 36 s ago" [ref=e298]
           - time
-            - StaticText "2026-11-04 12:20:0836 s ago"
+            - StaticText "2026-11-05 00:03:37"
+            - StaticText "36 s ago"
         - cell "Revoke" [ref=e299]
           - button "Revoke" [ref=e392]
-      - row "ref:or-generic 01a1a612-3a50-7763-9d88-74e56f2f22f6"
-        - cell "ref:or-generic id 01a1a612-3a50-7763-9d88-74e56f2f22f6" [ref=e300]
+      - row "ref:or-generic 01a1a896-4942-7324-9de6-e3f8bbb2d254"
+        - cell "ref:or-generic id 01a1a896-4942-7324-9de6-e3f8bbb2d254" [ref=e300]
           - StaticText "ref:or-generic"
           - generic
-            - StaticText "id 01a1a612-3a50-7763-9d88-74e56f2f22f6"
+            - StaticText "id 01a1a896-4942-7324-9de6-e3f8bbb2d254"
         - cell "none" [ref=e301]
         - cell "active" [ref=e302]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e303]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e303]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e304]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e305]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e305]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "Revoke" [ref=e306]
           - button "Revoke" [ref=e393]
-      - row "meter:budget 01a1a612-37d9-7498-b6ac-d3fad6b9e35b"
-        - cell "meter:budget id 01a1a612-37d9-7498-b6ac-d3fad6b9e35b" [ref=e307]
+      - row "meter:budget 01a1a896-46d0-7622-aad6-5925ab77c404"
+        - cell "meter:budget id 01a1a896-46d0-7622-aad6-5925ab77c404" [ref=e307]
           - StaticText "meter:budget"
           - generic
-            - StaticText "id 01a1a612-37d9-7498-b6ac-d3fad6b9e35b"
+            - StaticText "id 01a1a896-46d0-7622-aad6-5925ab77c404"
         - cell "none" [ref=e308]
         - cell "active" [ref=e309]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e310]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e310]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e311]
         - cell "not yet" [ref=e312]
         - cell "Revoke" [ref=e313]
           - button "Revoke" [ref=e394]
-      - row "deny 01a1a612-37d2-7245-b11d-6a36cf5122b4"
-        - cell "deny id 01a1a612-37d2-7245-b11d-6a36cf5122b4" [ref=e314]
+      - row "deny 01a1a896-46cc-7605-b182-11c1ad22676d"
+        - cell "deny id 01a1a896-46cc-7605-b182-11c1ad22676d" [ref=e314]
           - StaticText "deny"
           - generic
-            - StaticText "id 01a1a612-37d2-7245-b11d-6a36cf5122b4"
+            - StaticText "id 01a1a896-46cc-7605-b182-11c1ad22676d"
         - cell "none" [ref=e315]
         - cell "active" [ref=e316]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e317]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e317]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e318]
-        - cell "2026-11-04 12:20:0935 s ago" [ref=e319]
+        - cell "2026-11-05 00:03:38 35 s ago" [ref=e319]
           - time
-            - StaticText "2026-11-04 12:20:0935 s ago"
+            - StaticText "2026-11-05 00:03:38"
+            - StaticText "35 s ago"
         - cell "Revoke" [ref=e320]
           - button "Revoke" [ref=e395]
-      - row "default 01a1a612-37cd-76b7-8396-1d13b72ebca0"
-        - cell "default id 01a1a612-37cd-76b7-8396-1d13b72ebca0" [ref=e321]
+      - row "default 01a1a896-46c7-770a-bf58-28f3eddbc169"
+        - cell "default id 01a1a896-46c7-770a-bf58-28f3eddbc169" [ref=e321]
           - StaticText "default"
           - generic
-            - StaticText "id 01a1a612-37cd-76b7-8396-1d13b72ebca0"
+            - StaticText "id 01a1a896-46c7-770a-bf58-28f3eddbc169"
         - cell "none" [ref=e322]
         - cell "active" [ref=e323]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e324]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e324]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e325]
         - cell "not yet" [ref=e326]
         - cell "Revoke" [ref=e327]
           - button "Revoke" [ref=e396]
-      - row "ref:oa-ok 01a1a612-37c9-7297-9ff1-ad41b2e19951"
-        - cell "ref:oa-ok id 01a1a612-37c9-7297-9ff1-ad41b2e19951" [ref=e328]
+      - row "ref:oa-ok 01a1a896-46c2-72d0-be32-1ab9bd5d361d"
+        - cell "ref:oa-ok id 01a1a896-46c2-72d0-be32-1ab9bd5d361d" [ref=e328]
           - StaticText "ref:oa-ok"
           - generic
-            - StaticText "id 01a1a612-37c9-7297-9ff1-ad41b2e19951"
+            - StaticText "id 01a1a896-46c2-72d0-be32-1ab9bd5d361d"
         - cell "none" [ref=e329]
         - cell "active" [ref=e330]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e331]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e331]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e332]
         - cell "not yet" [ref=e333]
         - cell "Revoke" [ref=e334]
           - button "Revoke" [ref=e397]
-      - row "ref:an-ok 01a1a612-37c5-7025-8394-339384a33ce5"
-        - cell "ref:an-ok id 01a1a612-37c5-7025-8394-339384a33ce5" [ref=e335]
+      - row "ref:an-ok 01a1a896-46bd-76f6-a702-33c3a72850a1"
+        - cell "ref:an-ok id 01a1a896-46bd-76f6-a702-33c3a72850a1" [ref=e335]
           - StaticText "ref:an-ok"
           - generic
-            - StaticText "id 01a1a612-37c5-7025-8394-339384a33ce5"
+            - StaticText "id 01a1a896-46bd-76f6-a702-33c3a72850a1"
         - cell "none" [ref=e336]
         - cell "active" [ref=e337]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e338]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e338]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e339]
         - cell "not yet" [ref=e340]
         - cell "Revoke" [ref=e341]
           - button "Revoke" [ref=e398]
-      - row "ref:an-exp 01a1a612-37c1-747d-85a9-836e3dde3bb8"
-        - cell "ref:an-exp id 01a1a612-37c1-747d-85a9-836e3dde3bb8" [ref=e342]
+      - row "ref:an-exp 01a1a896-46b9-742d-91a6-93438f64abf1"
+        - cell "ref:an-exp id 01a1a896-46b9-742d-91a6-93438f64abf1" [ref=e342]
           - StaticText "ref:an-exp"
           - generic
-            - StaticText "id 01a1a612-37c1-747d-85a9-836e3dde3bb8"
+            - StaticText "id 01a1a896-46b9-742d-91a6-93438f64abf1"
         - cell "none" [ref=e343]
         - cell "active" [ref=e344]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e345]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e345]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e346]
-        - cell "2026-11-04 12:19:371 min ago" [ref=e347]
+        - cell "2026-11-05 00:03:06 1 min ago" [ref=e347]
           - time
-            - StaticText "2026-11-04 12:19:371 min ago"
+            - StaticText "2026-11-05 00:03:06"
+            - StaticText "1 min ago"
         - cell "Revoke" [ref=e348]
           - button "Revoke" [ref=e399]
-      - row "ref:nonexistent 01a1a612-37bd-75f8-b215-b9de38db4ed8"
-        - cell "ref:nonexistent id 01a1a612-37bd-75f8-b215-b9de38db4ed8" [ref=e349]
+      - row "ref:nonexistent 01a1a896-46b5-73cf-a876-710979e0dd84"
+        - cell "ref:nonexistent id 01a1a896-46b5-73cf-a876-710979e0dd84" [ref=e349]
           - StaticText "ref:nonexistent"
           - generic
-            - StaticText "id 01a1a612-37bd-75f8-b215-b9de38db4ed8"
+            - StaticText "id 01a1a896-46b5-73cf-a876-710979e0dd84"
         - cell "none" [ref=e350]
         - cell "active" [ref=e351]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e352]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e352]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e353]
-        - cell "2026-11-04 12:19:361 min ago" [ref=e354]
+        - cell "2026-11-05 00:03:05 1 min ago" [ref=e354]
           - time
-            - StaticText "2026-11-04 12:19:361 min ago"
+            - StaticText "2026-11-05 00:03:05"
+            - StaticText "1 min ago"
         - cell "Revoke" [ref=e355]
           - button "Revoke" [ref=e400]
-      - row "ref:or-dis 01a1a612-37b9-724c-9fa1-01c56eaffed5"
-        - cell "ref:or-dis id 01a1a612-37b9-724c-9fa1-01c56eaffed5" [ref=e356]
+      - row "ref:or-dis 01a1a896-46b1-7024-a8bb-dfd16797498e"
+        - cell "ref:or-dis id 01a1a896-46b1-7024-a8bb-dfd16797498e" [ref=e356]
           - StaticText "ref:or-dis"
           - generic
-            - StaticText "id 01a1a612-37b9-724c-9fa1-01c56eaffed5"
+            - StaticText "id 01a1a896-46b1-7024-a8bb-dfd16797498e"
         - cell "none" [ref=e357]
         - cell "active" [ref=e358]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e359]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e359]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e360]
-        - cell "2026-11-04 12:19:351 min ago" [ref=e361]
+        - cell "2026-11-05 00:03:04 1 min ago" [ref=e361]
           - time
-            - StaticText "2026-11-04 12:19:351 min ago"
+            - StaticText "2026-11-05 00:03:04"
+            - StaticText "1 min ago"
         - cell "Revoke" [ref=e362]
           - button "Revoke" [ref=e401]
-      - row "ref:or-rl 01a1a612-37b4-77f1-a8ce-1a5db363527c"
-        - cell "ref:or-rl id 01a1a612-37b4-77f1-a8ce-1a5db363527c" [ref=e363]
+      - row "ref:or-rl 01a1a896-46ab-77c8-8f4b-89af31bbe383"
+        - cell "ref:or-rl id 01a1a896-46ab-77c8-8f4b-89af31bbe383" [ref=e363]
           - StaticText "ref:or-rl"
           - generic
-            - StaticText "id 01a1a612-37b4-77f1-a8ce-1a5db363527c"
+            - StaticText "id 01a1a896-46ab-77c8-8f4b-89af31bbe383"
         - cell "none" [ref=e364]
         - cell "active" [ref=e365]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e366]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e366]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e367]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e368]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e368]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "Revoke" [ref=e369]
           - button "Revoke" [ref=e402]
-      - row "ref:or-bad 01a1a612-37b0-72fe-bb72-b41734eca1e1"
-        - cell "ref:or-bad id 01a1a612-37b0-72fe-bb72-b41734eca1e1" [ref=e370]
+      - row "ref:or-bad 01a1a896-46a5-716c-b0b9-3f8bd8ae3768"
+        - cell "ref:or-bad id 01a1a896-46a5-716c-b0b9-3f8bd8ae3768" [ref=e370]
           - StaticText "ref:or-bad"
           - generic
-            - StaticText "id 01a1a612-37b0-72fe-bb72-b41734eca1e1"
+            - StaticText "id 01a1a896-46a5-716c-b0b9-3f8bd8ae3768"
         - cell "none" [ref=e371]
         - cell "active" [ref=e372]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e373]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e373]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e374]
-        - cell "2026-11-04 12:20:0935 s ago" [ref=e375]
+        - cell "2026-11-05 00:03:38 35 s ago" [ref=e375]
           - time
-            - StaticText "2026-11-04 12:20:0935 s ago"
+            - StaticText "2026-11-05 00:03:38"
+            - StaticText "35 s ago"
         - cell "Revoke" [ref=e376]
           - button "Revoke" [ref=e403]
-      - row "ref:or-good 01a1a612-37ac-718d-850e-ec40ee907ac8"
-        - cell "ref:or-good id 01a1a612-37ac-718d-850e-ec40ee907ac8" [ref=e377]
+      - row "ref:or-good 01a1a896-46a0-7778-bc83-043d756234f1"
+        - cell "ref:or-good id 01a1a896-46a0-7778-bc83-043d756234f1" [ref=e377]
           - StaticText "ref:or-good"
           - generic
-            - StaticText "id 01a1a612-37ac-718d-850e-ec40ee907ac8"
+            - StaticText "id 01a1a896-46a0-7778-bc83-043d756234f1"
         - cell "none" [ref=e378]
         - cell "active" [ref=e379]
-        - cell "2026-11-04 12:19:341 min ago" [ref=e380]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e380]
           - time
-            - StaticText "2026-11-04 12:19:341 min ago"
+            - StaticText "2026-11-05 00:03:03"
+            - StaticText "1 min ago"
         - cell "never" [ref=e381]
-        - cell "2026-11-04 12:20:0935 s ago" [ref=e382]
+        - cell "2026-11-05 00:03:38 35 s ago" [ref=e382]
           - time
-            - StaticText "2026-11-04 12:20:0935 s ago"
+            - StaticText "2026-11-05 00:03:38"
+            - StaticText "35 s ago"
         - cell "Revoke" [ref=e383]
           - button "Revoke" [ref=e404]
 
@@ -778,20 +825,21 @@
 - generic [ref=e1] clickable [onclick]
   - link "Skip to content" [ref=e5]
   - complementary
-    - StaticText "Janus"
-    - navigation "Views" [ref=e6]
-      - list
-        - listitem [level=1]
-          - link "Overview" [ref=e23]
-        - listitem [level=1]
-          - link "Credentials" [ref=e24]
-        - listitem [level=1]
-          - link "Identities" [ref=e25]
-        - listitem [level=1]
-          - link "Requests" [ref=e26]
-        - listitem [level=1]
-          - link "Plugin" [ref=e27]
-    - button "Forget token" [ref=e13]
+    - generic
+      - StaticText "Janus"
+      - navigation "Views" [ref=e12]
+        - list
+          - listitem [level=1]
+            - link "Overview" [ref=e61]
+          - listitem [level=1]
+            - link "Credentials" [ref=e62]
+          - listitem [level=1]
+            - link "Identities" [ref=e63]
+          - listitem [level=1]
+            - link "Requests" [ref=e64]
+          - listitem [level=1]
+            - link "Plugin" [ref=e65]
+      - button "Forget token" [ref=e21]
   - main
     - sectionheader
       - heading "Requests" [level=1, ref=e405]
@@ -890,9 +938,9 @@
           - columnheader "Status" [ref=e565]
           - columnheader "Duration" [ref=e566]
       - row [ref=e414] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:09 36 s ago" [ref=e432]
+        - cell "2026-11-05 00:03:38 36 s ago" [ref=e432]
           - time
-            - StaticText "2026-11-04 12:20:09"
+            - StaticText "2026-11-05 00:03:38"
             - StaticText "36 s ago"
         - cell "unidentified openrouter" [ref=e433]
           - StaticText "unidentified"
@@ -900,31 +948,32 @@
         - cell "rejected identity invalid" [ref=e434]
           - StaticText "rejected identity"
           - StaticText "invalid"
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-c061-74d4-bcfe-fe5c0da73cb0)" [ref=e435]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-c061-74d4-bcfe-fe5c0da73cb0)" [ref=e567]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4f-734c-83d4-d1c028ddfa9e)" [ref=e435]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4f-734c-83d4-d1c028ddfa9e)" [ref=e567]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "—" [ref=e436]
         - cell "—" [ref=e437]
         - cell "0 ms" [ref=e438]
       - row [ref=e415] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:09 36 s ago" [ref=e439]
+        - cell "2026-11-05 00:03:38 36 s ago" [ref=e439]
           - time
-            - StaticText "2026-11-04 12:20:09"
+            - StaticText "2026-11-05 00:03:38"
             - StaticText "36 s ago"
         - cell "ref:or-bad openrouter" [ref=e440]
           - StaticText "ref:or-bad"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e441]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-c05f-7427-b799-e8214bcccd8f)" [ref=e442]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-c05f-7427-b799-e8214bcccd8f)" [ref=e568]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4f-734c-83d4-d1bf39d2e912)" [ref=e442]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4f-734c-83d4-d1bf39d2e912)" [ref=e568]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-bad" [ref=e443]
         - cell "200" [ref=e444]
-        - cell "1 ms" [ref=e445]
+          - StaticText "200"
+        - cell "0 ms" [ref=e445]
       - row [ref=e416] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:09 36 s ago" [ref=e446]
+        - cell "2026-11-05 00:03:38 36 s ago" [ref=e446]
           - time
-            - StaticText "2026-11-04 12:20:09"
+            - StaticText "2026-11-05 00:03:38"
             - StaticText "36 s ago"
         - cell "deny openrouter" [ref=e447]
           - StaticText "deny"
@@ -932,206 +981,214 @@
         - cell "denied denied by qa plugin" [ref=e448]
           - StaticText "denied"
           - StaticText "denied by qa plugin"
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-c05d-7002-90ff-6117955e6b23)" [ref=e449]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-c05d-7002-90ff-6117955e6b23)" [ref=e569]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4e-7020-83c2-8d39e62b905e)" [ref=e449]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4e-7020-83c2-8d39e62b905e)" [ref=e569]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "—" [ref=e450]
         - cell "—" [ref=e451]
-        - cell "1 ms" [ref=e452]
+        - cell "0 ms" [ref=e452]
       - row [ref=e417] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:09 36 s ago" [ref=e453]
+        - cell "2026-11-05 00:03:38 36 s ago" [ref=e453]
           - time
-            - StaticText "2026-11-04 12:20:09"
+            - StaticText "2026-11-05 00:03:38"
             - StaticText "36 s ago"
         - cell "ref:or-good openrouter" [ref=e454]
           - StaticText "ref:or-good"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e455]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-c059-7179-90a0-8dba8050b855)" [ref=e456]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-c059-7179-90a0-8dba8050b855)" [ref=e570]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4c-76ba-a2a8-da64b6b2bcaa)" [ref=e456]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-cf4c-76ba-a2a8-da64b6b2bcaa)" [ref=e570]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-good" [ref=e457]
         - cell "200" [ref=e458]
-        - cell "3 ms" [ref=e459]
+          - StaticText "200"
+        - cell "1 ms" [ref=e459]
       - row [ref=e418] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:08 36 s ago" [ref=e460]
+        - cell "2026-11-05 00:03:37 36 s ago" [ref=e460]
           - time
-            - StaticText "2026-11-04 12:20:08"
+            - StaticText "2026-11-05 00:03:37"
             - StaticText "36 s ago"
         - cell "ref:oa-exp openai" [ref=e461]
           - StaticText "ref:oa-exp"
           - StaticText "openai"
         - cell "upstream error" [ref=e462]
-        - cell "Show details of POST /openai/v1/chat/completions (01a1a612-be50-7455-a945-a75b1196af52)" [ref=e463]
-          - button "Show details of POST /openai/v1/chat/completions (01a1a612-be50-7455-a945-a75b1196af52)" [ref=e571]
+        - cell "Show details of POST /openai/v1/chat/completions (01a1a896-cd43-7191-a37d-a3183786dbe3)" [ref=e463]
+          - button "Show details of POST /openai/v1/chat/completions (01a1a896-cd43-7191-a37d-a3183786dbe3)" [ref=e571]
             - StaticText "POST /openai/v1/chat/completions"
         - cell "oa-exp" [ref=e464]
         - cell "—" [ref=e465]
-        - cell "15 ms" [ref=e466]
+        - cell "16 ms" [ref=e466]
       - row [ref=e419] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:20:08 37 s ago" [ref=e467]
+        - cell "2026-11-05 00:03:37 37 s ago" [ref=e467]
           - time
-            - StaticText "2026-11-04 12:20:08"
+            - StaticText "2026-11-05 00:03:37"
             - StaticText "37 s ago"
         - cell "ref:an-exp2 anthropic" [ref=e468]
           - StaticText "ref:an-exp2"
           - StaticText "anthropic"
         - cell "forwarded" [ref=e469]
-        - cell "Show details of POST /anthropic/v1/messages (01a1a612-bc23-7359-ad96-0e9b887113e0)" [ref=e470]
-          - button "Show details of POST /anthropic/v1/messages (01a1a612-bc23-7359-ad96-0e9b887113e0)" [ref=e572]
+        - cell "Show details of POST /anthropic/v1/messages (01a1a896-cb0b-701c-aec2-f904b195a79c)" [ref=e470]
+          - button "Show details of POST /anthropic/v1/messages (01a1a896-cb0b-701c-aec2-f904b195a79c)" [ref=e572]
             - StaticText "POST /anthropic/v1/messages"
         - cell "an-exp2" [ref=e471]
         - cell "200" [ref=e472]
-        - cell "12 ms" [ref=e473]
+          - StaticText "200"
+        - cell "10 ms" [ref=e473]
       - row [ref=e420] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:37 1 min ago" [ref=e474]
+        - cell "2026-11-05 00:03:06 1 min ago" [ref=e474]
           - time
-            - StaticText "2026-11-04 12:19:37"
+            - StaticText "2026-11-05 00:03:06"
             - StaticText "1 min ago"
         - cell "ref:an-exp anthropic" [ref=e475]
           - StaticText "ref:an-exp"
           - StaticText "anthropic"
         - cell "credential unavailable" [ref=e476]
-        - cell "Show details of POST /anthropic/v1/messages (01a1a612-43d6-761a-bdbd-7b0c628e5a93)" [ref=e477]
-          - button "Show details of POST /anthropic/v1/messages (01a1a612-43d6-761a-bdbd-7b0c628e5a93)" [ref=e573]
+        - cell "Show details of POST /anthropic/v1/messages (01a1a896-52dc-76a8-8418-e3f005e81335)" [ref=e477]
+          - button "Show details of POST /anthropic/v1/messages (01a1a896-52dc-76a8-8418-e3f005e81335)" [ref=e573]
             - StaticText "POST /anthropic/v1/messages"
         - cell "—" [ref=e478]
         - cell "—" [ref=e479]
-        - cell "0 ms" [ref=e480]
+        - cell "1 ms" [ref=e480]
       - row [ref=e421] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:36 1 min ago" [ref=e481]
+        - cell "2026-11-05 00:03:05 1 min ago" [ref=e481]
           - time
-            - StaticText "2026-11-04 12:19:36"
+            - StaticText "2026-11-05 00:03:05"
             - StaticText "1 min ago"
         - cell "ref:an-exp anthropic" [ref=e482]
           - StaticText "ref:an-exp"
           - StaticText "anthropic"
         - cell "credential unavailable" [ref=e483]
-        - cell "Show details of POST /anthropic/v1/messages (01a1a612-4178-72d9-9f9a-eca0ab447f31)" [ref=e484]
-          - button "Show details of POST /anthropic/v1/messages (01a1a612-4178-72d9-9f9a-eca0ab447f31)" [ref=e574]
+        - cell "Show details of POST /anthropic/v1/messages (01a1a896-507e-7065-80e1-0a06a0905c5c)" [ref=e484]
+          - button "Show details of POST /anthropic/v1/messages (01a1a896-507e-7065-80e1-0a06a0905c5c)" [ref=e574]
             - StaticText "POST /anthropic/v1/messages"
         - cell "—" [ref=e485]
         - cell "—" [ref=e486]
         - cell "2 ms" [ref=e487]
       - row [ref=e422] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:36 1 min ago" [ref=e488]
+        - cell "2026-11-05 00:03:05 1 min ago" [ref=e488]
           - time
-            - StaticText "2026-11-04 12:19:36"
+            - StaticText "2026-11-05 00:03:05"
             - StaticText "1 min ago"
         - cell "ref:nonexistent openrouter" [ref=e489]
           - StaticText "ref:nonexistent"
           - StaticText "openrouter"
         - cell "credential unavailable" [ref=e490]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-3f1d-7335-a5d4-d6f4a1ecb4f2)" [ref=e491]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-3f1d-7335-a5d4-d6f4a1ecb4f2)" [ref=e575]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4e1b-72d2-9b80-8c64248a9136)" [ref=e491]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4e1b-72d2-9b80-8c64248a9136)" [ref=e575]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "—" [ref=e492]
         - cell "—" [ref=e493]
-        - cell "1 ms" [ref=e494]
+        - cell "3 ms" [ref=e494]
       - row [ref=e423] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:35 1 min ago" [ref=e495]
+        - cell "2026-11-05 00:03:04 1 min ago" [ref=e495]
           - time
-            - StaticText "2026-11-04 12:19:35"
+            - StaticText "2026-11-05 00:03:04"
             - StaticText "1 min ago"
         - cell "ref:or-dis openrouter" [ref=e496]
           - StaticText "ref:or-dis"
           - StaticText "openrouter"
         - cell "credential unavailable" [ref=e497]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-3cbf-734e-8936-ce1e9f5d34ed)" [ref=e498]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-3cbf-734e-8936-ce1e9f5d34ed)" [ref=e576]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4bb6-7322-89d1-5cd28dc3c50d)" [ref=e498]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4bb6-7322-89d1-5cd28dc3c50d)" [ref=e576]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "—" [ref=e499]
         - cell "—" [ref=e500]
         - cell "0 ms" [ref=e501]
       - row [ref=e424] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e502]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e502]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-generic openrouter" [ref=e503]
           - StaticText "ref:or-generic"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e504]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-3a55-73f4-80c2-588b5cc19ce8)" [ref=e505]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-3a55-73f4-80c2-588b5cc19ce8)" [ref=e577]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4944-74fc-8336-b21fe6652cf5)" [ref=e505]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4944-74fc-8336-b21fe6652cf5)" [ref=e577]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-generic" [ref=e506]
         - cell "401" [ref=e507]
+          - StaticText "401"
         - cell "0 ms" [ref=e508]
       - row [ref=e425] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e509]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e509]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-rl openrouter" [ref=e510]
           - StaticText "ref:or-rl"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e511]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-382d-70d8-a03e-f4a416eb84f6)" [ref=e512]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-382d-70d8-a03e-f4a416eb84f6)" [ref=e578]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4717-7484-962f-b320fb9ceb0d)" [ref=e512]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4717-7484-962f-b320fb9ceb0d)" [ref=e578]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-rl" [ref=e513]
         - cell "429" [ref=e514]
+          - StaticText "429"
         - cell "0 ms" [ref=e515]
       - row [ref=e426] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e516]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e516]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-bad openrouter" [ref=e517]
           - StaticText "ref:or-bad"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e518]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-382c-748c-b33b-ffe04d89b521)" [ref=e519]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-382c-748c-b33b-ffe04d89b521)" [ref=e579]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4716-76bc-8d37-afa03a91422d)" [ref=e519]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4716-76bc-8d37-afa03a91422d)" [ref=e579]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-bad" [ref=e520]
         - cell "401" [ref=e521]
+          - StaticText "401"
         - cell "0 ms" [ref=e522]
       - row [ref=e427] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e523]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e523]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-good openrouter" [ref=e524]
           - StaticText "ref:or-good"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e525]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-382b-76f7-acc5-17abe918c2f9)" [ref=e526]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-382b-76f7-acc5-17abe918c2f9)" [ref=e580]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4715-71b8-be31-999754670ac9)" [ref=e526]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4715-71b8-be31-999754670ac9)" [ref=e580]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-good" [ref=e527]
         - cell "200" [ref=e528]
+          - StaticText "200"
         - cell "0 ms" [ref=e529]
       - row [ref=e428] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e530]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e530]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-good openrouter" [ref=e531]
           - StaticText "ref:or-good"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e532]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-3829-71e6-ab4a-d889a16ccef2)" [ref=e533]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-3829-71e6-ab4a-d889a16ccef2)" [ref=e581]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-4714-703d-a5d8-f26439a32afa)" [ref=e533]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-4714-703d-a5d8-f26439a32afa)" [ref=e581]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-good" [ref=e534]
         - cell "200" [ref=e535]
+          - StaticText "200"
         - cell "1 ms" [ref=e536]
       - row [ref=e429] clickable [cursor:pointer, onclick]
-        - cell "2026-11-04 12:19:34 1 min ago" [ref=e537]
+        - cell "2026-11-05 00:03:03 1 min ago" [ref=e537]
           - time
-            - StaticText "2026-11-04 12:19:34"
+            - StaticText "2026-11-05 00:03:03"
             - StaticText "1 min ago"
         - cell "ref:or-good openrouter" [ref=e538]
           - StaticText "ref:or-good"
           - StaticText "openrouter"
         - cell "forwarded" [ref=e539]
-        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a612-3823-740b-8e95-d7f834586655)" [ref=e540]
-          - button "Show details of POST /openrouter/v1/chat/completions (01a1a612-3823-740b-8e95-d7f834586655)" [ref=e582]
+        - cell "Show details of POST /openrouter/v1/chat/completions (01a1a896-470e-74ad-9578-dfe18aceb9ee)" [ref=e540]
+          - button "Show details of POST /openrouter/v1/chat/completions (01a1a896-470e-74ad-9578-dfe18aceb9ee)" [ref=e582]
             - StaticText "POST /openrouter/v1/chat/completions"
         - cell "or-good" [ref=e541]
         - cell "200" [ref=e542]
+          - StaticText "200"
         - cell "5 ms" [ref=e543]
     - paragraph
       - StaticText "That is everything matching these filters."
@@ -1140,20 +1197,21 @@
 - generic [ref=e1] clickable [onclick]
   - link "Skip to content" [ref=e5]
   - complementary
-    - StaticText "Janus"
-    - navigation "Views" [ref=e6]
-      - list
-        - listitem [level=1]
-          - link "Overview" [ref=e23]
-        - listitem [level=1]
-          - link "Credentials" [ref=e24]
-        - listitem [level=1]
-          - link "Identities" [ref=e25]
-        - listitem [level=1]
-          - link "Requests" [ref=e26]
-        - listitem [level=1]
-          - link "Plugin" [ref=e27]
-    - button "Forget token" [ref=e13]
+    - generic
+      - StaticText "Janus"
+      - navigation "Views" [ref=e12]
+        - list
+          - listitem [level=1]
+            - link "Overview" [ref=e61]
+          - listitem [level=1]
+            - link "Credentials" [ref=e62]
+          - listitem [level=1]
+            - link "Identities" [ref=e63]
+          - listitem [level=1]
+            - link "Requests" [ref=e64]
+          - listitem [level=1]
+            - link "Plugin" [ref=e65]
+      - button "Forget token" [ref=e21]
   - main
     - sectionheader
       - heading "Plugin" [level=1, ref=e597]
@@ -1175,7 +1233,7 @@
         - term "Last successful call"
         - definition
           - time
-            - StaticText "2026-11-04 12:20:0937 s ago"
+            - StaticText "2026-11-05 00:03:3837 s ago"
         - term "Dropped notify events"
         - definition "Dropped notify events"
           - StaticText "0"

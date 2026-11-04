@@ -107,7 +107,7 @@
   {
     "name": "identity create --json has an id",
     "ok": true,
-    "detail": "{\n  \"claims\": {},\n  \"created_at\": \"2026-11-04T10:19:35.209840Z\",\n  \"expires_at\": null,\n  \"id\": \"01a1a612-3ba9-72c8-b9e0-"
+    "detail": "{\n  \"claims\": {},\n  \"created_at\": \"2026-11-04T22:03:04.083758Z\",\n  \"expires_at\": null,\n  \"id\": \"01a1a896-4a13-76e8-84a0-"
   },
   {
     "name": "identity list: exit 0 + valid JSON",
@@ -142,7 +142,7 @@
   {
     "name": "log tail --json: every line valid JSON",
     "ok": true,
-    "detail": "{\"binding\":\"opaque\",\"caller_identity\":\"agent-1\",\"claimed_identity\":null,\"correlation_id\":null,\"credential_ref\":\"or1\",\"duration_ms\":4,\"error\":null,\"method\":\"POST\",\"outcome\":\"forwarded\",\"path\":\"/openrou"
+    "detail": "{\"binding\":\"opaque\",\"caller_identity\":\"agent-1\",\"claimed_identity\":null,\"correlation_id\":null,\"credential_ref\":\"or1\",\"duration_ms\":13,\"error\":null,\"method\":\"POST\",\"outcome\":\"forwarded\",\"path\":\"/openro"
   },
   {
     "name": "plugin status: exit 0 + valid JSON",

@@ -3,7 +3,7 @@ $ janus status  env=JANUS_DATA_DIR
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -33,7 +33,7 @@ $ janus status  env=HOME
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -63,7 +63,7 @@ $ janus status --config /tmp/qa-lm/run/config.toml  env=HOME
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -93,7 +93,7 @@ $ janus status  env=HOME,JANUS_ADMIN
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -123,7 +123,7 @@ $ janus status --admin http://127.0.0.1:26002 --token-file /tmp/qa-lm/run/data/a
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -153,7 +153,7 @@ $ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_ADMIN_TOKEN
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -183,7 +183,7 @@ $ janus status --admin http://127.0.0.1:26002  env=HOME,JANUS_DATA_DIR
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/
@@ -213,7 +213,7 @@ $ janus status  env=HOME,JANUS_ADMIN,JANUS_DATA_DIR
 $ exit=0
 --- stdout
 version          0.1.0 (build dev)
-started          2026-11-04T10:19:34Z
+started          2026-11-04T22:03:03Z
 data plane       127.0.0.1:26001
 admin socket     /tmp/qa-lm/run/data/admin.sock
 admin tcp        http://127.0.0.1:26002/

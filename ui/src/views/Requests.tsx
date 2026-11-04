@@ -13,7 +13,7 @@ import {
   type RequestRecord,
   type UpstreamKind,
 } from '@/api/types'
-import { Badge } from '@/components/Badge'
+import { Badge, StatusBadge } from '@/components/Badge'
 import { PageHeader } from '@/components/PageHeader'
 import { Passage } from '@/components/Passage'
 import { Empty, ErrorNotice, Loading } from '@/components/States'
@@ -485,7 +485,7 @@ export function Requests() {
                         </button>
                       </td>
                       <td className="mono">{r.credential_ref ?? <span className="text-muted">—</span>}</td>
-                      <td className="mono text-right">{r.status ?? <span className="text-muted">—</span>}</td>
+                      <td className="text-right">{r.status === null ? <span className="text-muted">—</span> : <StatusBadge code={r.status} />}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatDuration(r.duration_ms)}</td>
                     </tr>
                   )

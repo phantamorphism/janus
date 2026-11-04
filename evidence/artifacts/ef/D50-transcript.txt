@@ -4,5 +4,5 @@ OK   request-log outcome=plugin_failed
 OK   health after failed call = unreachable
 OK   nothing forwarded upstream by the failed call
 OK   after the plugin starts the request succeeds (HTTP 200, attempts=1)
-OK   health=ok last_ok_at=2026-11-04T10:19:35.457936Z
+OK   health=ok last_ok_at=2026-11-04T22:03:04.192384Z
 OK   plugin received 1 ResolveRoute

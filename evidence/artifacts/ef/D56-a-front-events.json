@@ -1,66 +1,66 @@
 [
   {
     "event": "listening",
-    "t": 1793787589.106314
+    "t": 1793829797.485695
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.297277
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829797.668121
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.301124
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829797.673822
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.305505
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829797.680591
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.307405
+    "t": 1793829797.683896
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
-    "t": 1793787589.308248
+    "t": 1793829797.684844
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.3134952
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829797.6940138
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.314641
+    "t": 1793829797.6964521
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
-    "t": 1793787589.315354
+    "t": 1793829797.697553
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.316843
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829797.7007759
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.317915
+    "t": 1793829797.702137
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return a certificate (_ssl.c:1082)",
-    "t": 1793787589.318611
+    "t": 1793829797.703209
   }
 ]

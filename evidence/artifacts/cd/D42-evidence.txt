@@ -3,18 +3,18 @@
   "body": "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
   "events": [
     {
-      "t": 1793787581888,
+      "t": 1793829790838,
       "ev": {
         "event_type": "credential_invalid",
-        "request_id": "01a1a612-55b6-77a4-b8d4-55af9d90adce",
+        "request_id": "01a1a896-646a-754f-bd8f-d092ef22ee82",
         "payload_json": "{\"credential_ref\":\"acct-bad\",\"reason\":\"401 Unauthorized: authentication_error: invalid x-api-key\",\"status\":401,\"upstream\":\"anthropic\"}"
       }
     },
     {
-      "t": 1793787581888,
+      "t": 1793829790838,
       "ev": {
         "event_type": "call_completed",
-        "request_id": "01a1a612-55b6-77a4-b8d4-55af9d90adce",
+        "request_id": "01a1a896-646a-754f-bd8f-d092ef22ee82",
         "payload_json": "{\"caller_identity\":\"u42\",\"upstream\":\"anthropic\",\"status\":401,\"credential_ref\":\"acct-bad\",\"duration_ms\":0,\"usage\":null}"
       }
     }
@@ -39,7 +39,7 @@
     "kind": "api_key",
     "label": null,
     "last_error": "rejected by the upstream: 401 Unauthorized: authentication_error: invalid x-api-key",
-    "last_used_at": "2026-11-04T10:19:41.878856Z",
+    "last_used_at": "2026-11-04T22:03:10.827427Z",
     "rate_limited_until": null,
     "ref": "acct-bad",
     "request_count": 1,
@@ -47,5 +47,5 @@
     "status": "invalid",
     "upstream": "anthropic"
   },
-  "cliShow": "ref                 acct-bad\nupstream            anthropic\nkind                api_key\nlabel               -\nsource              pool\nstatus              invalid\nrate limited until  -\nexpires             -\nlast used           2026-11-04T10:19:41Z\nrequests            1\nerrors              1\nlast error          rejected by the upstream: 401 Unauthorized: authentication_error: invalid x-api-key\n"
+  "cliShow": "ref                 acct-bad\nupstream            anthropic\nkind                api_key\nlabel               -\nsource              pool\nstatus              invalid\nrate limited until  -\nexpires             -\nlast used           2026-11-04T22:03:10Z\nrequests            1\nerrors              1\nlast error          rejected by the upstream: 401 Unauthorized: authentication_error: invalid x-api-key\n"
 }

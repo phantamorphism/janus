@@ -1,26 +1,26 @@
 $ exit=0
 --- stdout
 RECEIVED              REQUEST ID                            UPSTREAM    METHOD  PATH                             IDENTITY    OUTCOME                     STATUS  MS
-2026-11-04T10:19:41Z  01a1a612-531e-767c-b69f-7978b5d170e9  openrouter  POST    /openrouter/v1/boom              agent-1     forwarded                   500     0
-2026-11-04T10:19:41Z  01a1a612-531e-767c-b69f-7977e84fd9a4  openrouter  POST    /openrouter/v1/chat/completions  -           rejected_identity(invalid)  -       0
-2026-11-04T10:19:41Z  01a1a612-531d-7324-b1a5-2a57192efded  openrouter  POST    /openrouter/v1/chat/completions  deny-agent  denied(policy says no)      -       0
-2026-11-04T10:19:41Z  01a1a612-531d-7324-b1a5-2a561a3573fb  openrouter  POST    /openrouter/v1/chat/completions  agent-2     forwarded                   200     0
-2026-11-04T10:19:41Z  01a1a612-531c-74c1-b3b2-02eb984c025a  openrouter  POST    /openrouter/v1/chat/completions  agent-1     forwarded                   200     0
+2026-11-04T22:03:10Z  01a1a896-6186-74be-9823-e2ed337f67c9  openrouter  POST    /openrouter/v1/boom              agent-1     forwarded                   500     0
+2026-11-04T22:03:10Z  01a1a896-6186-74be-9823-e2ece2c18a21  openrouter  POST    /openrouter/v1/chat/completions  -           rejected_identity(invalid)  -       0
+2026-11-04T22:03:10Z  01a1a896-6185-7664-b40b-3b3972b56e37  openrouter  POST    /openrouter/v1/chat/completions  deny-agent  denied(policy says no)      -       0
+2026-11-04T22:03:10Z  01a1a896-6184-70db-b7e2-74863df85fd0  openrouter  POST    /openrouter/v1/chat/completions  agent-2     forwarded                   200     0
+2026-11-04T22:03:10Z  01a1a896-6183-7320-9cc5-745dcf18dda6  openrouter  POST    /openrouter/v1/chat/completions  agent-1     forwarded                   200     0
 
 --- stderr
-more: janus log query ... --before MjAyNi0xMS0wNFQxMDoxOTo0MS4yMTIyMzgwMDBaLzEw
+more: janus log query ... --before MjAyNi0xMS0wNFQyMjowMzoxMC4wODM3MzEwMDBaLzEw
 
 
 tail output:
-2026-11-04T10:19:42Z  01a1a612-5834-70c6-8824-860a7fe19779  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1
-2026-11-04T10:19:42Z  01a1a612-5837-7423-b64b-fe0a56383da5  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  1
+2026-11-04T22:03:11Z  01a1a896-6698-74f7-8ce2-25e914924260  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0
+2026-11-04T22:03:11Z  01a1a896-669a-72bf-9427-67bb58297e66  openrouter  POST  /openrouter/v1/chat/completions  agent-2  forwarded  200  0
 
 (tail ended: null/SIGINT)
 $ exit=0
 --- stdout
-request id        01a1a612-5837-7423-b64b-fe0a56383da5
-received          2026-11-04T10:19:42Z
-duration          1 ms
+request id        01a1a896-669a-72bf-9427-67bb58297e66
+received          2026-11-04T22:03:11Z
+duration          0 ms
 upstream          openrouter
 route             -
 request           POST /openrouter/v1/chat/completions

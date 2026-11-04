@@ -62,7 +62,7 @@
     "artifacts": [
       "evidence/artifacts/a/D8-streaming.json"
     ],
-    "note": "SSE upstream emits an event every 500ms for ~2.5s; first byte via Janus at 4ms (total 3007ms), 6 separate chunks, byte-identical stream, for all three upstreams."
+    "note": "SSE upstream emits an event every 500ms for ~2.5s; first byte via Janus at 3ms (total 3005ms), 6 separate chunks, byte-identical stream, for all three upstreams."
   },
   {
     "id": "D9",

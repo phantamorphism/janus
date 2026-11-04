@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useApi } from '@/api/context'
 import type { RequestRecord } from '@/api/types'
-import { Badge } from '@/components/Badge'
+import { Badge, StatusBadge } from '@/components/Badge'
 import { Drawer } from '@/components/Drawer'
 import { ErrorNotice } from '@/components/States'
 import { Time } from '@/components/Time'
@@ -71,8 +71,8 @@ export function RequestDrawer({ initial, onClose }: { initial: RequestRecord; on
         <Field label="Credential" mono>
           {r.credential_ref ?? none}
         </Field>
-        <Field label="Upstream status" mono>
-          {r.status ?? none}
+        <Field label="Upstream status">
+          {r.status === null ? none : <StatusBadge code={r.status} />}
         </Field>
         <Field label="Error" mono>
           {r.error ?? none}

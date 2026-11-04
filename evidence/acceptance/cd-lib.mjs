@@ -9,6 +9,10 @@ import { createRequire } from 'node:module';
 
 export const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 export const SCRATCH = '/tmp/qa-cd';
+fs.mkdirSync(SCRATCH, { recursive: true });
+if (!fs.existsSync(SCRATCH + '/node_modules/@grpc/grpc-js')) {
+  spawnSync('npm', ['install', '--prefix', SCRATCH, '@grpc/grpc-js', '@grpc/proto-loader'], { stdio: 'ignore' });
+}
 const require = createRequire(SCRATCH + '/');
 export const grpc = require('@grpc/grpc-js');
 export const protoLoader = require('@grpc/proto-loader');

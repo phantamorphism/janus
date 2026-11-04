@@ -31,17 +31,16 @@ problem. Janus inserting its own minting authority into that flow would mean
 every adopter rebuilding sandbox provisioning around Janus. Verifying what the
 existing provisioner already issues costs the adopter one config block.
 
-The precedent this generalizes is concrete. The gateway Janus builds on (see
-<ref target="docs/scope#extractable">scope: what carries over</ref>) is embedded
-in a host that mints an HMAC token per agent session and delivers it by writing
-the agent CLI's own credential file and base-URL setting — the agent then
-presents that token believing it is an ordinary API key. The minting and the
-delivery are the host's, specific to how the host spawns agents. Only the
-verification step is generic, and only the verification step becomes Janus.
+A common pattern shows why (see <ref target="docs/scope#inprocess-gap">scope:
+embedded gateways</ref>): a host mints an HMAC token per agent session and
+delivers it by writing the agent CLI's own credential file and base-URL setting,
+and the agent then presents that token believing it is an ordinary API key. The
+minting and the delivery are the host's, specific to how it spawns agents. Only
+the verification step is generic, and only the verification step is Janus.
 
-A host migrating onto Janus therefore keeps its minting code and configures a
-matching <ref target="docs/caller-identity#methods">`hmac` method</ref> with the
-same shared secret and namespace. Nothing about identity issuance has to move.
+A host adopting Janus therefore keeps its minting code and configures a matching
+<ref target="docs/caller-identity#methods">`hmac` method</ref> with the same
+shared secret and namespace. Nothing about identity issuance has to move.
 
 ## The extractor {#extractor}
 

@@ -1,4 +1,4 @@
 status=200
-log={"binding":"hmac","caller_identity":"src-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/qry","received_at":"2026-11-04T10:19:40.880129Z","request_id":"01a1a612-51d0-749e-a021-86d59bd96c29","route":"/v1/qry","status":200,"upstream":"openai","usage":null}
+log={"binding":"hmac","caller_identity":"src-user","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/qry","received_at":"2026-11-04T22:03:09.842352Z","request_id":"01a1a896-6092-72a9-a727-c87c4d2a2ead","route":"/v1/qry","status":200,"upstream":"openai","usage":null}
 outbound url=/v1/qry?other=1
 outbound headers={"authorization":"Bearer sk-src-o","accept":"*/*","host":"127.0.0.1:21103","transfer-encoding":"chunked"}

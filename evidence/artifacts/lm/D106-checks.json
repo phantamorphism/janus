@@ -37,7 +37,7 @@
   {
     "name": "Refresh button issues the refresh admin call with the token",
     "ok": true,
-    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/ui1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787613404}"
+    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/ui1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793829823044}"
   },
   {
     "name": "Refresh on an API key surfaces the daemon refusal in the UI",
@@ -52,7 +52,7 @@
   {
     "name": "UI Refresh on an OAuth credential calls the refresh admin endpoint with the token",
     "ok": true,
-    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/oauth1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793787616998}"
+    "detail": "{\"method\":\"POST\",\"url\":\"/v1/credentials/oauth1/refresh\",\"authorization\":\"Bearer <redacted>\",\"cookie\":null,\"t\":1793829826684}"
   },
   {
     "name": "daemon contacted the mock token endpoint (token_url) exactly once",
@@ -62,7 +62,7 @@
   {
     "name": "state actually changes: expires_at moved forward (confirmed by `credential show`)",
     "ok": true,
-    "detail": "2026-11-04T10:50:14.676Z -> 2026-11-04T12:20:17.003Z"
+    "detail": "2026-11-04T22:33:44.335Z -> 2026-11-05T00:03:46.690Z"
   },
   {
     "name": "UI row shows the new expiry and no token material",

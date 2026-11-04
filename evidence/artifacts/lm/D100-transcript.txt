@@ -3,7 +3,7 @@ create: $ exit=0
 <redacted-token>
 
 --- stderr
-created identity 01a1a612-48f1-7727-a802-833e08710b49 for "rev-agent" (expires -); the token below is shown once and cannot be retrieved again
+created identity 01a1a896-575d-7145-b3de-01702197ba79 for "rev-agent" (expires -); the token below is shown once and cannot be retrieved again
 
 
 $ exit=0
@@ -12,9 +12,9 @@ $ exit=0
   "identities": [
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:38.633904Z",
+      "created_at": "2026-11-04T22:03:07.499144Z",
       "expires_at": null,
-      "id": "01a1a612-4909-704b-8e54-1d30f41934a4",
+      "id": "01a1a896-576b-70c4-b1f6-c6260013f669",
       "identity": "rm-agent",
       "label": null,
       "last_seen_at": null,
@@ -22,9 +22,9 @@ $ exit=0
     },
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:38.627712Z",
+      "created_at": "2026-11-04T22:03:07.494334Z",
       "expires_at": null,
-      "id": "01a1a612-4903-7220-b038-14fa09312518",
+      "id": "01a1a896-5766-7269-966e-38b76f19a96c",
       "identity": "keep-agent",
       "label": null,
       "last_seen_at": null,
@@ -32,9 +32,9 @@ $ exit=0
     },
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:38.619083Z",
-      "expires_at": "2026-11-04T10:19:40.619083Z",
-      "id": "01a1a612-48fb-7061-86f5-63718b5d4a10",
+      "created_at": "2026-11-04T22:03:07.489801Z",
+      "expires_at": "2026-11-04T22:03:09.489801Z",
+      "id": "01a1a896-5761-7176-8aa4-5280b88e0f1a",
       "identity": "exp-agent",
       "label": null,
       "last_seen_at": null,
@@ -44,9 +44,9 @@ $ exit=0
       "claims": {
         "tenant": "zeta"
       },
-      "created_at": "2026-11-04T10:19:38.609230Z",
+      "created_at": "2026-11-04T22:03:07.485002Z",
       "expires_at": null,
-      "id": "01a1a612-48f1-7727-a802-833e08710b49",
+      "id": "01a1a896-575d-7145-b3de-01702197ba79",
       "identity": "rev-agent",
       "label": "will-revoke",
       "last_seen_at": null,
@@ -54,9 +54,9 @@ $ exit=0
     },
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:34.891068Z",
+      "created_at": "2026-11-04T22:03:03.742135Z",
       "expires_at": null,
-      "id": "01a1a612-3a6b-744c-b755-4f10e1989290",
+      "id": "01a1a896-48be-74d9-9943-e4ea1d0a0659",
       "identity": "deny-agent",
       "label": "denied",
       "last_seen_at": null,
@@ -66,12 +66,12 @@ $ exit=0
       "claims": {
         "tenant": "acme"
       },
-      "created_at": "2026-11-04T10:19:34.884836Z",
+      "created_at": "2026-11-04T22:03:03.736872Z",
       "expires_at": null,
-      "id": "01a1a612-3a64-774b-8320-b098710fe4f4",
+      "id": "01a1a896-48b8-7479-91cc-cf7c6d7baaef",
       "identity": "agent-1",
       "label": "a1",
-      "last_seen_at": "2026-11-04T10:19:38.105785Z",
+      "last_seen_at": "2026-11-04T22:03:06.969686Z",
       "revoked_at": null
     }
   ]
@@ -82,11 +82,11 @@ $ exit=0
 
 $ exit=0
 --- stdout
-id         01a1a612-48f1-7727-a802-833e08710b49
+id         01a1a896-575d-7145-b3de-01702197ba79
 identity   rev-agent
 claims     tenant=zeta
 label      will-revoke
-created    2026-11-04T10:19:38Z
+created    2026-11-04T22:03:07Z
 expires    -
 revoked    -
 last seen  -
@@ -100,9 +100,9 @@ $ exit=0
   "claims": {
     "tenant": "zeta"
   },
-  "created_at": "2026-11-04T10:19:38.609230Z",
+  "created_at": "2026-11-04T22:03:07.485002Z",
   "expires_at": null,
-  "id": "01a1a612-48f1-7727-a802-833e08710b49",
+  "id": "01a1a896-575d-7145-b3de-01702197ba79",
   "identity": "rev-agent",
   "label": "will-revoke",
   "last_seen_at": null,

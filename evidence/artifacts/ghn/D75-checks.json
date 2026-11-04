@@ -27,7 +27,7 @@
   {
     "name": "SIGKILL mid-run: every acknowledged charge survives",
     "ok": true,
-    "detail": "acked=92 survived=92"
+    "detail": "acked=145 survived=145"
   },
   {
     "name": "store reopens after SIGKILL (stale lock released)",

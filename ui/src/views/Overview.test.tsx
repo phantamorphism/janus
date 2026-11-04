@@ -34,7 +34,7 @@ describe('Overview view', () => {
     expect(within(pluginSection).getByText('Daemon client certificate expires')).toBeInTheDocument()
     expect(within(pluginSection).getByText('expired')).toBeInTheDocument()
     expect(screen.getByText('0.1.0')).toBeInTheDocument()
-    expect(await screen.findByText(/5,321 records stored, kept for 30days/)).toBeInTheDocument()
+    expect(await screen.findByText(/5,321 records stored, kept for 30 days/)).toBeInTheDocument()
   })
 
   it('shows plugin dropped events, routes and listener URLs from the status document', async () => {

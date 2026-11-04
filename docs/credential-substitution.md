@@ -136,9 +136,9 @@ additive.
 ## Not specific to LLM providers {#general-purpose}
 
 The first upstreams Janus implements are Anthropic, OpenAI, and OpenRouter,
-because that is the concrete need and there is existing proxy code for them to
-build on (see <ref target="docs/scope">scope and non-goals</ref>). Those are the
-first implementation of the model, not the model itself.
+because that is the concrete need (see <ref target="docs/scope">scope and
+non-goals</ref>). Those are the first implementation of the model, not the model
+itself.
 
 Nothing in the preceding sections is LLM-shaped. "A caller that must not hold
 the credential," "a credential resolved per-identity," and "a policy decision

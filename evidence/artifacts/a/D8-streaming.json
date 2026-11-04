@@ -3,12 +3,12 @@
     "status": 200,
     "contentType": "text/event-stream",
     "chunkArrivalMs": [
-      0,
-      502,
-      1002,
-      1502,
+      1,
+      503,
+      1003,
+      1503,
       2003,
-      2504
+      2503
     ],
     "totalMs": 3004,
     "identical": true,
@@ -18,14 +18,14 @@
     "status": 200,
     "contentType": "text/event-stream",
     "chunkArrivalMs": [
-      4,
-      503,
+      3,
+      504,
       1004,
-      1506,
-      2005,
-      2507
+      1505,
+      2004,
+      2505
     ],
-    "totalMs": 3007,
+    "totalMs": 3005,
     "identical": true,
     "incremental": true
   },
@@ -34,13 +34,13 @@
     "contentType": "text/event-stream",
     "chunkArrivalMs": [
       1,
-      501,
-      1001,
-      1501,
-      2000,
-      2503
+      502,
+      1002,
+      1503,
+      2003,
+      2504
     ],
-    "totalMs": 3002,
+    "totalMs": 3004,
     "identical": true,
     "incremental": true
   }

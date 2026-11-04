@@ -8,13 +8,13 @@
     "class": "plugin_error",
     "correlation_id": null,
     "credential_ref": null,
-    "duration_ms": 0,
+    "duration_ms": 1,
     "error": "plugin_error: plugin returned gRPC status Internal: plugin internal error",
     "method": "POST",
     "outcome": "plugin_failed",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:38.974338Z",
-    "request_id": "01a1a612-4a5e-71a5-831c-81df00efb7ca",
+    "received_at": "2026-11-04T22:03:07.877573Z",
+    "request_id": "01a1a896-58e5-7162-b72d-195c28eba011",
     "route": null,
     "status": null,
     "upstream": "anthropic",
@@ -25,7 +25,7 @@
     "endpoint": "unix://<repo>/evidence/.run-cd/a.sock",
     "health": "error",
     "last_error": "plugin returned gRPC status Internal: plugin internal error",
-    "last_ok_at": "2026-11-04T10:19:37.200753Z",
+    "last_ok_at": "2026-11-04T22:03:06.100254Z",
     "mode": "unix"
   }
 }

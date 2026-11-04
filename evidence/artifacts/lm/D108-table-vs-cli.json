@@ -1,17 +1,17 @@
 {
   "ui_rows": [
-    "2026-11-04 12:20:32 just now ui-keep openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
-    "2026-11-04 12:20:32 just now unidentified openrouter rejected identity revoked POST /openrouter/v1/chat/completions — — 0 ms",
-    "2026-11-04 12:20:31 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
-    "2026-11-04 12:20:30 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 4 ms",
-    "2026-11-04 12:20:04 28 s ago unidentified openrouter rejected identity invalid POST /openrouter/v1/chat/completions — — 0 ms",
-    "2026-11-04 12:20:04 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
-    "2026-11-04 12:20:04 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
-    "2026-11-04 12:20:04 28 s ago agent-1 openrouter forwarded POST /openrouter/v1/chat/completions or1 200 0 ms"
+    "2026-11-05 00:04:02 just now ui-keep openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
+    "2026-11-05 00:04:02 just now unidentified openrouter rejected identity revoked POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-05 00:04:00 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
+    "2026-11-05 00:04:00 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 2 ms",
+    "2026-11-05 00:03:33 28 s ago unidentified openrouter rejected identity invalid POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-05 00:03:33 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-05 00:03:33 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-05 00:03:33 28 s ago agent-1 openrouter forwarded POST /openrouter/v1/chat/completions or1 200 0 ms"
   ],
   "cli": [
     [
-      "2026-11-04T10:20:32.383509Z",
+      "2026-11-04T22:04:02.144529Z",
       "ui-keep",
       "openrouter",
       "forwarded",
@@ -20,7 +20,7 @@
       200
     ],
     [
-      "2026-11-04T10:20:32.319827Z",
+      "2026-11-04T22:04:02.079863Z",
       "",
       "openrouter",
       "rejected_identity",
@@ -29,7 +29,7 @@
       null
     ],
     [
-      "2026-11-04T10:20:31.106159Z",
+      "2026-11-04T22:04:00.863307Z",
       "ui-revoke-me",
       "openrouter",
       "forwarded",
@@ -38,7 +38,7 @@
       200
     ],
     [
-      "2026-11-04T10:20:30.729580Z",
+      "2026-11-04T22:04:00.492022Z",
       "ui-revoke-me",
       "openrouter",
       "forwarded",
@@ -47,7 +47,7 @@
       200
     ],
     [
-      "2026-11-04T10:20:04.417581Z",
+      "2026-11-04T22:03:33.993697Z",
       "",
       "openrouter",
       "rejected_identity",
@@ -56,7 +56,7 @@
       null
     ],
     [
-      "2026-11-04T10:20:04.416486Z",
+      "2026-11-04T22:03:33.992988Z",
       "deny-agent",
       "openrouter",
       "denied",
@@ -65,7 +65,7 @@
       null
     ],
     [
-      "2026-11-04T10:20:04.415390Z",
+      "2026-11-04T22:03:33.992106Z",
       "deny-agent",
       "openrouter",
       "denied",
@@ -74,7 +74,7 @@
       null
     ],
     [
-      "2026-11-04T10:20:04.414025Z",
+      "2026-11-04T22:03:33.990927Z",
       "agent-1",
       "openrouter",
       "forwarded",

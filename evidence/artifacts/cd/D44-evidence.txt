@@ -12,7 +12,7 @@
       "endpoint": "unix://<repo>/evidence/.run-cd/n-block.sock",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:52.825580Z",
+      "last_ok_at": "2026-11-04T22:03:21.618304Z",
       "mode": "unix"
     }
   },
@@ -20,7 +20,7 @@
     "sts": [
       200
     ],
-    "maxMs": 3,
+    "maxMs": 2,
     "medianMs": 1,
     "notifiesSeen": 1,
     "streams": 1,
@@ -29,7 +29,7 @@
       "endpoint": "unix://<repo>/evidence/.run-cd/n-error.sock",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:53.119044Z",
+      "last_ok_at": "2026-11-04T22:03:21.890471Z",
       "mode": "unix"
     }
   }

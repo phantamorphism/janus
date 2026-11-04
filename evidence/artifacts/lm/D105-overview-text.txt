@@ -9,7 +9,7 @@ Version
 Build
 dev
 Started
-2026-11-04 12:19:3431 s ago
+2026-11-05 00:03:0332 s ago
 Listeners
 Listener	Address	TLS
 data plane	127.0.0.1:26001	—
@@ -28,7 +28,7 @@ tlsgRPC over mutual TLS
 Endpoint
 https://localhost:26020/
 Last successful call
-2026-11-04 12:20:041 s ago
+2026-11-05 00:03:331 s ago
 Dropped notify events
 0
 Daemon client certificate expires
@@ -75,7 +75,14 @@ upstream error	0
 
 abandoned	0
 
-Request log on, 24 records stored, kept for 30days.
+Upstream error means Janus got no reply from the upstream (it was unreachable or the connection failed). An upstream that replied with an error status is counted as forwarded, with its status shown on the request.
+
+Upstream replied 4xx
+0
+Upstream replied 5xx
+1
+
+Request log on, 24 records stored, kept for 30 days.
 
 Dropped log records
 0

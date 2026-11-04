@@ -1,57 +1,57 @@
 [
   {
     "event": "listening",
-    "t": 1793787589.480339
+    "t": 1793829797.872693
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.668619
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829798.0554502
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.6727328
+    "t": 1793829798.058818
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
     "client_cert_sha256": null,
-    "t": 1793787589.6741881
+    "t": 1793829798.059711
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.6820962
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829798.067727
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.6838322
+    "t": 1793829798.069221
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
     "client_cert_sha256": null,
-    "t": 1793787589.684937
+    "t": 1793829798.070173
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
-    "client_cert_sha256": "45035c1079da14393f2968283ad7900904e1a9df9116d19edef5da404051a253",
-    "t": 1793787589.687551
+    "client_cert_sha256": "349f229d2c6b9a5f9a9d61eaaed3f9296446cae0b2a5ce33ecedc3f21132b14a",
+    "t": 1793829798.0725892
   },
   {
     "event": "handshake_rejected",
     "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)",
-    "t": 1793787589.689041
+    "t": 1793829798.0741508
   },
   {
     "event": "handshake_ok",
     "version": "TLSv1.3",
     "client_cert_sha256": null,
-    "t": 1793787589.690151
+    "t": 1793829798.0751739
   }
 ]

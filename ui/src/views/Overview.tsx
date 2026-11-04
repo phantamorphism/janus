@@ -7,7 +7,7 @@ import { PageHeader, Section } from '@/components/PageHeader'
 import { PluginFacts } from '@/components/PluginFacts'
 import { ErrorNotice, Loading } from '@/components/States'
 import { Time } from '@/components/Time'
-import { formatCount, words } from '@/lib/format'
+import { credentialErrorText, formatCount, formatRetain, words } from '@/lib/format'
 import { loadTraffic, MAX_PAGES, type Traffic } from '@/lib/traffic'
 import { credentialTone, outcomeTone } from '@/lib/tone'
 import { useResource } from '@/lib/useResource'
@@ -78,7 +78,7 @@ function CredentialHealth({ creds, pool }: { creds: CredentialMetadata[]; pool: 
             <li key={c.ref}>
               <span className="mono">{c.ref}</span> <span className="text-muted">({c.upstream})</span>{' '}
               {words(c.status)}
-              {c.last_error && <span className="text-bad">: {c.last_error}</span>}
+              {credentialErrorText(c) && <span className="text-bad">: {credentialErrorText(c)}</span>}
             </li>
           ))}
         </ul>
@@ -154,6 +154,27 @@ function TrafficPanel({ t }: { t: Traffic }) {
           ))}
         </tbody>
       </table>
+      <p className="mt-2 max-w-xl text-xs text-muted">
+        <span className="font-medium">Upstream error</span> means Janus got no reply from the upstream (it was
+        unreachable or the connection failed). An upstream that replied with an error status is counted as{' '}
+        <span className="font-medium">forwarded</span>, with its status shown on the request.
+      </p>
+      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm" aria-label="Forwarded requests by upstream reply">
+        <div>
+          <dt className="text-xs text-muted">Upstream replied 4xx</dt>
+          <dd className="tabular-nums" aria-label="Upstream 4xx replies">
+            {floor}
+            {formatCount(t.upstreamReplies.clientError)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">Upstream replied 5xx</dt>
+          <dd className="tabular-nums" aria-label="Upstream 5xx replies">
+            {floor}
+            {formatCount(t.upstreamReplies.serverError)}
+          </dd>
+        </div>
+      </dl>
       {t.truncated && (
         <p className="mt-2 text-xs text-muted">
           More than {formatCount(MAX_PAGES * MAX_LIMIT)} requests in this window; counts are a floor. Choose a
@@ -219,7 +240,7 @@ export function Overview() {
             </dl>
           </Section>
 
-          <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
+          <div>
             <Section title="Listeners">
               <table className="data-table" aria-label="Listeners">
                 <thead>
@@ -244,7 +265,8 @@ export function Overview() {
               {s.upstreams.length === 0 ? (
                 <p className="text-sm text-muted">No upstreams are configured.</p>
               ) : (
-                <table className="data-table" aria-label="Upstreams">
+                <div className="overflow-x-auto">
+              <table className="data-table" aria-label="Upstreams">
                   <thead>
                     <tr>
                       <th scope="col">Upstream</th>
@@ -257,9 +279,9 @@ export function Overview() {
                   <tbody>
                     {s.upstreams.map((u) => (
                       <tr key={u.name}>
-                        <td>{u.name}</td>
-                        <td className="mono">{u.path_prefix}</td>
-                        <td className="mono break-all">{u.base_url}</td>
+                        <td className="whitespace-nowrap">{u.name}</td>
+                        <td className="mono whitespace-nowrap">{u.path_prefix}</td>
+                        <td className="mono whitespace-nowrap">{u.base_url}</td>
                         <td className="mono">{u.binding ?? <span className="text-muted">none</span>}</td>
                         <td className="mono">
                           {u.routes.length === 0 ? (
@@ -278,6 +300,7 @@ export function Overview() {
                     ))}
                   </tbody>
                 </table>
+              </div>
               )}
             </Section>
           </div>
@@ -314,8 +337,8 @@ export function Overview() {
         {traffic.data === undefined ? traffic.loading && <Loading what="request counts" /> : <TrafficPanel t={traffic.data} />}
         {s && (
           <p className="mt-4 text-xs text-muted">
-            Request log {s.request_log.enabled ? 'on' : 'off'}, {formatCount(s.request_log.rows)} records stored,
-            kept for {s.request_log.retain}.
+            Request log {s.request_log.enabled ? 'on' : 'off'}, {formatCount(s.request_log.rows)} records stored,{' '}
+            kept for {formatRetain(s.request_log.retain)}.
           </p>
         )}
         {s && (

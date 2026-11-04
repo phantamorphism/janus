@@ -1,0 +1,18 @@
+# Gitleaks configuration.
+#
+# The default ruleset applies everywhere except the paths below, which hold
+# deliberately fake credentials: key-shaped strings used as test inputs and as
+# recorded evidence from the acceptance harness. None is a real secret.
+
+title = "janus gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures and recorded acceptance evidence containing fake credentials"
+paths = [
+  '''crates/janus-core/src/identity/testkit\.rs''',
+  '''crates/janus-cli/tests/cli\.rs''',
+  '''evidence/''',
+]

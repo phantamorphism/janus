@@ -1,6 +1,6 @@
 {
   "response": {
-    "ref": "openrouter-d5e32d04",
+    "ref": "openrouter-b49f96c5",
     "upstream": "openrouter",
     "kind": "api_key",
     "label": "generated",

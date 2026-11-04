@@ -7,7 +7,7 @@
       "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51c-same/p.sock",
       "health": "ok",
       "last_error": null,
-      "last_ok_at": "2026-11-04T10:19:37.293613Z",
+      "last_ok_at": "2026-11-04T22:03:05.782566Z",
       "dropped_events": 0
     }
   },

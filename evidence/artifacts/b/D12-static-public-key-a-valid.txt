@@ -1,2 +1,2 @@
 status=200
-{"binding":"jwt","caller_identity":"jwt-user-1","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/x","received_at":"2026-11-04T10:19:39.782322Z","request_id":"01a1a612-4d86-715b-9d3b-5054e0a0fc39","route":null,"status":200,"upstream":"openai","usage":null}
+{"binding":"jwt","caller_identity":"jwt-user-1","claimed_identity":null,"correlation_id":null,"credential_ref":"o1","duration_ms":0,"error":null,"method":"POST","outcome":"forwarded","path":"/openai/v1/x","received_at":"2026-11-04T22:03:08.699016Z","request_id":"01a1a896-5c1b-7018-96a7-4c50a968fa50","route":null,"status":200,"upstream":"openai","usage":null}

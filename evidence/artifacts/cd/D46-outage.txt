@@ -13,8 +13,8 @@
     "method": "POST",
     "outcome": "plugin_failed",
     "path": "/anthropic/v1/messages",
-    "received_at": "2026-11-04T10:19:45.386771Z",
-    "request_id": "01a1a612-636a-7774-bd01-9c7250f441be",
+    "received_at": "2026-11-04T22:03:14.211604Z",
+    "request_id": "01a1a896-71a3-762b-ae3e-221ab1cc4252",
     "route": null,
     "status": null,
     "upstream": "anthropic",
@@ -25,7 +25,7 @@
     "endpoint": "unix://<repo>/evidence/.run-cd/a.sock",
     "health": "unreachable",
     "last_error": "cannot connect to plugin socket <repo>/evidence/.run-cd/a.sock: No such file or directory (os error 2)",
-    "last_ok_at": "2026-11-04T10:19:44.577186Z",
+    "last_ok_at": "2026-11-04T22:03:13.406126Z",
     "mode": "unix"
   },
   "forwarded": 0

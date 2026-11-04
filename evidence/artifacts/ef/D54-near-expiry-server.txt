@@ -1,7 +1,7 @@
-2026-11-04T10:19:45.478792Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d54-near-server/data/credentials credentials=0
-2026-11-04T10:19:45.484628Z  INFO janus_daemon::admin::token: generated the admin token path=/tmp/qa-ef/run/d54-near-server/data/admin-token
-2026-11-04T10:19:45.485253Z  INFO janus_daemon::admin: admin socket ready socket=/tmp/qa-ef/run/d54-near-server/data/admin.sock
-2026-11-04T10:19:45.485262Z  INFO janus_daemon::run: janus-daemon started data_plane=127.0.0.1:23151 data_dir=/tmp/qa-ef/run/d54-near-server/data plugin=tls
-2026-11-04T10:19:45.613273Z  INFO janus_core::pool: credential added to the pool credential=k1 upstream=anthropic
-2026-11-04T10:19:45.613323Z  INFO janus::admin::audit: admin mutation principal="socket" action="credential.add" resource="credential/k1" outcome="ok"
-2026-11-04T10:19:47.480069Z  WARN janus_daemon::plugin::tls: plugin TLS certificate expires in 9 days certificate="server" expires_at=2026-11-14 10:19:33 UTC
+2026-11-04T22:03:13.910923Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d54-near-server/data/credentials credentials=0
+2026-11-04T22:03:13.917120Z  INFO janus_daemon::admin::token: generated the admin token path=/tmp/qa-ef/run/d54-near-server/data/admin-token
+2026-11-04T22:03:13.917838Z  INFO janus_daemon::admin: admin socket ready socket=/tmp/qa-ef/run/d54-near-server/data/admin.sock
+2026-11-04T22:03:13.917850Z  INFO janus_daemon::run: janus-daemon started data_plane=127.0.0.1:23151 data_dir=/tmp/qa-ef/run/d54-near-server/data plugin=tls
+2026-11-04T22:03:14.032187Z  INFO janus_core::pool: credential added to the pool credential=k1 upstream=anthropic
+2026-11-04T22:03:14.032211Z  INFO janus::admin::audit: admin mutation principal="socket" action="credential.add" resource="credential/k1" outcome="ok"
+2026-11-04T22:03:15.913616Z  WARN janus_daemon::plugin::tls: plugin TLS certificate expires in 9 days certificate="server" expires_at=2026-11-14 22:03:02 UTC

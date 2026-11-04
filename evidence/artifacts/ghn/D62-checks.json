@@ -32,7 +32,7 @@
   {
     "name": "default endpoint returns oa-b metadata",
     "ok": true,
-    "detail": "{\"ref\":\"oa-b\",\"upstream\":\"openai\",\"kind\":\"api_key\",\"label\":null,\"source\":\"pool\",\"status\":\"active\",\"rate_limited_until\":null,\"expires_at\":null,\"last_used_at\":\"2026-11-04T10:20:50.532056Z\",\"request_count\":6,\"error_count\":0,\"last_error\":null}"
+    "detail": "{\"ref\":\"oa-b\",\"upstream\":\"openai\",\"kind\":\"api_key\",\"label\":null,\"source\":\"pool\",\"status\":\"active\",\"rate_limited_until\":null,\"expires_at\":null,\"last_used_at\":\"2026-11-04T22:04:19.555465Z\",\"request_count\":6,\"error_count\":0,\"last_error\":null}"
   },
   {
     "name": "default endpoint metadata matches credential show",

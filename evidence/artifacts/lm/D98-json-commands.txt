@@ -263,9 +263,9 @@ $ exit=0
 --- stdout
 {
   "claims": {},
-  "created_at": "2026-11-04T10:19:35.209840Z",
+  "created_at": "2026-11-04T22:03:04.083758Z",
   "expires_at": null,
-  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "id": "01a1a896-4a13-76e8-84a0-e69456c3c222",
   "identity": "j-agent",
   "label": "jid",
   "last_seen_at": null,
@@ -284,9 +284,9 @@ $ exit=0
   "identities": [
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:35.209840Z",
+      "created_at": "2026-11-04T22:03:04.083758Z",
       "expires_at": null,
-      "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+      "id": "01a1a896-4a13-76e8-84a0-e69456c3c222",
       "identity": "j-agent",
       "label": "jid",
       "last_seen_at": null,
@@ -294,9 +294,9 @@ $ exit=0
     },
     {
       "claims": {},
-      "created_at": "2026-11-04T10:19:34.891068Z",
+      "created_at": "2026-11-04T22:03:03.742135Z",
       "expires_at": null,
-      "id": "01a1a612-3a6b-744c-b755-4f10e1989290",
+      "id": "01a1a896-48be-74d9-9943-e4ea1d0a0659",
       "identity": "deny-agent",
       "label": "denied",
       "last_seen_at": null,
@@ -306,9 +306,9 @@ $ exit=0
       "claims": {
         "tenant": "acme"
       },
-      "created_at": "2026-11-04T10:19:34.884836Z",
+      "created_at": "2026-11-04T22:03:03.736872Z",
       "expires_at": null,
-      "id": "01a1a612-3a64-774b-8320-b098710fe4f4",
+      "id": "01a1a896-48b8-7479-91cc-cf7c6d7baaef",
       "identity": "agent-1",
       "label": "a1",
       "last_seen_at": null,
@@ -321,14 +321,14 @@ $ exit=0
 
 
 ### identity show
-$ janus identity show 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ janus identity show 01a1a896-4a13-76e8-84a0-e69456c3c222 --json
 $ exit=0
 --- stdout
 {
   "claims": {},
-  "created_at": "2026-11-04T10:19:35.209840Z",
+  "created_at": "2026-11-04T22:03:04.083758Z",
   "expires_at": null,
-  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "id": "01a1a896-4a13-76e8-84a0-e69456c3c222",
   "identity": "j-agent",
   "label": "jid",
   "last_seen_at": null,
@@ -339,29 +339,29 @@ $ exit=0
 
 
 ### identity revoke
-$ janus identity revoke 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ janus identity revoke 01a1a896-4a13-76e8-84a0-e69456c3c222 --json
 $ exit=0
 --- stdout
 {
   "claims": {},
-  "created_at": "2026-11-04T10:19:35.209840Z",
+  "created_at": "2026-11-04T22:03:04.083758Z",
   "expires_at": null,
-  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "id": "01a1a896-4a13-76e8-84a0-e69456c3c222",
   "identity": "j-agent",
   "label": "jid",
   "last_seen_at": null,
-  "revoked_at": "2026-11-04T10:19:35.224324Z"
+  "revoked_at": "2026-11-04T22:03:04.098275Z"
 }
 
 --- stderr
 
 
 ### identity rm
-$ janus identity rm 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ janus identity rm 01a1a896-4a13-76e8-84a0-e69456c3c222 --json
 $ exit=0
 --- stdout
 {
-  "deleted": "01a1a612-3ba9-72c8-b9e0-6e7102a14034"
+  "deleted": "01a1a896-4a13-76e8-84a0-e69456c3c222"
 }
 
 --- stderr
@@ -381,13 +381,13 @@ $ exit=0
       "claimed_identity": null,
       "correlation_id": null,
       "credential_ref": "or1",
-      "duration_ms": 9,
+      "duration_ms": 10,
       "error": null,
       "method": "POST",
       "outcome": "forwarded",
       "path": "/openrouter/v1/chat/completions",
-      "received_at": "2026-11-04T10:19:35.235126Z",
-      "request_id": "01a1a612-3bc3-7107-bd6a-4a48f662aee1",
+      "received_at": "2026-11-04T22:03:04.109183Z",
+      "request_id": "01a1a896-4a2d-71c6-b032-f55e101130c4",
       "route": null,
       "status": 200,
       "upstream": "openrouter",
@@ -400,7 +400,7 @@ $ exit=0
 
 
 ### log show
-$ janus log show 01a1a612-3bc3-7107-bd6a-4a48f662aee1 --json
+$ janus log show 01a1a896-4a2d-71c6-b032-f55e101130c4 --json
 $ exit=0
 --- stdout
 {
@@ -409,13 +409,13 @@ $ exit=0
   "claimed_identity": null,
   "correlation_id": null,
   "credential_ref": "or1",
-  "duration_ms": 9,
+  "duration_ms": 10,
   "error": null,
   "method": "POST",
   "outcome": "forwarded",
   "path": "/openrouter/v1/chat/completions",
-  "received_at": "2026-11-04T10:19:35.235126Z",
-  "request_id": "01a1a612-3bc3-7107-bd6a-4a48f662aee1",
+  "received_at": "2026-11-04T22:03:04.109183Z",
+  "request_id": "01a1a896-4a2d-71c6-b032-f55e101130c4",
   "route": null,
   "status": 200,
   "upstream": "openrouter",
@@ -426,7 +426,7 @@ $ exit=0
 
 
 ### log tail --json
-{"binding":"opaque","caller_identity":"agent-1","claimed_identity":null,"correlation_id":null,"credential_ref":"or1","duration_ms":4,"error":null,"method":"POST","outcome":"forwarded","path":"/openrouter/v1/chat/completions","received_at":"2026-11-04T10:19:36.168046Z","request_id":"01a1a612-3f68-708c-b786-fb569b4e8d5f","route":null,"status":200,"upstream":"openrouter","usage":null}
+{"binding":"opaque","caller_identity":"agent-1","claimed_identity":null,"correlation_id":null,"credential_ref":"or1","duration_ms":13,"error":null,"method":"POST","outcome":"forwarded","path":"/openrouter/v1/chat/completions","received_at":"2026-11-04T22:03:05.053609Z","request_id":"01a1a896-4ddd-74a9-8fa6-3f9193c6962a","route":null,"status":200,"upstream":"openrouter","usage":null}
 
 ### plugin status
 $ janus plugin status --json
@@ -438,7 +438,7 @@ $ exit=0
   "endpoint": "https://localhost:26020/",
   "health": "ok",
   "last_error": null,
-  "last_ok_at": "2026-11-04T10:19:36.170764Z",
+  "last_ok_at": "2026-11-04T22:03:05.056509Z",
   "mode": "tls",
   "server_cert_expires_at": "2027-11-04T00:00:00Z"
 }

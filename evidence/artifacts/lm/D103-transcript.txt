@@ -9,7 +9,7 @@ credentials 0
 upstream    openrouter /openrouter identity=opaque
 
 --- stderr
-[2m2026-11-04T10:19:45.934692Z[0m [32m INFO[0m [2mjanus_core::pool[0m[2m:[0m credential pool opened [3mdir[0m[2m=[0m/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/.tmpyVwdy4/credentials [3mcredentials[0m[2m=[0m0
+[2m2026-11-04T22:03:14.790031Z[0m [32m INFO[0m [2mjanus_core::pool[0m[2m:[0m credential pool opened [3mdir[0m[2m=[0m/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/.tmpFuFEzA/credentials [3mcredentials[0m[2m=[0m0
 
 
 admin/ui ports listening: false,false

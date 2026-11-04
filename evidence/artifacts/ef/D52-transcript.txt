@@ -8,5 +8,5 @@ OK   plugin observed the daemon client cert
 OK   (extra) SPIFFE plugin with a non-matching expected_san fails plugin_tls_error (HTTP 503)
 OK   TLS1.2-only plugin fails (HTTP 503, resolve=0); class=tls_error/TLS handshake with plugin at localhost:23140 failed: received fatal alert: ProtocolVersion
 OK   TLS 1.2-only failure is classed plugin_tls_error
-OK   baseline mTLS succeeds; plugin saw authorized client cert 45:03:5C:10:79:DA:14
+OK   baseline mTLS succeeds; plugin saw authorized client cert 34:9F:22:9D:2C:6B:9A
 OK   health=ok

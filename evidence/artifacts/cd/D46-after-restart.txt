@@ -9,32 +9,32 @@
   ],
   "resolves": [
     {
-      "request_id": "01a1a612-6589-7130-a4a5-ee431f90d48b",
+      "request_id": "01a1a896-73ca-7673-8028-4dcd6cd52b9c",
       "upstream": "anthropic",
       "caller_identity": "u46post0"
     },
     {
-      "request_id": "01a1a612-6783-74de-ac9f-0e4d245d13e3",
+      "request_id": "01a1a896-75c4-738a-90ee-387f773e0676",
       "upstream": "anthropic",
       "caller_identity": "u46post1"
     },
     {
-      "request_id": "01a1a612-697c-709d-aed2-84c4681f3d5c",
+      "request_id": "01a1a896-77be-77f4-a3cf-a29b27b591eb",
       "upstream": "anthropic",
       "caller_identity": "u46post2"
     },
     {
-      "request_id": "01a1a612-6b77-74a9-bee2-2a2ebadb2b01",
+      "request_id": "01a1a896-79b9-74cf-8a36-32a297e8db6c",
       "upstream": "anthropic",
       "caller_identity": "u46post3"
     },
     {
-      "request_id": "01a1a612-6d72-7425-becf-227413ab280d",
+      "request_id": "01a1a896-7bb4-751b-9fc1-c6cf319d650f",
       "upstream": "anthropic",
       "caller_identity": "u46post4"
     },
     {
-      "request_id": "01a1a612-6f69-762a-8c8f-f0097dd3c082",
+      "request_id": "01a1a896-7da9-746e-bf46-00afcafc5aed",
       "upstream": "anthropic",
       "caller_identity": "u46post5"
     }
@@ -43,37 +43,37 @@
   "events": [
     {
       "event_type": "call_abandoned",
-      "request_id": "01a1a612-636a-7774-bd01-9c7250f441be",
+      "request_id": "01a1a896-71a3-762b-ae3e-221ab1cc4252",
       "payload_json": "{\"caller_identity\":\"u46out\",\"stage\":\"resolve\",\"reason\":\"plugin_unreachable: cannot connect to plugin socket <repo>/evidence/.run-cd/a.sock: No such file or directory (os error 2)\"}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-6589-7130-a4a5-ee431f90d48b",
-      "payload_json": "{\"caller_identity\":\"u46post0\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+      "request_id": "01a1a896-73ca-7673-8028-4dcd6cd52b9c",
+      "payload_json": "{\"caller_identity\":\"u46post0\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":4,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-6783-74de-ac9f-0e4d245d13e3",
-      "payload_json": "{\"caller_identity\":\"u46post1\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":3,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+      "request_id": "01a1a896-75c4-738a-90ee-387f773e0676",
+      "payload_json": "{\"caller_identity\":\"u46post1\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":2,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-697c-709d-aed2-84c4681f3d5c",
+      "request_id": "01a1a896-77be-77f4-a3cf-a29b27b591eb",
       "payload_json": "{\"caller_identity\":\"u46post2\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":3,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-6b77-74a9-bee2-2a2ebadb2b01",
+      "request_id": "01a1a896-79b9-74cf-8a36-32a297e8db6c",
       "payload_json": "{\"caller_identity\":\"u46post3\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":5,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-6d72-7425-becf-227413ab280d",
+      "request_id": "01a1a896-7bb4-751b-9fc1-c6cf319d650f",
       "payload_json": "{\"caller_identity\":\"u46post4\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     },
     {
       "event_type": "call_completed",
-      "request_id": "01a1a612-6f69-762a-8c8f-f0097dd3c082",
+      "request_id": "01a1a896-7da9-746e-bf46-00afcafc5aed",
       "payload_json": "{\"caller_identity\":\"u46post5\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
     }
   ],
@@ -82,7 +82,7 @@
     "endpoint": "unix://<repo>/evidence/.run-cd/a.sock",
     "health": "ok",
     "last_error": "cannot connect to plugin socket <repo>/evidence/.run-cd/a.sock: No such file or directory (os error 2)",
-    "last_ok_at": "2026-11-04T10:19:48.458226Z",
+    "last_ok_at": "2026-11-04T22:03:17.290274Z",
     "mode": "unix"
   }
 }

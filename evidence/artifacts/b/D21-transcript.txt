@@ -1,6 +1,6 @@
-response={"head":"HTTP/1.1 401 Unauthorized","ms":0,"written":0}
+response={"head":"HTTP/1.1 401 Unauthorized","ms":1,"written":0}
 plugin.resolves delta=0
 plugin.events delta=0
 upstream reqs delta=0 connections delta=0
-cred before={"error_count":0,"expires_at":null,"kind":"api_key","label":null,"last_error":null,"last_used_at":"2026-11-04T10:19:36.596683Z","rate_limited_until":null,"ref":"a1","request_count":3,"source":"pool","status":"active","upstream":"anthropic"}
-cred after={"error_count":0,"expires_at":null,"kind":"api_key","label":null,"last_error":null,"last_used_at":"2026-11-04T10:19:36.596683Z","rate_limited_until":null,"ref":"a1","request_count":3,"source":"pool","status":"active","upstream":"anthropic"}
+cred before={"error_count":0,"expires_at":null,"kind":"api_key","label":null,"last_error":null,"last_used_at":"2026-11-04T22:03:05.515743Z","rate_limited_until":null,"ref":"a1","request_count":3,"source":"pool","status":"active","upstream":"anthropic"}
+cred after={"error_count":0,"expires_at":null,"kind":"api_key","label":null,"last_error":null,"last_used_at":"2026-11-04T22:03:05.515743Z","rate_limited_until":null,"ref":"a1","request_count":3,"source":"pool","status":"active","upstream":"anthropic"}

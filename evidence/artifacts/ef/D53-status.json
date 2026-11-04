@@ -5,8 +5,8 @@
     "health": "no_client_auth",
     "last_error": "the plugin at localhost:23144 did not request a client certificate; it must verify the daemon",
     "last_ok_at": null,
-    "client_cert_expires_at": "2027-11-04T10:19:33Z",
-    "server_cert_expires_at": "2027-11-04T10:19:33Z",
+    "client_cert_expires_at": "2027-11-04T22:03:02Z",
+    "server_cert_expires_at": "2027-11-04T22:03:02Z",
     "dropped_events": 0
   },
   "logs": [
@@ -22,8 +22,8 @@
       "method": "POST",
       "outcome": "plugin_failed",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:38.783478Z",
-      "request_id": "01a1a612-499f-771a-ae57-07beb5dd0a75",
+      "received_at": "2026-11-04T22:03:07.254448Z",
+      "request_id": "01a1a896-5676-73a1-bf87-d24e6e937803",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -36,13 +36,13 @@
       "class": "plugin_no_client_auth",
       "correlation_id": null,
       "credential_ref": null,
-      "duration_ms": 2,
+      "duration_ms": 4,
       "error": "plugin_no_client_auth: the plugin at localhost:23144 did not request a client certificate; it must verify the daemon",
       "method": "POST",
       "outcome": "plugin_failed",
       "path": "/anthropic/v1/messages",
-      "received_at": "2026-11-04T10:19:38.774452Z",
-      "request_id": "01a1a612-4996-7392-abe9-411c40c19ed3",
+      "received_at": "2026-11-04T22:03:07.239788Z",
+      "request_id": "01a1a896-5667-764b-b501-65efc8c1c1f1",
       "route": null,
       "status": null,
       "upstream": "anthropic",
@@ -56,28 +56,28 @@
       "authError": null,
       "clientFp": null,
       "protocol": "TLSv1.3",
-      "at": 1793787578777
+      "at": 1793829787244
     },
     {
       "authorized": false,
       "authError": null,
       "clientFp": null,
       "protocol": "TLSv1.3",
-      "at": 1793787578778
+      "at": 1793829787246
     },
     {
       "authorized": false,
       "authError": null,
       "clientFp": null,
       "protocol": "TLSv1.3",
-      "at": 1793787578784
+      "at": 1793829787256
     },
     {
       "authorized": false,
       "authError": null,
       "clientFp": null,
       "protocol": "TLSv1.3",
-      "at": 1793787578790
+      "at": 1793829787265
     }
   ]
 }

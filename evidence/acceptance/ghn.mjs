@@ -18,12 +18,18 @@ const ART = path.join(ROOT, ART_REL);
 const RES = path.join(ROOT, 'evidence/results/ghn.json');
 const WORK = '/tmp/qa-ghn/run';
 const TARGET = process.env.CARGO_TARGET_DIR || '/tmp/qa-target-ghn';
-const BIN = process.env.JANUS_BIN || (fs.existsSync(path.join(ROOT, 'target/release/janus-daemon')) ? path.join(ROOT, 'target/release') : path.join(TARGET, 'release'));
+const BIN = process.env.JANUS_BIN || process.env.JANUS_BIN_DIR || (fs.existsSync(path.join(ROOT, 'target/release/janus-daemon')) ? path.join(ROOT, 'target/release') : path.join(TARGET, 'release'));
 const DAEMON = path.join(BIN, 'janus-daemon');
 const CLI = path.join(BIN, 'janus');
 const NETSB = path.join(HERE, 'ghn-net.sb');
 const UI_ASSETS = path.join(ROOT, 'ui/dist');
-const GRPC_ROOT = process.env.GRPC_NODE_MODULES || '<repo>/../agent/node_modules';
+// @grpc/grpc-js and @grpc/proto-loader for the mock plugin: GRPC_NODE_MODULES, or a scratch install.
+const GRPC_ROOT = process.env.GRPC_NODE_MODULES || path.join(os.tmpdir(), 'qa-ghn-node', 'node_modules');
+if (!fs.existsSync(path.join(GRPC_ROOT, '@grpc/grpc-js'))) {
+  const dir = path.dirname(GRPC_ROOT);
+  fs.mkdirSync(dir, { recursive: true });
+  execFileSync('npm', ['install', '--prefix', dir, '@grpc/grpc-js', '@grpc/proto-loader'], { stdio: 'ignore' });
+}
 const PROTO = path.join(ROOT, 'proto/janus.proto');
 const PLUG_DIR = path.join(os.tmpdir(), 'qa-ghn-plug');
 
