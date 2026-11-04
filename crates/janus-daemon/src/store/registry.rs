@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use janus_core::contract::registry::{
     IdentityRecord, OpaqueRegistry, RegistryEntry, TokenHash, OPAQUE_TOKEN_BYTES,
 };
-use rand::RngCore;
+use rand::Rng;
 use rusqlite::{params, Connection};
 
 use super::db::{opt_ts_from_sql, ts_from_sql, ts_to_sql};

@@ -1368,13 +1368,31 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     eprintln!("seed {seed}");
     let mut rng = Lcg(seed);
     let caller = token("alice");
+    // Warm the daemon's plugin connection first. A cold gRPC connect plus 200
+    // simultaneous callers can take longer than the 120 ms abort window on a
+    // loaded runner, and then no request would ever reach the plugin.
+    let warm = client()
+        .post(rt.url("/anthropic/v1/messages"))
+        .header("x-api-key", &caller)
+        .body("{}")
+        .send()
+        .await
+        .expect("warm-up request");
+    assert!(warm.status().is_success(), "warm-up: {}", warm.status());
+    let _ = warm.bytes().await;
     let mut tasks = tokio::task::JoinSet::new();
     for _ in 0..REQUESTS {
         // Abort anywhere from before the head is sent to mid-stream.
-        let abort_after = Duration::from_millis(rng.below(120));
+        let mut abort_after = Duration::from_millis(rng.below(120));
+        // One caller in four is patient: it waits far longer than a loaded CI
+        // runner needs, so some quick-upstream requests always complete.
+        let patient = rng.below(4) == 0;
         let request = if rng.below(2) == 0 {
             client().post(rt.url(CHAT)).bearer_auth(&caller).body("{}")
         } else {
+            if patient {
+                abort_after = Duration::from_secs(4);
+            }
             client()
                 .post(rt.url("/anthropic/v1/messages"))
                 .header("x-api-key", &caller)
@@ -1382,14 +1400,31 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
         };
         tasks.spawn(async move {
             let exchange = async {
-                let mut response = request.send().await.ok()?;
+                let mut response = match request.send().await {
+                    Ok(r) => r,
+                    Err(e) => return format!("senderr {e:?}"),
+                };
+                let status = response.status();
                 while let Ok(Some(_)) = response.chunk().await {}
-                Some(())
+                format!("done {status}")
             };
-            let _ = tokio::time::timeout(abort_after, exchange).await;
+            let out = tokio::time::timeout(abort_after, exchange).await;
+            format!(
+                "patient={} {}",
+                abort_after.as_secs() > 0,
+                out.unwrap_or_else(|_| "aborted".into())
+            )
         });
+        // Stagger the callers. The daemon opens a unix-socket connection per
+        // plugin call and a Linux listener refuses connects past its backlog
+        // (128), which a 200-wide burst exceeds; the plugin would then look
+        // unreachable for reasons that are not what this test is about.
+        tokio::time::sleep(Duration::from_millis(1)).await;
     }
-    while tasks.join_next().await.is_some() {}
+    let mut diag = std::collections::BTreeMap::<String, usize>::new();
+    while let Some(r) = tasks.join_next().await {
+        *diag.entry(r.unwrap()).or_default() += 1;
+    }
 
     let recorder = &plugin.recorder;
     let settled = |request_id: &str| {
@@ -1412,7 +1447,7 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     let resolved = recorder.resolved();
     assert!(
         resolved.len() as u64 > REQUESTS / 4,
-        "enough requests reached the plugin (seed {seed}): {}",
+        "enough requests reached the plugin (seed {seed}): {} outcomes {diag:?}",
         resolved.len()
     );
     let ids: std::collections::HashSet<_> = resolved.iter().map(|r| r.request_id.clone()).collect();
@@ -1460,7 +1495,7 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     assert!(
         kinds.get("call_completed").is_some_and(|n| *n > 0)
             && kinds.get("call_abandoned").is_some_and(|n| *n > 0),
-        "the run exercised both endings (seed {seed}): {kinds:?}"
+        "the run exercised both endings (seed {seed}): {kinds:?} outcomes {diag:?}"
     );
     rt.stop().await;
 }
