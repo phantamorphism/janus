@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" role="img" aria-label="Request lifecycle sequence: caller, Janus, policy plugin, credential pool, upstream">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#7b8798" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<marker id="at" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#2fb8a8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<marker id="am" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#e8a33d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="1200" height="640" rx="14" fill="#f6f8fa" stroke="#d0d7de"/>
+<g font-family="'Inter','Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif" fill="#1f2937">
+<text x="600" y="36" font-size="20" text-anchor="middle" fill="#1f2937" font-weight="700">Request lifecycle</text>
+<rect x="80" y="56" width="120" height="36" rx="8" fill="#ffffff" stroke="#2fb8a8" stroke-width="2"/><text x="140" y="79" font-size="15" text-anchor="middle" fill="#1f2937" font-weight="700">Caller</text>
+<path d="M140 92 V600" stroke="#c4ccd6" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="360" y="56" width="120" height="36" rx="8" fill="#ffffff" stroke="#7b8798" stroke-width="2"/><text x="420" y="79" font-size="15" text-anchor="middle" fill="#1f2937" font-weight="700">Janus</text>
+<path d="M420 92 V600" stroke="#c4ccd6" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="620" y="56" width="120" height="36" rx="8" fill="#ffffff" stroke="#7b8798" stroke-width="2"/><text x="680" y="79" font-size="15" text-anchor="middle" fill="#1f2937" font-weight="700">Plugin</text>
+<path d="M680 92 V600" stroke="#c4ccd6" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="840" y="56" width="120" height="36" rx="8" fill="#ffffff" stroke="#e8a33d" stroke-width="2"/><text x="900" y="79" font-size="15" text-anchor="middle" fill="#1f2937" font-weight="700">Pool</text>
+<path d="M900 92 V600" stroke="#c4ccd6" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="1030" y="56" width="120" height="36" rx="8" fill="#ffffff" stroke="#e8a33d" stroke-width="2"/><text x="1090" y="79" font-size="15" text-anchor="middle" fill="#1f2937" font-weight="700">Upstream</text>
+<path d="M1090 92 V600" stroke="#c4ccd6" stroke-width="2" stroke-dasharray="4 6"/>
+<path d="M144 124 H416" fill="none" stroke="#2fb8a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#at)"/>
+<text x="280.0" y="116" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">1  request + identity</text>
+<path d="M424 168 h46 v26 h-44" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#a)"/>
+<text x="480" y="182" font-size="13" text-anchor="start" fill="#1f2937" font-weight="400">2  verify identity (reject here on failure)</text>
+<path d="M424 228 H676" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#a)"/>
+<text x="550.0" y="220" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">3  ResolveRoute(identity, upstream)</text>
+<path d="M676 262 H424" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="550.0" y="254" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">credential ref | defer | deny</text>
+<path d="M424 312 H896" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#a)"/>
+<text x="660.0" y="304" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">4  fetch material (refresh if expired)</text>
+<path d="M896 346 H424" fill="none" stroke="#e8a33d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#am)"/>
+<text x="660.0" y="338" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">credential</text>
+<path d="M424 384 h46 v26 h-44" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" marker-end="url(#a)"/><text x="480" y="398" font-size="13" text-anchor="start" fill="#1f2937" font-weight="400">5  rewrite: allowlist, real auth, new target</text>
+<path d="M424 450 H1086" fill="none" stroke="#e8a33d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#am)"/>
+<text x="755.0" y="442" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">6  forward</text>
+<path d="M1086 486 H424" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="755.0" y="478" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">response (streams)</text>
+<path d="M416 522 H144" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="280.0" y="514" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">response, unmodified</text>
+<path d="M424 566 H676" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="550.0" y="558" font-size="13" text-anchor="middle" fill="#1f2937" font-weight="400">7  Notify: call_completed | call_abandoned (async)</text>
+<text x="600" y="616" font-size="13" text-anchor="middle" fill="#57606a" font-weight="400">With no plugin configured, steps 3 and 7 do not happen: the default chain picks the credential.</text>
+</g>
+</svg>

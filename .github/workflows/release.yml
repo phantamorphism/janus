@@ -1,0 +1,226 @@
+name: Release
+
+# Push a tag like v0.1.0 to cut a release: CI runs again on the tagged commit,
+# release binaries (with the built UI beside them) are built for linux and
+# macOS on x86_64 and aarch64, a GitHub Release is created with checksums and
+# the CHANGELOG.md notes, and a multi-arch image is pushed to ghcr.io.
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  verify-tag:
+    name: Verify tag matches Cargo version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          crate="$(awk '/^\[workspace.package\]/{p=1;next} /^\[/{p=0} p && /^version *=/{gsub(/[" ]/,"",$0); sub(/^version=/,"",$0); print; exit}' Cargo.toml)"
+          echo "tag=$tag cargo=$crate"
+          if [ "$tag" != "$crate" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match [workspace.package] version ${crate} in Cargo.toml"
+            exit 1
+          fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
+  ci:
+    name: CI
+    needs: verify-tag
+    uses: ./.github/workflows/ci.yml
+
+  ui:
+    name: Build UI
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+        working-directory: ui
+      - run: npm run build
+        working-directory: ui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+          if-no-files-found: error
+
+  binaries:
+    name: Binaries (${{ matrix.target }})
+    needs: [ui, ci]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # Built on the oldest hosted images to keep the glibc requirement low.
+          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: aarch64-apple-darwin,      os: macos-latest }
+          - { target: x86_64-apple-darwin,       os: macos-latest }   # cross-compiled on arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p janus-daemon -p janus-cli
+      - name: Package
+        run: scripts/ci/package.sh "${GITHUB_REF_NAME#v}" "${{ matrix.target }}" "target/${{ matrix.target }}/release" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write       # build provenance attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -- *.tar.gz | tee SHA256SUMS
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Release notes
+        run: |
+          if scripts/ci/changelog-section.sh "$GITHUB_REF_NAME" > notes.md; then
+            echo "notes from CHANGELOG.md"
+          else
+            echo "::warning::no CHANGELOG.md section for ${GITHUB_REF_NAME}; using generated notes"
+            rm -f notes.md
+          fi
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          flags=()
+          case "$GITHUB_REF_NAME" in *-*) flags+=(--prerelease) ;; esac
+          if [ -f notes.md ]; then flags+=(--notes-file notes.md); else flags+=(--generate-notes); fi
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
+            --title "$GITHUB_REF_NAME" --verify-tag "${flags[@]}"
+
+  image:
+    name: Image (${{ matrix.platform }})
+    needs: [ci, verify-tag]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { platform: linux/amd64, runner: ubuntu-latest }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=image-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.platform }}
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+
+  image-manifest:
+    name: Publish multi-arch image
+    needs: [image, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref_name, 'v0.') }}
+      - name: Create manifest list
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          mapfile -t tags < <(jq -r '.tags[] | "-t " + .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          srcs=()
+          for d in *; do srcs+=("ghcr.io/${{ github.repository }}@sha256:${d}"); done
+          # shellcheck disable=SC2068  # each "-t tag" entry is intentionally two words
+          docker buildx imagetools create ${tags[@]} "${srcs[@]}"
+      - name: Inspect
+        run: docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}"

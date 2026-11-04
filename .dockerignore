@@ -1,0 +1,14 @@
+.git
+.github
+.schematic
+.unlazy
+target
+**/node_modules
+ui/dist
+docs
+evidence
+reviews
+planning
+scripts/demo
+*.md
+!README.md

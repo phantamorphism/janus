@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+keywords = ["proxy", "credentials", "api-gateway", "ai-agents", "security"]
+categories = ["network-programming", "web-programming::http-client"]
+# Not published to crates.io yet; see docs/development.md.
+publish = false
 description = "Janus proxy core: caller-identity extraction, credential pool, credential substitution, forwarding, metering primitives."
 build = "build.rs"
 

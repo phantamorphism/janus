@@ -1,0 +1,71 @@
+name: Bug report
+description: Something Janus does that it should not, or fails to do.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **If this could let a caller reach a real credential, bypass identity checks, or expose the admin surface, stop and report it privately instead** (Security tab, "Report a vulnerability"). See SECURITY.md.
+
+        Remove every real API key, token, secret and credential file content from anything you paste here.
+  - type: input
+    id: version
+    attributes:
+      label: Janus version or commit
+      description: Output of `janus-daemon --version` or the git commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Data plane (proxying)
+        - Identity extraction
+        - Credential pool or refresh
+        - Plugin channel or contract
+        - Admin API
+        - janus CLI
+        - UI
+        - Request log
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Include error messages and the relevant request-log record.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The daemon config (secrets removed), the request or command, and anything about the upstream or plugin involved. A failing test is ideal.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Rust version if built from source, and whether a plugin is configured and over which transport.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checks
+      options:
+        - label: I removed all secrets from this report.
+          required: true
+        - label: This is not a security vulnerability (those go through private reporting).
+          required: true

@@ -1,0 +1,9 @@
+# Default configuration baked into the container image at /etc/janus/janus.toml.
+# It brings up the data plane only; the admin unix socket always exists inside
+# the data directory (`docker exec <ctr> janus ...` talks to it). Mount your own
+# file over /etc/janus/janus.toml to add upstreams, credentials, identity
+# bindings, or the [admin] / [ui] listeners (see docs/configuration.md).
+data_dir = "/var/lib/janus"
+
+[data_plane]
+bind = "0.0.0.0:7600"

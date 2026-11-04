@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="1200" height="460" role="img" aria-label="Janus overview: the caller presents an identity, Janus verifies it, resolves a credential from the pool, substitutes it and forwards to the upstream">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#7b8798" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<marker id="at" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#2fb8a8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<marker id="am" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#e8a33d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="1200" height="460" rx="14" fill="#f6f8fa" stroke="#d0d7de"/>
+<g font-family="'Inter','Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif" fill="#1f2937">
+<text x="600" y="38" font-size="20" text-anchor="middle" fill="#1f2937" font-weight="700">The caller holds an identity. Janus holds the credentials.</text>
+<rect x="40" y="100" width="230" height="150" rx="10" fill="#ffffff" stroke="#2fb8a8" stroke-width="2"/>
+<text x="155.0" y="126" font-size="17" font-weight="700" text-anchor="middle">Caller</text>
+<text x="155.0" y="150" font-size="14" fill="#57606a" text-anchor="middle">agent in a sandbox</text>
+<text x="155.0" y="170" font-size="14" fill="#57606a" text-anchor="middle">holds only its identity</text>
+<text x="155.0" y="190" font-size="14" fill="#57606a" text-anchor="middle">base URL points at Janus</text>
+<circle cx="155" cy="226" r="9" fill="#2fb8a8"/><text x="155" y="263" font-size="13" text-anchor="middle" fill="#2fb8a8" font-weight="700">identity</text>
+<rect x="340" y="76" width="520" height="330" rx="14" fill="#ffffff" stroke="#7b8798" stroke-width="2.5"/>
+<text x="600" y="106" font-size="20" text-anchor="middle" fill="#1f2937" font-weight="700">Janus</text>
+<rect x="360" y="122" width="480" height="48" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+<circle cx="386" cy="146" r="12" fill="#2fb8a8"/><text x="386" y="151" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">1</text>
+<text x="408" y="143" font-size="15" font-weight="700">Verify identity</text><text x="408" y="160" font-size="12.5" fill="#57606a">extractor bound to the request type; reject before anything else</text>
+<rect x="360" y="180" width="480" height="48" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+<circle cx="386" cy="204" r="12" fill="#7b8798"/><text x="386" y="209" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">2</text>
+<text x="408" y="201" font-size="15" font-weight="700">Resolve credential</text><text x="408" y="218" font-size="12.5" fill="#57606a">policy plugin if configured, else the default chain; deny is final</text>
+<rect x="360" y="238" width="480" height="48" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+<circle cx="386" cy="262" r="12" fill="#e8a33d"/><text x="386" y="267" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">3</text>
+<text x="408" y="259" font-size="15" font-weight="700">Substitute</text><text x="408" y="276" font-size="12.5" fill="#57606a">outbound request built from an allowlist; real auth applied</text>
+<rect x="360" y="296" width="480" height="48" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+<circle cx="386" cy="320" r="12" fill="#7b8798"/><text x="386" y="325" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">4</text>
+<text x="408" y="317" font-size="15" font-weight="700">Forward</text><text x="408" y="334" font-size="12.5" fill="#57606a">response relayed unmodified, streaming if upstream streams</text>
+<rect x="360" y="356" width="230" height="38" rx="8" fill="#fdf3e0" stroke="#e8a33d" stroke-width="2"/><text x="475" y="380" font-size="12.5" text-anchor="middle" fill="#1f2937" font-weight="600">Credential pool: real keys live here only</text>
+<rect x="610" y="356" width="230" height="38" rx="8" fill="#ffffff" stroke="#7b8798" stroke-width="2" stroke-dasharray="6 5"/><text x="725" y="380" font-size="12.5" text-anchor="middle" fill="#1f2937" font-weight="600">Policy plugin (optional)</text>
+<rect x="930" y="100" width="230" height="46" rx="10" fill="#ffffff" stroke="#e8a33d" stroke-width="2"/>
+<text x="1045.0" y="129" font-size="16" font-weight="700" text-anchor="middle">Anthropic</text>
+<rect x="930" y="158" width="230" height="46" rx="10" fill="#ffffff" stroke="#e8a33d" stroke-width="2"/>
+<text x="1045.0" y="187" font-size="16" font-weight="700" text-anchor="middle">OpenAI</text>
+<rect x="930" y="216" width="230" height="46" rx="10" fill="#ffffff" stroke="#e8a33d" stroke-width="2"/>
+<text x="1045.0" y="245" font-size="16" font-weight="700" text-anchor="middle">OpenRouter</text>
+<text x="1045" y="284" font-size="13" text-anchor="middle" fill="#57606a" font-weight="400">sees an ordinary, correctly</text>
+<text x="1045" y="302" font-size="13" text-anchor="middle" fill="#57606a" font-weight="400">authenticated request</text>
+<path d="M270 175 H338" fill="none" stroke="#2fb8a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#at)"/>
+<text x="304" y="166" font-size="12" text-anchor="middle" fill="#2fb8a8" font-weight="700">identity</text>
+<path d="M860 175 H928" fill="none" stroke="#e8a33d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#am)"/>
+<text x="894" y="166" font-size="12" text-anchor="middle" fill="#e8a33d" font-weight="700">real key</text>
+<path d="M928 235 H862" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<path d="M338 235 H272" fill="none" stroke="#7b8798" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="895" y="252" font-size="12" text-anchor="middle" fill="#57606a" font-weight="400">response</text>
+<text x="305" y="252" font-size="12" text-anchor="middle" fill="#57606a" font-weight="400">response</text>
+</g>
+</svg>

@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+keywords = ["proxy", "credentials", "cli", "ai-agents", "security"]
+categories = ["command-line-utilities", "network-programming"]
+# Not published to crates.io yet; see docs/development.md.
+publish = false
 description = "Admin CLI for janus-daemon: manage credentials and opaque identities, inspect pool and plugin health, query and tail the request log."
 
 [[bin]]

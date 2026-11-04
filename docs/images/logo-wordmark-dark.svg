@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 256" width="720" height="256" role="img" aria-label="Janus">
+  <g>
+  <!-- doorway: arch and threshold -->
+  <path d="M40 222 V128 a88 88 0 0 1 176 0 V222" fill="none" stroke="#7b8798" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M26 228 H230" stroke="#7b8798" stroke-width="12" stroke-linecap="round"/>
+  <!-- face toward the caller (left) -->
+  <path d="M125 52 C98 52 80 68 79 94 L81 106 L80 114 L63 137 L79 141 L77 149 L81 153 L78 159 L82 163 L80 175 C84 186 98 194 114 197 L114 212 L125 212 Z" fill="#2fb8a8"/>
+  <!-- face toward the upstream (right) -->
+  <path d="M131 52 C158 52 176 68 177 94 L175 106 L176 114 L193 137 L177 141 L179 149 L175 153 L178 159 L174 163 L176 175 C172 186 158 194 142 197 L142 212 L131 212 Z" fill="#e8a33d"/>
+</g>
+  <text x="272" y="162" font-family="'Inter','SF Pro Display','Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif" font-size="132" font-weight="700" letter-spacing="-2" fill="#f0f3f6">Janus</text>
+</svg>

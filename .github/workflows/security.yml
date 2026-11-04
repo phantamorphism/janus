@@ -1,0 +1,66 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"   # weekly, Monday 05:17 UTC: new advisories land without a code change
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    name: cargo-deny (${{ matrix.checks }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        checks: [advisories, "bans licenses sources"]
+    # A new RustSEC advisory must not block an unrelated PR; it fails the
+    # scheduled and push runs, where someone is meant to look.
+    continue-on-error: ${{ matrix.checks == 'advisories' && github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check ${{ matrix.checks }}
+
+  npm-audit:
+    name: npm audit (ui, production deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm audit --omit=dev --audit-level=low
+        working-directory: ui
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, rust]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

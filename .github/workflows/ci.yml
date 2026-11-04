@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+  workflow_call:   # release.yml gates a release on a green CI run
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  rust-lint:
+    name: Rust fmt + clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      # janus-core/build.rs compiles proto/janus.proto and needs protoc.
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  rust-test:
+    name: Rust tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.os }}
+      - run: cargo test --workspace --all-features
+
+  ui:
+    name: UI (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx vitest run
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+          retention-days: 7
+
+  repo-gates:
+    name: Repo gates (duplication, stubs, proto lock)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Gate self-tests
+        run: |
+          node scripts/gates/dup-scan.mjs --selftest
+          node scripts/gates/no-stubs.mjs --selftest
+      - name: No duplicated 10-line runs in crates
+        run: node scripts/gates/dup-scan.mjs crates 10
+      - name: No stubs, TODOs or lint suppressions
+        run: node scripts/gates/no-stubs.mjs crates ui/src
+      - name: Plugin contract (proto) drift
+        run: scripts/ci/proto-lock.sh
+
+  # Single stable name for branch protection: require only "CI ok".
+  ci-ok:
+    name: CI ok
+    if: always()
+    needs: [rust-lint, rust-test, ui, repo-gates]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs succeeded
+        run: |
+          echo '${{ toJSON(needs) }}'
+          test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false"
