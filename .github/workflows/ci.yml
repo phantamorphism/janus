@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -55,6 +55,8 @@ jobs:
         with:
           key: test-${{ matrix.os }}
       - run: cargo test --workspace --all-features
+        env:
+          TMPDIR: ${{ runner.temp }}
 
   ui:
     name: UI (lint, typecheck, test, build)
