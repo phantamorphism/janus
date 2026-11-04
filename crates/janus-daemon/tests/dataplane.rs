@@ -1415,6 +1415,11 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
                 out.unwrap_or_else(|_| "aborted".into())
             )
         });
+        // Stagger the callers. The daemon opens a unix-socket connection per
+        // plugin call and a Linux listener refuses connects past its backlog
+        // (128), which a 200-wide burst exceeds; the plugin would then look
+        // unreachable for reasons that are not what this test is about.
+        tokio::time::sleep(Duration::from_millis(1)).await;
     }
     let mut diag = std::collections::BTreeMap::<String, usize>::new();
     while let Some(r) = tasks.join_next().await {
