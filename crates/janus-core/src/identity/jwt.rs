@@ -410,13 +410,15 @@ fn jwk_key(jwk: &Jwk) -> Option<VerifyKey> {
         AlgorithmParameters::EllipticCurve(ec) => match ec.curve {
             EllipticCurve::P256 => &[Algorithm::ES256],
             EllipticCurve::P384 => &[Algorithm::ES384],
-            EllipticCurve::P521 | EllipticCurve::Ed25519 => return None,
+            // Both enums are `#[non_exhaustive]`: anything else is unsupported.
+            _ => return None,
         },
         AlgorithmParameters::OctetKeyPair(okp) => match okp.curve {
             EllipticCurve::Ed25519 => &[Algorithm::EdDSA],
             _ => return None,
         },
-        AlgorithmParameters::OctetKey(_) => return None,
+        // Symmetric (oct) and unknown key types never verify a signature here.
+        _ => return None,
     };
     let algorithms = match jwk.common.key_algorithm {
         Some(declared) => {

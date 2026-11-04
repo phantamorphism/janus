@@ -4,7 +4,7 @@
 //! the binding's identity claim (`docs/caller-identity#methods`).
 
 use async_trait::async_trait;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde_json::{Map, Value};
 use sha2::Sha256;
 
@@ -41,7 +41,7 @@ impl HmacExtractor {
         if secret.is_empty() {
             return Err(ExtractorBuildError::EmptySecret);
         }
-        let mac = <HmacSha256 as Mac>::new_from_slice(secret.expose())
+        let mac = <HmacSha256 as KeyInit>::new_from_slice(secret.expose())
             .map_err(|e| ExtractorBuildError::InvalidKey(e.to_string()))?;
         Ok(HmacExtractor {
             namespace: spec.namespace,

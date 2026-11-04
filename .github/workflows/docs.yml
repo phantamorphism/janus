@@ -37,9 +37,27 @@ jobs:
       # then degrades to the deterministic rules.
       TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # sch compares main..HEAD
+
+      # The schematic repo is private and this repo has no SCHEMATIC_REPO_TOKEN
+      # secret (Dependabot PRs never see Actions secrets either). Without access
+      # the check cannot run; say so as a warning instead of failing every PR on
+      # a clone error. Add the secret to make this check run.
+      - name: Probe access to the schematic repo
+        id: probe
+        env:
+          SCH_REPO_TOKEN: ${{ secrets.SCHEMATIC_REPO_TOKEN }}
+        run: |
+          auth=""
+          [ -n "${SCH_REPO_TOKEN}" ] && auth="x-access-token:${SCH_REPO_TOKEN}@"
+          if GIT_TERMINAL_PROMPT=0 git ls-remote --quiet "https://${auth}github.com/phantamorphism/schematic.git" HEAD >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=sch check skipped::cannot read phantamorphism/schematic (private); add the SCHEMATIC_REPO_TOKEN secret (and the same as a Dependabot secret) to run this check"
+          fi
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -47,30 +65,32 @@ jobs:
 
       - name: Cache sch binary
         id: sch-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.local/bin/sch
           key: sch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/install-sch.sh') }}
 
       - name: Install sch (pinned commit, built from source)
-        if: steps.sch-cache.outputs.cache-hit != 'true'
+        if: steps.probe.outputs.available == 'true' && steps.sch-cache.outputs.cache-hit != 'true'
         env:
           # Only needed while the schematic repo is private.
           SCH_REPO_TOKEN: ${{ secrets.SCHEMATIC_REPO_TOKEN }}
         run: scripts/ci/install-sch.sh
 
       - name: Add sch to PATH
+        if: steps.probe.outputs.available == 'true'
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: sch check
         id: check
+        if: steps.probe.outputs.available == 'true'
         env:
           SCH_BASE: origin/${{ github.base_ref || 'main' }}
         run: scripts/ci/sch-check.sh
 
       - name: Sticky PR comment (same-repo PRs only)
-        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        if: always() && steps.probe.outputs.available == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
         env:
           REPORT: ${{ runner.temp }}/sch/report.md
         with:
@@ -86,7 +106,7 @@ jobs:
             if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sch-report

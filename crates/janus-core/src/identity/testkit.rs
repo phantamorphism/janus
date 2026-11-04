@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use http::{HeaderMap, HeaderName, HeaderValue, Method, Response, StatusCode, Uri};
 use http_body_util::Full;
 use hyper::server::conn::http1;
@@ -80,7 +80,7 @@ pub(crate) fn clock_at(secs: i64) -> Clock {
 /// `<claims-hex>.<signature-hex>` exactly as a host would mint it.
 pub(crate) fn mint_hmac(secret: &[u8], claims: &Value) -> String {
     let claims_hex = hex::encode(serde_json::to_vec(claims).expect("claims json"));
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(secret).expect("hmac key");
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(secret).expect("hmac key");
     mac.update(claims_hex.as_bytes());
     format!("{claims_hex}.{}", hex::encode(mac.finalize().into_bytes()))
 }

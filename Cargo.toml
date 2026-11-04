@@ -46,7 +46,7 @@ hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 bytes = "1"
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["fs"] }
+tower-http = { version = "0.7", features = ["fs"] }
 axum = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "json", "stream"] }
 url = { version = "2", features = ["serde"] }
@@ -62,7 +62,7 @@ rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem
 # Serialization and config.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.9"
+toml = "1"
 humantime = "2"
 humantime-serde = "1"
 
@@ -72,16 +72,16 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 
 # Identity verification, tokens, hashing.
-hmac = "0.12"
-sha2 = "0.10"
+hmac = "0.13"
+sha2 = "0.11"
 hex = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 subtle = "2"
-rand = "0.9"
-jsonwebtoken = { version = "10", default-features = false, features = ["use_pem", "rust_crypto"] }
+rand = "0.10"
+jsonwebtoken = { version = "11", default-features = false, features = ["use_pem", "rust_crypto"] }
 
 # Storage (daemon's janus.db, SqliteUsageStore).
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 
 # Misc.
 uuid = { version = "1", features = ["v4", "v7", "serde"] }

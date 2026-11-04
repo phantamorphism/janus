@@ -571,27 +571,35 @@ pub fn record(
 #[derive(Clone, Default)]
 pub struct Logs(Arc<Mutex<Vec<u8>>>);
 
-impl Logs {
-    /// Capture until the guard drops.
-    pub fn capture() -> (Logs, tracing::subscriber::DefaultGuard) {
-        let logs = Logs::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(logs.clone())
-            .with_ansi(false)
-            .with_max_level(tracing::Level::DEBUG)
-            .finish();
-        let guard = tracing::subscriber::set_default(subscriber);
-        (logs, guard)
-    }
+thread_local! {
+    /// The capture active on this thread, if any. Each test runs on its own
+    /// thread, so a thread-local sink keeps concurrent captures apart.
+    static SINK: std::cell::RefCell<Option<Logs>> = const { std::cell::RefCell::new(None) };
+}
 
-    pub fn text(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().expect("lock")).into_owned()
+/// Ends a capture when dropped.
+pub struct CaptureGuard;
+
+impl Drop for CaptureGuard {
+    fn drop(&mut self) {
+        SINK.with(|s| *s.borrow_mut() = None);
     }
 }
 
-impl std::io::Write for Logs {
+/// The one process-wide subscriber, routing each event to the capture on its
+/// thread. A `set_default` subscriber per test races with tracing's global
+/// callsite-interest cache when tests run concurrently, which dropped events
+/// on machines with few cores.
+#[derive(Clone, Copy)]
+struct Router;
+
+impl std::io::Write for Router {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().expect("lock").extend_from_slice(buf);
+        SINK.with(|s| {
+            if let Some(logs) = s.borrow().as_ref() {
+                logs.0.lock().expect("lock").extend_from_slice(buf);
+            }
+        });
         Ok(buf.len())
     }
 
@@ -600,10 +608,33 @@ impl std::io::Write for Logs {
     }
 }
 
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Logs {
-    type Writer = Logs;
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Router {
+    type Writer = Router;
 
-    fn make_writer(&'a self) -> Logs {
-        self.clone()
+    fn make_writer(&'a self) -> Router {
+        *self
+    }
+}
+
+impl Logs {
+    /// Capture this thread's events until the guard drops.
+    pub fn capture() -> (Logs, CaptureGuard) {
+        static INSTALL: std::sync::Once = std::sync::Once::new();
+        INSTALL.call_once(|| {
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(Router)
+                .with_ansi(false)
+                .with_max_level(tracing::Level::DEBUG)
+                .finish();
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("no other global subscriber in the admin tests");
+        });
+        let logs = Logs::default();
+        SINK.with(|s| *s.borrow_mut() = Some(logs.clone()));
+        (logs, CaptureGuard)
+    }
+
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().expect("lock")).into_owned()
     }
 }

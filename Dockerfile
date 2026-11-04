@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- UI ---------------------------------------------------------------------
-FROM node:24-slim AS ui
+FROM node:26-slim AS ui
 WORKDIR /src/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci

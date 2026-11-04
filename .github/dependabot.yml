@@ -1,27 +1,47 @@
+# Updates arrive weekly, grouped so one PR per ecosystem carries every
+# minor/patch bump. Major bumps stay separate (they can break the build) and
+# are capped by open-pull-requests-limit so a backlog cannot flood the repo.
 version: 2
 updates:
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, rust]
     groups:
       rust-minor-patch:
         update-types: [minor, patch]
-    open-pull-requests-limit: 10
 
   - package-ecosystem: npm
     directory: /ui
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, javascript]
     groups:
       ui-minor-patch:
         update-types: [minor, patch]
-    open-pull-requests-limit: 10
+    ignore:
+      # typescript-eslint (<= 8.x) refuses TypeScript 7 at load time ("does not
+      # support TS 7.0"), so lint breaks. Revisit once typescript-eslint supports it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # CI and the release workflow run Node 24; @types/node must track the
+      # Node major the tooling runs on, not the newest. Bump together with the
+      # node-version in the workflows.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    labels: [dependencies, ci]
     groups:
       actions:
         patterns: ["*"]
@@ -30,3 +50,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    labels: [dependencies, docker]
+    groups:
+      docker:
+        patterns: ["*"]
