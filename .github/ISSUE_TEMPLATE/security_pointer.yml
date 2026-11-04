@@ -1,0 +1,25 @@
+name: Security question (not a vulnerability report)
+description: A general question about Janus's security model. Vulnerabilities go through private reporting.
+labels: ["security", "question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not put vulnerability details in this issue.** To report one privately, use the Security tab and choose "Report a vulnerability" (https://github.com/phantamorphism/janus/security/advisories/new). See SECURITY.md for scope and the disclosure timeline.
+
+        Use this form for questions about the trust model, hardening a deployment, or suggestions that are not exploitable bugs. The documented limits are in SECURITY.md and in `docs/credential-substitution.md`, `docs/caller-identity.md`, `docs/admin-surface.md` and `docs/plugin-contract.md`.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question or suggestion
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checks
+      options:
+        - label: This contains no exploit details, and no real secrets.
+          required: true
+        - label: I read SECURITY.md and this is not a vulnerability report.
+          required: true

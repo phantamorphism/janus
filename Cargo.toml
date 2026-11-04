@@ -11,6 +11,10 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/phantamorphism/janus"
+homepage = "https://github.com/phantamorphism/janus"
+readme = "README.md"
+# Floor set by the dependency tree (uuid 1.x declares 1.89); see docs/development.md.
+rust-version = "1.89"
 
 # One version of every third-party crate for the whole workspace, so no leaf has
 # to pick a version. The member manifests declare, up front, every dependency

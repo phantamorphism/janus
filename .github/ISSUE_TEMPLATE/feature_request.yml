@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose a new capability or a change to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Janus adds surface area only when a real user needs it. Please read `docs/scope.md`, `docs/decisions.md` and the "Not built" items in `docs/status.md` first. Some things are deliberately absent and have a named trigger.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you today? Describe the need, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What would you add or change? For a new upstream, identity method or config key, say what the config would look like.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New upstream
+        - Identity extractor
+        - Credential pool
+        - Metering or UsageStore
+        - Plugin contract (proto/janus.proto)
+        - Admin API, CLI or UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Plugin contract impact
+      description: If this touches `proto/janus.proto`, say why `ResolveRoute` and the generic `Notify` envelope cannot carry it and how old plugins are handled. Write "none" otherwise.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including a custom build with a linked plugin or extractor, which needs no change to Janus.
+    validations:
+      required: false
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to work on this.

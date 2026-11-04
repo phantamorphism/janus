@@ -2,6 +2,13 @@
   "name": "janus-ui",
   "private": true,
   "version": "0.0.0",
+  "description": "Operator UI for janus-daemon: credentials, identities, request log and plugin health.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phantamorphism/janus.git",
+    "directory": "ui"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

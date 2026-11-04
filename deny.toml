@@ -1,0 +1,55 @@
+# cargo-deny configuration. Run: cargo deny check
+# Janus is MIT OR Apache-2.0, so only licenses compatible with distributing under
+# either of those are allowed. Add to `allow` deliberately, with a reason.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    # `rsa` arrives through jsonwebtoken's rust_crypto backend. Janus only
+    # verifies JWTs with public keys (identity/jwt.rs: DecodingKey); the Marvin
+    # timing attack needs RSA private-key operations, which Janus never performs.
+    # No patched release exists. Remove when jsonwebtoken drops or fixes rsa.
+    # `crypto-bigint` 0.5 arrives through p256/p384 (ecdsa 0.16, elliptic-curve
+    # 0.13), again for ES256/ES384 public-key verification only: no secret
+    # integers are processed. The fix is in crypto-bigint 0.7, which the 0.13
+    # RustCrypto line cannot take; revisit when jsonwebtoken moves to the next line.
+    { id = "RUSTSEC-2026-0387", reason = "ecdsa verification with public keys only; no secret-integer operations" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa used for public-key JWT verification only; no private-key operations" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true   # path dependencies inside the workspace
+highlight = "all"
+# One TLS stack: rustls with ring. Keep OpenSSL out of the build.
+deny = [
+    { crate = "openssl" },
+    { crate = "openssl-sys" },
+    { crate = "native-tls" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -4,111 +4,226 @@ type: overview
 status: accepted
 ---
 
-# Janus
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner-dark.svg">
+    <img alt="Janus: callers hold an identity, never the key." src="docs/images/banner.svg" width="100%">
+  </picture>
+</p>
 
-A standalone proxy that stands between a caller and the authenticated services
-it needs to reach, so the caller never holds the real credentials.
+<p align="center">
+  <a href="https://github.com/phantamorphism/janus/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/phantamorphism/janus/ci.yml?branch=main&label=ci"></a>
+  <a href="https://github.com/phantamorphism/janus/actions/workflows/docs.yml"><img alt="Docs" src="https://img.shields.io/github/actions/workflow/status/phantamorphism/janus/docs.yml?branch=main&label=docs"></a>
+  <a href="https://github.com/phantamorphism/janus/releases"><img alt="Release" src="https://img.shields.io/github/v/release/phantamorphism/janus?include_prereleases&sort=semver"></a>
+  <a href="#license"><img alt="License: MIT or Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-blue"></a>
+</p>
 
-The motivating caller is an agent in a sandbox: it needs to call APIs gated by
-API keys and OAuth tokens, but the sandbox is the last place those secrets
-should live. With Janus, the agent holds its own identity, presents that
-identity, and calls the upstream's own API as usual. Janus substitutes the real
-credential on the way out. The agent can authenticate; it can never read the
-token it authenticated with.
+**Janus is a proxy that sits between an agent and the authenticated APIs it
+calls, so the agent presents an identity and Janus injects the real credential
+on the way out. The agent can authenticate; it can never read the key it
+authenticated with.**
 
-Janus verifies that identity; it does not issue it. Whatever already creates
-your agent sandboxes is the only thing positioned to hand one an identity, so
-Janus's job starts at extraction — a configured extractor per request type reads
-the material a caller presents and verifies it locally.
+## Why
 
-And because every such call crosses Janus, Janus is where policy on those calls
-gets enforced — is this identity allowed this credential, is it out of credit,
-is it over its rate budget — via plugins rather than hardcoded rules.
+- **Nothing worth stealing in the sandbox.** Agents hold a revocable identity,
+  not a long-lived API key. A leaked identity is not the credential behind it.
+- **Every call is attributable.** Each request is tied to the identity that made
+  it, in a request log, instead of landing on one shared account.
+- **Revocation is surgical.** Cut off one agent without rotating the key every
+  other agent uses.
+- **Policy at the chokepoint.** Every call crosses Janus, so authorization and
+  budget checks run before anything reaches the upstream, through a plugin
+  contract rather than forks.
 
-Named for the Roman god of doors and thresholds, depicted two-faced, looking
-both directions at once: one face toward the caller, one toward the upstream.
+## How it fits
 
-**Status:** the daemon, `janus-core`, the `janus` CLI and the admin UI are
-implemented. See [docs/status.md](docs/status.md).
+<p align="center">
+  <img alt="Janus overview: the caller presents an identity; Janus verifies it, resolves a credential from the pool, substitutes it and forwards to the upstream." src="docs/images/diagram-overview.svg" width="100%">
+</p>
 
-## First upstreams
+The caller uses the upstream's own API or SDK, changing only the base URL and
+the credential it presents. Janus does not define an API of its own in front of
+an upstream. See <ref target="docs/credential-substitution">credential
+substitution and policy enforcement</ref>.
 
-Anthropic, OpenAI and OpenRouter — the LLM APIs — are the first upstreams Janus
-targets, because that is where the need is concrete and there is existing proxy
-code to build on. They are the first implementation of the model, not the
-definition of it: holding a credential on a caller's behalf, substituting it
-per-request, and gating the call on policy applies to any authenticated HTTP
-service an agent is pointed at.
+## See it
 
-## Goals
+The operator UI is served by the daemon on its own port.
 
-- **Callers never hold real credentials.** The credential a request is
-  authenticated with is resolved and injected inside Janus. A caller's own
-  identity is the only secret it sees, and compromising it does not yield the
-  credential behind it.
-- **Every call is a policy enforcement point.** Authentication, authorization,
-  and credit/usage checks apply per-request, before anything is forwarded, and a
-  denial is a first-class outcome.
-- **Standalone by default.** A daemon + CLI you can run with no dependencies
-  beyond upstream credentials. No external calls, no configuration required to
-  get a working pass-through proxy.
-- **Extensible via plugins, not forks.** Policy and observability behavior is
-  reached only through one contract (`proto/janus.proto`). Janus is always the
-  *client*; the plugin implements the server side, and can be compiled into a
-  custom build of the daemon, or reached over gRPC on a local unix socket or
-  across the network.
+<table>
+  <tr>
+    <td width="50%"><img alt="Overview" src="docs/images/ui-overview.png"><br><sub>Overview: listeners, upstreams, credential health, plugin</sub></td>
+    <td width="50%"><img alt="Credentials" src="docs/images/ui-credentials.png"><br><sub>Credentials: status and counters, never material</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img alt="Identities" src="docs/images/ui-identities.png"><br><sub>Identities: the registry, with revoke</sub></td>
+    <td width="50%"><img alt="Requests" src="docs/images/ui-requests.png"><br><sub>Requests: filterable log with live tail</sub></td>
+  </tr>
+</table>
 
-## Layout
+<p align="center">
+  <img alt="Request detail drawer" src="docs/images/ui-request-detail.png" width="80%"><br>
+  <sub>One request: who called, which credential, what the outcome was</sub>
+</p>
 
+## Features
+
+Built and running; see <ref target="docs/status">status</ref> for the
+authoritative list.
+
+- **Upstreams:** Anthropic, OpenAI (API keys and ChatGPT-account OAuth) and
+  OpenRouter, relayed unmodified, streaming included.
+- **Caller identity, verified locally:** `hmac`, `jwt` (JWKS or public key),
+  `opaque` (a daemon-managed registry with expiry and instant revocation),
+  `trusted_header`, and `none` for explicitly open routes. Bound per daemon, per
+  upstream or per path.
+- **Credential pool:** config credentials and pool slots added live; OAuth
+  refresh; enable, disable, rotate; a default chain when no plugin chooses.
+- **Policy plugins:** `ResolveRoute` (sync, fails closed) and `Notify` (async)
+  over a unix socket, mutual TLS, or linked into a custom build; metering
+  primitives with in-memory and SQLite stores.
+- **Admin surface:** one HTTP+JSON API on a `0600` unix socket by default, an
+  opt-in token-guarded TCP listener, and a UI listener.
+- **`janus` CLI:** status, credentials, identities, request-log query and tail,
+  plugin check and TLS bootstrap, config check.
+- **Request log:** metadata only (no bodies), SQLite, with retention.
+- **Not built, on purpose:** response transformation, a replicated usage store,
+  credential entry in the UI, body capture in the log. See
+  <ref target="docs/status#open-questions">status</ref>.
+
+Janus targets the three LLM APIs first, but the model applies to any
+authenticated HTTP service.
+
+## Quickstart
+
+```sh
+cargo build --release
+export PATH="$PWD/target/release:$PATH"
+export JANUS_DATA_DIR="$PWD/data"
+
+cat > config.toml <<'EOF'
+[data_plane]
+bind = "127.0.0.1:7600"
+
+[identity]
+method = "opaque"
+source = { header = "authorization", scheme = "Bearer " }
+
+[[upstream]]
+name        = "openrouter"
+path_prefix = "/openrouter"
+base_url    = "https://openrouter.ai/api"
+EOF
+
+janus-daemon --config config.toml &
+
+printf '%s' "$OPENROUTER_API_KEY" \
+  | janus credential add --upstream openrouter --api-key-stdin
+TOKEN=$(janus identity create --identity agent-1 --expires-in 1h)
+
+curl -s http://127.0.0.1:7600/openrouter/v1/models \
+  -H "Authorization: Bearer $TOKEN"
 ```
-janus/
-├── crates/
-│   ├── janus-core/      # identity extraction, credential pool, substitution,
-│   │                    # forwarding, metering primitives
-│   ├── janus-daemon/    # library + binary; data plane + admin surface + plugin
-│   │                    # client. Linked into custom builds with a plugin.
-│   └── janus-cli/       # admin client binary ("janus"), talks to the daemon
-├── proto/
-│   └── janus.proto      # the plugin contract: ResolveRoute (sync), Notify (async)
-├── ui/                  # standalone operator web UI, served on its own port
-├── docs/                # design docs, kept consistent by Schematic (`sch`)
-└── README.md
-```
 
-## Documentation
+The agent only ever holds `$TOKEN`. To serve the web UI, build `ui/` and place
+it in a `ui` directory beside the executable (or set `ui.assets_dir`). The
+<ref target="docs/quickstart">full walkthrough</ref> runs against a local
+stand-in upstream you can inspect, and covers the log, revocation and the UI.
 
-Design docs live in `docs/` and are kept internally consistent by
-[Schematic](https://github.com/phantamorphism/schematic) (the `sch` CLI) — this
-repo is itself a Schematic corpus (`schematic.yaml` at the root). Start at
-<ref target="docs/index">docs/index.md</ref>; the core model is in
-<ref target="docs/credential-substitution">docs/credential-substitution.md</ref>,
-and how Janus establishes who is calling is in
-<ref target="docs/caller-identity">docs/caller-identity.md</ref>. When editing
-docs, use the `sch branch` / `sch check` / `sch fix` / `sch commit` /
-`sch merge` loop instead of plain git — see the `schematic` skill or
-`skills/schematic/SKILL.md` in the Schematic repo for the full workflow.
+## How it works
+
+<p align="center">
+  <img alt="Request lifecycle: verify identity, resolve credential, fetch from pool, rewrite, forward, notify" src="docs/images/diagram-lifecycle.svg" width="90%">
+</p>
+
+Janus verifies the caller's identity first and rejects before touching anything
+else if it does not verify. The credential is then resolved by a plugin or the
+default chain, fetched from the pool, and the outbound request is built from a
+per-upstream allowlist, so the caller's identity material is absent from it
+rather than deleted. Janus verifies identities; it does not mint them. Details:
+<ref target="docs/architecture">architecture</ref> and
+<ref target="docs/caller-identity">caller identity extraction</ref>.
 
 ## Plugin contract
 
-Two extension points, shaped differently because they behave differently:
+Policy is reached through one contract, `proto/janus.proto`. Janus is always the
+client.
 
-- **`ResolveRoute`** — the synchronous credential-substitution decision,
-  consulted after the caller's identity is verified and before the request is
-  forwarded. Given a verified caller identity and the target upstream, a plugin
-  answers with a credential to use, a deferral to the default chain, or a denial
-  — the single hook for authorization and credit/usage enforcement. Blocking by
-  design. Fails **closed**: if a configured plugin is unreachable or errors, the
-  request is rejected rather than silently falling back to a default credential.
-- **`Notify`** — a fire-and-forget event stream using one generic envelope
-  (`{event_type, request_id, correlation_id, payload_json}`) rather than one RPC
-  per event kind, so new event types don't require a proto change.
+- **`ResolveRoute`** is synchronous: given a verified identity and the upstream,
+  a plugin answers with a credential, a deferral to the default chain, or a
+  denial. It fails closed: an unreachable or erroring plugin rejects the
+  request.
+- **`Notify`** is a fire-and-forget event stream with one generic envelope.
 
-Policy decisions are the plugin's, but the mechanics they share are not:
-`janus-core` ships per-identity counting and quota primitives so every metering
-plugin doesn't reimplement them.
+With no plugin configured Janus makes no plugin calls and is a plain
+credential-substituting proxy. See <ref target="docs/plugin-contract">the plugin
+contract</ref>.
 
-With no plugin configured, Janus makes zero calls defined in `janus.proto` and
-behaves as a plain credential-substituting pass-through proxy.
+## Configuration, admin and CLI
+
+<p align="center">
+  <img alt="Janus listeners: data plane, admin socket, optional admin TCP, optional UI, and the plugin channel" src="docs/images/diagram-listeners.svg" width="90%">
+</p>
+
+- <ref target="docs/configuration">Daemon configuration</ref>: every section and
+  key of the config file. Unknown or ineffective keys refuse startup.
+- <ref target="docs/admin-surface">Admin surface, CLI and UI</ref>: endpoints,
+  the `janus` command set, exit codes, the request log.
+- Admin routes are never mounted on the data plane, so a caller cannot address
+  them. `janus --help` lists every command.
+
+## Security model
+
+Janus is built to defend against:
+
+- **Credential theft from the sandbox.** The agent, any dependency it runs, and
+  any prompt-injected instruction can read only an identity, not the credential.
+- **Cross-caller blast radius.** Identities are separately attributable and
+  revocable; a plugin can scope which credential each one may use.
+- **Reaching credential management from the data plane.** Admin runs on separate
+  listeners; every TCP admin listener requires a token, and non-loopback binds
+  require TLS or an explicit opt-out.
+- **A fail-open policy.** A plugin that cannot be reached denies; it never
+  silently falls back to a default credential.
+
+It does not defend against:
+
+- **Misuse through Janus.** A caller holding a valid identity can still spend
+  the credential Janus applies on its behalf, within whatever policy you
+  configure. With no plugin and the default chain, that is every active
+  credential for that upstream.
+- **Open and header-trusted routes.** A `method = "none"` route is open to
+  anything that can reach the data plane, and `trusted_header` is only safe
+  behind a front proxy that authenticates callers.
+- **A compromised Janus host or operator account.** The daemon holds the
+  credentials; anyone running as its user can read the data directory.
+- **Upstream content.** Responses are relayed unmodified.
+
+Report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
+
+## Project status
+
+Janus is pre-1.0. The daemon, core library, CLI and UI are implemented; what is
+deliberately not built, and what would trigger building it, is in
+<ref target="docs/status">status</ref> and <ref target="docs/decisions">decision
+records</ref>. Scope boundaries are in <ref target="docs/scope">scope and
+non-goals</ref>.
+
+## Documentation
+
+Design docs live in `docs/`, start at
+<ref target="docs/index">docs/index.md</ref>. This repo is a
+[Schematic](https://github.com/phantamorphism/schematic) corpus
+(`schematic.yaml` at the root), kept consistent by the `sch` CLI; edit docs with
+the `sch branch` / `sch check` / `sch fix` / `sch commit` / `sch merge` loop
+rather than plain git. The workspace is `crates/janus-core`,
+`crates/janus-daemon` and `crates/janus-cli`, plus `proto/` and the web UI in
+`ui/`.
+
+## Contributing
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code
+of Conduct](CODE_OF_CONDUCT.md). Design changes start in the docs.
 
 ## License
 
