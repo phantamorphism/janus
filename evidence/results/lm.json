@@ -1,0 +1,164 @@
+[
+  {
+    "id": "D97",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D97-checks.json",
+      "evidence/artifacts/lm/D97-help.txt",
+      "evidence/artifacts/lm/D97-token-flag-rejected.txt",
+      "evidence/artifacts/lm/D97-transcript.txt"
+    ],
+    "note": "16/16 checks passed."
+  },
+  {
+    "id": "D98",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D98-checks.json",
+      "evidence/artifacts/lm/D98-json-commands.txt",
+      "evidence/artifacts/lm/D98-status-json.txt",
+      "evidence/artifacts/lm/D98-status.txt"
+    ],
+    "note": "32/32 checks passed."
+  },
+  {
+    "id": "D99",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D99-add-help.txt",
+      "evidence/artifacts/lm/D99-checks.json",
+      "evidence/artifacts/lm/D99-transcript.txt"
+    ],
+    "note": "17/17 checks passed."
+  },
+  {
+    "id": "D100",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D100-checks.json",
+      "evidence/artifacts/lm/D100-transcript.txt"
+    ],
+    "note": "12/12 checks passed."
+  },
+  {
+    "id": "D101",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D101-checks.json",
+      "evidence/artifacts/lm/D101-transcript.txt"
+    ],
+    "note": "17/17 checks passed."
+  },
+  {
+    "id": "D102",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D102-checks.json",
+      "evidence/artifacts/lm/D102-transcript.txt"
+    ],
+    "note": "11/11 checks passed."
+  },
+  {
+    "id": "D103",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D103-checks.json",
+      "evidence/artifacts/lm/D103-transcript.txt"
+    ],
+    "note": "8/8 checks passed."
+  },
+  {
+    "id": "D104",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D104-1-token-prompt.png",
+      "evidence/artifacts/lm/D104-2-after-login.png",
+      "evidence/artifacts/lm/D104-3-after-reload.png",
+      "evidence/artifacts/lm/D104-4-wrong-token.png",
+      "evidence/artifacts/lm/D104-browser-console.txt",
+      "evidence/artifacts/lm/D104-checks.json",
+      "evidence/artifacts/lm/D104-network-log.json",
+      "evidence/artifacts/lm/D104-response-headers.txt",
+      "evidence/artifacts/lm/D104-secret-scan.txt",
+      "evidence/artifacts/lm/D104-storage.json",
+      "evidence/artifacts/lm/D104-wrong-token-text.txt"
+    ],
+    "note": "20/20 checks passed."
+  },
+  {
+    "id": "D105",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D105-checks.json",
+      "evidence/artifacts/lm/D105-cli-credentials.json",
+      "evidence/artifacts/lm/D105-cli-status.json",
+      "evidence/artifacts/lm/D105-counts.json",
+      "evidence/artifacts/lm/D105-credential-health.json",
+      "evidence/artifacts/lm/D105-overview-text.txt",
+      "evidence/artifacts/lm/D105-overview.png"
+    ],
+    "note": "13/13 checks passed."
+  },
+  {
+    "id": "D106",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D106-1-credentials.png",
+      "evidence/artifacts/lm/D106-2-after-disable.png",
+      "evidence/artifacts/lm/D106-3-after-refresh.png",
+      "evidence/artifacts/lm/D106-3b-after-oauth-refresh.png",
+      "evidence/artifacts/lm/D106-4-remove-confirm.png",
+      "evidence/artifacts/lm/D106-checks.json",
+      "evidence/artifacts/lm/D106-final-credentials.txt",
+      "evidence/artifacts/lm/D106-oauth-refresh.json"
+    ],
+    "note": "17/17 checks passed."
+  },
+  {
+    "id": "D107",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D107-1-identities.png",
+      "evidence/artifacts/lm/D107-2-filter-identity.png",
+      "evidence/artifacts/lm/D107-3-include-revoked.png",
+      "evidence/artifacts/lm/D107-4-revoke-clicked.png",
+      "evidence/artifacts/lm/D107-5-after-revoke.png",
+      "evidence/artifacts/lm/D107-checks.json",
+      "evidence/artifacts/lm/D107-controls.json"
+    ],
+    "note": "14/14 checks passed."
+  },
+  {
+    "id": "D108",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D108-1-requests.png",
+      "evidence/artifacts/lm/D108-2-filter-denied.png",
+      "evidence/artifacts/lm/D108-3-live-on.png",
+      "evidence/artifacts/lm/D108-4-live-rows-arrived.png",
+      "evidence/artifacts/lm/D108-5-live-off.png",
+      "evidence/artifacts/lm/D108-6-drawer.png",
+      "evidence/artifacts/lm/D108-checks.json",
+      "evidence/artifacts/lm/D108-drawer-text.txt",
+      "evidence/artifacts/lm/D108-record.json",
+      "evidence/artifacts/lm/D108-table-vs-cli.json"
+    ],
+    "note": "10/10 checks passed."
+  },
+  {
+    "id": "D109",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/lm/D109-1-plugin.png",
+      "evidence/artifacts/lm/D109-2-check-healthy.png",
+      "evidence/artifacts/lm/D109-3-check-misconfigured.png",
+      "evidence/artifacts/lm/D109-4-plugin-down.png",
+      "evidence/artifacts/lm/D109-checks.json",
+      "evidence/artifacts/lm/D109-healthy-cli.json",
+      "evidence/artifacts/lm/D109-healthy-ui.txt",
+      "evidence/artifacts/lm/D109-misconfigured-cli.json",
+      "evidence/artifacts/lm/D109-misconfigured-ui.txt"
+    ],
+    "note": "7/7 checks passed."
+  }
+]

@@ -1,0 +1,100 @@
+$ exit=0
+--- stdout
+plugin               tls
+endpoint             https://localhost:26020/
+health               ok
+last ok              2026-11-04T10:19:42Z
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  2027-11-04T00:00:00Z
+
+--- stderr
+
+
+$ exit=0
+--- stdout
+{
+  "client_cert_expires_at": "2027-11-04T00:00:00Z",
+  "dropped_events": 0,
+  "endpoint": "https://localhost:26020/",
+  "health": "ok",
+  "last_error": null,
+  "last_ok_at": "2026-11-04T10:19:42.520397Z",
+  "mode": "tls",
+  "server_cert_expires_at": "2027-11-04T00:00:00Z"
+}
+
+--- stderr
+
+
+$ exit=0
+--- stdout
+plugin tls https://localhost:26020/: PASSED
+  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's
+  ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)
+  ok   no_cert_rejected: the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired)
+
+--- stderr
+
+
+$ exit=0
+--- stdout
+{
+  "endpoint": "https://localhost:26020/",
+  "mode": "tls",
+  "passed": true,
+  "steps": [
+    {
+      "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's",
+      "passed": true,
+      "step": "handshake"
+    },
+    {
+      "detail": "the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)",
+      "passed": true,
+      "step": "throwaway_cert_rejected"
+    },
+    {
+      "detail": "the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired)",
+      "passed": true,
+      "step": "no_cert_rejected"
+    }
+  ]
+}
+
+--- stderr
+
+
+$ exit=0
+--- stdout
+wrote /private/tmp/qa-lm/run/init-out/daemon.pem, /private/tmp/qa-lm/run/init-out/daemon-key.pem (mode 0600), /private/tmp/qa-lm/run/init-out/plugin.pem, /private/tmp/qa-lm/run/init-out/plugin-key.pem (mode 0600)
+
+Add to the daemon's config, under [plugin]:
+
+[plugin.tls]
+pinned_cert = "/private/tmp/qa-lm/run/init-out/plugin.pem"
+client_cert = "/private/tmp/qa-lm/run/init-out/daemon.pem"
+client_key  = "/private/tmp/qa-lm/run/init-out/daemon-key.pem"
+
+For the plugin:
+  - serve TLS 1.3 with certificate /private/tmp/qa-lm/run/init-out/plugin.pem and key /private/tmp/qa-lm/run/init-out/plugin-key.pem
+  - require a client certificate, and accept only /private/tmp/qa-lm/run/init-out/daemon.pem (pin it; there is no CA)
+
+--- stderr
+
+
+daemon.pem 644
+daemon-key.pem 600
+plugin.pem 644
+plugin-key.pem 600
+--- misconfigured plugin (client cert optional)
+$ exit=1
+--- stdout
+plugin tls https://localhost:26020/: FAILED
+  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's
+  ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)
+  FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certificate without requiring one
+
+--- stderr
+janus: the plugin channel check did not pass
+

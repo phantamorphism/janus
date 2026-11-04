@@ -1,0 +1,2 @@
+exit=1
+custom-build: config: plugin.endpoint: config names a plugin endpoint and this build also links a plugin; ambiguous

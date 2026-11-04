@@ -1,0 +1,102 @@
+[
+  {
+    "name": "prompt appears on first visit",
+    "ok": true,
+    "detail": "Janus\nAdmin token\n\nThe daemon generates it into <data_dir>/admin-token and logs that path at startup. It is kept in this tab’s session storage only, and forgotten when the tab closes.\n\nConnect"
+  },
+  {
+    "name": "no API call is made before the token is entered",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "entering the token reaches the app (Overview)",
+    "ok": true,
+    "detail": "Overview\n\nWhat this Janus daemon is, where it listens, and how its traffic and credentials are doing"
+  },
+  {
+    "name": "reload does not prompt again",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token present in sessionStorage",
+    "ok": true,
+    "detail": "janus.admin-token"
+  },
+  {
+    "name": "token not in localStorage",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token not in cookies",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token not in the page URL",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "API requests were made (status, credentials, identities, requests, plugin)",
+    "ok": true,
+    "detail": "/v1/status,/v1/credentials,/v1/requests,/v1/identities,/v1/plugin"
+  },
+  {
+    "name": "every API request carries Authorization: Bearer <admin token>",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "token never appears in any request URL or cookie",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "static assets are fetched without the token requirement",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI document carries CSP default-src 'self' and frame-ancestors 'none'",
+    "ok": true,
+    "detail": "default-src 'self'; frame-ancestors 'none'"
+  },
+  {
+    "name": "UI document carries X-Content-Type-Options: nosniff and a Referrer-Policy",
+    "ok": true,
+    "detail": "{\"content-type\":\"text/html\",\"accept-ranges\":\"bytes\",\"last-modified\":\"Wed, 04 Nov 2026 10:18:40 GMT\",\"content-length\":\"455\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"date\":\"Wed, 04 Nov 2026 10:19:48 GMT\"}"
+  },
+  {
+    "name": "API responses on the UI listener carry the same security headers",
+    "ok": true,
+    "detail": "{\"content-type\":\"application/json\",\"x-content-type-options\":\"nosniff\",\"content-security-policy\":\"default-src 'self'; frame-ancestors 'none'\",\"referrer-policy\":\"no-referrer\",\"content-length\":\"1070\",\"date\":\"Wed, 04 Nov 2026 10:19:49 GMT\"}"
+  },
+  {
+    "name": "no CSP violations or JS errors in the browser console while the UI works end to end",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a new browser session prompts again (token is session-scoped)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a wrong token is refused (prompt stays, no console data)",
+    "ok": true,
+    "detail": "Janus\nAdmin token\n\nThe daemon generates it into <data_dir>/admin-token and logs that path at startup. It is kept in this tab’s session storage only, and forgotten when the tab closes.\n\nThe daemon reje"
+  },
+  {
+    "name": "correct token then succeeds",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no secret (admin token, identity tokens, API keys) in any artifact",
+    "ok": true,
+    "detail": ""
+  }
+]

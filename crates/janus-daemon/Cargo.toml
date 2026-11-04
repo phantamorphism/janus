@@ -21,10 +21,7 @@ tokio-util.workspace = true
 futures.workspace = true
 async-trait.workspace = true
 tonic.workspace = true
-tonic-prost.workspace = true
-prost.workspace = true
 http.workspace = true
-http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
@@ -36,7 +33,6 @@ url.workspace = true
 percent-encoding.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
-rustls-pki-types.workspace = true
 x509-parser.workspace = true
 rcgen.workspace = true
 serde.workspace = true
@@ -57,7 +53,7 @@ uuid.workspace = true
 chrono.workspace = true
 libc.workspace = true
 clap.workspace = true
+tempfile.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 reqwest.workspace = true

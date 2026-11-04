@@ -3,30 +3,29 @@ import { apiError, eventStream, mockApi } from '@/test/http'
 import { SseParser, runTail, type SseEvent, type TailState } from './sse'
 
 describe('SseParser', () => {
-  it('parses events across chunk boundaries, CRLF/CR line ends, comments, ids and retry', () => {
+  it('parses events across chunk boundaries, CRLF/CR line ends and comments; id and retry fields are ignored', () => {
     const p = new SseParser()
     const out: SseEvent[] = []
     out.push(...p.feed(': keepalive\r\nretry: 1500\r'))
     out.push(...p.feed('\nevent: request\r\nid: 7\r\ndata: {"a":'))
     out.push(...p.feed('1}\r\n\r\nevent: ping\rdata\r\r'))
     out.push(...p.feed('data: one\ndata: two\n\n'))
-    expect(p.retry).toBe(1500)
     expect(out).toEqual([
-      { event: 'request', data: '{"a":1}', lastEventId: '7' },
-      { event: 'ping', data: '', lastEventId: '7' },
-      { event: 'message', data: 'one\ntwo', lastEventId: '7' },
+      { event: 'request', data: '{"a":1}' },
+      { event: 'ping', data: '' },
+      { event: 'message', data: 'one\ntwo' },
     ])
   })
 
   it('does not dispatch an event block without data', () => {
     const p = new SseParser()
     expect(p.feed('event: request\n\n')).toEqual([])
-    expect(p.feed('data: x\n\n')).toEqual([{ event: 'message', data: 'x', lastEventId: '' }])
+    expect(p.feed('data: x\n\n')).toEqual([{ event: 'message', data: 'x' }])
   })
 })
 
 describe('runTail', () => {
-  it('reads with the bearer header, reconnects after the stream ends and presents Last-Event-ID', async () => {
+  it('reads with the bearer header, reconnects after the stream ends with the same request and no Last-Event-ID', async () => {
     const ctl = new AbortController()
     const events: SseEvent[] = []
     const states: TailState[] = []
@@ -37,10 +36,10 @@ describe('runTail', () => {
         n++
         const s = eventStream()
         if (n === 1) {
-          s.send('retry: 250\nid: 41\nevent: request\ndata: {"request_id":"r1"}\n\n')
+          s.send('event: request\ndata: {"request_id":"r1"}\n\n')
           s.close()
         } else {
-          s.send('event: request\nid: 42\ndata: {"request_id":"r2"}\n\n')
+          s.send('event: request\ndata: {"request_id":"r2"}\n\n')
           s.close()
           ctl.abort()
         }
@@ -63,9 +62,9 @@ describe('runTail', () => {
     expect(first.headers.get('Authorization')).toBe('Bearer tok')
     expect(first.headers.get('Accept')).toBe('text/event-stream')
     expect(first.headers.get('Last-Event-ID')).toBeNull()
-    expect(second.headers.get('Last-Event-ID')).toBe('41')
+    expect(second.headers.get('Last-Event-ID')).toBeNull()
     expect(second.url).not.toContain('tok')
-    expect(sleeps).toEqual([250])
+    expect(sleeps).toEqual([2000])
     expect(states.map((s) => s.phase)).toEqual(['connecting', 'open', 'waiting', 'connecting', 'open'])
   })
 

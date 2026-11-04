@@ -1,0 +1,11 @@
+CASE A-control-stock-allowlist: OK uri=http://127.0.0.1:9/v1/chat headers=http://127.0.0.1:9/v1/chat [("content-type", "application/json"), ("authorization", "Bearer sk-POOL-KEY-123")]
+  contains_caller_token=false contains_pool_key=true
+CASE B-leaky-allowlist-x-api-key: ERR IdentityLeak upstream="openai" location=header x-api-key
+CASE C-leaky-allowlist-authorization: ERR IdentityLeak upstream="openai" location=header authorization
+CASE D-leaky-basic-password: ERR IdentityLeak upstream="openai" location=header authorization
+CASE E-leaky-allowlist-but-no-identity-presented: OK uri=http://127.0.0.1:9/v1/chat headers=http://127.0.0.1:9/v1/chat [("content-type", "application/json"), ("x-api-key", "Bearer CALLER-IDENTITY-TOKEN-xyz"), ("authorization", "Bearer sk-POOL-KEY-123")]
+  contains_caller_token=true contains_pool_key=true
+E ok_request_built=false
+FAILS=0 E_ok=false
+
+--stderr--

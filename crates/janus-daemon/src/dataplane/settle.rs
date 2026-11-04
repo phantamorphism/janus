@@ -307,7 +307,7 @@ async fn settle_relayed(
     )
 }
 
-/// Write the record off the caller's critical path.
+/// Hand the record to the writer queue; never waits and never spawns.
 fn submit(dp: &Arc<DataPlane>, facts: Facts, duration_ms: u64, ending: Ending) {
     let record = RequestRecord {
         request_id: facts.request_id,
@@ -327,6 +327,5 @@ fn submit(dp: &Arc<DataPlane>, facts: Facts, duration_ms: u64, ending: Ending) {
         usage: ending.usage,
         error: ending.error,
     };
-    let requests = Arc::clone(&dp.requests);
-    dp.spawn(async move { requests.submit(record).await });
+    dp.requests.try_submit(record);
 }

@@ -1,0 +1,62 @@
+[
+  {
+    "name": "create prints a token (alone on stdout)",
+    "ok": true,
+    "detail": "<redacted-token>\n"
+  },
+  {
+    "name": "create --json carries the token too (once)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "show/list never print any token",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token works before revoke",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "revoke takes effect on the very next data-plane request (401)",
+    "ok": true,
+    "detail": "revoke=0 status=401"
+  },
+  {
+    "name": "expired token is rejected (401)",
+    "ok": true,
+    "detail": "401"
+  },
+  {
+    "name": "default list hides revoked and expired",
+    "ok": true,
+    "detail": "rm-agent,keep-agent,deny-agent,agent-1"
+  },
+  {
+    "name": "--include-revoked adds only revoked",
+    "ok": true,
+    "detail": "rm-agent,keep-agent,rev-agent,deny-agent,agent-1"
+  },
+  {
+    "name": "--include-expired adds only expired",
+    "ok": true,
+    "detail": "rm-agent,keep-agent,exp-agent,deny-agent,agent-1"
+  },
+  {
+    "name": "both flags show both",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "--identity filters list",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "rm removes the entry",
+    "ok": true,
+    "detail": ""
+  }
+]

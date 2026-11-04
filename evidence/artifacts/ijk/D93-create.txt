@@ -1,0 +1,21 @@
+{
+  "create": {
+    "id": "01a1a612-89e6-712f-953e-10fde92007ef",
+    "identity": "kate",
+    "claims": {
+      "tenant": "acme"
+    },
+    "label": "L",
+    "created_at": "2026-11-04T10:19:55.238646Z",
+    "expires_at": null,
+    "revoked_at": null,
+    "last_seen_at": null,
+    "token": "<redacted: 32 bytes b64url>"
+  },
+  "schema": "CREATE TABLE identities (\n        id           TEXT PRIMARY KEY NOT NULL,\n        token_hash   TEXT NOT NULL UNIQUE,\n        identity     TEXT NOT NULL,\n        claims       TEXT NOT NULL,\n        label        TEXT,\n        created_at   TEXT NOT NULL,\n        expires_at   TEXT,\n        revoked_at   TEXT,\n        last_seen_at TEXT\n    );\nCREATE INDEX identities_identity ON identities (identity);\n",
+  "rowcount": "3\n",
+  "supplied_token_attempt": {
+    "status": 400,
+    "body": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"Failed to deserialize the JSON body into the target type: token: unknown field `token`, expected one of `identity`, `claims`, `label`, `expires_in`, `expires_at` at line 1 column 26\"}}"
+  }
+}

@@ -1,0 +1,72 @@
+[
+  {
+    "name": "list shows registry entries (active by default)",
+    "ok": true,
+    "detail": "Identities\n\nThe opaque-identity registry: who each issued token speaks for. Your provisioner creates entries when it creates a sandbox; here you can see them and revoke them.\n\nIdentity (exact)\nFilter\n"
+  },
+  {
+    "name": "no create control (only filter, toggles, Revoke)",
+    "ok": true,
+    "detail": "FORM:Identity (exact)\nFilter\nInclude revoked\nInclude expired | INPUT:text | BUTTON:Filter | INPUT:checkbox | INPUT:checkbox | BUTTON:Revoke | BUTTON:Revoke | BUTTON:Revoke | BUTTON:Revoke | BUTTON:Revoke | BUTTON:Revoke"
+  },
+  {
+    "name": "no token displayed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "filter input present",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "identity filter narrows the list",
+    "ok": true,
+    "detail": "Identities\n\nThe opaque-identity registry: who each issued token speaks for. Your provisioner creates entries when it creates a sandbox; here you can see them and revoke them.\n\nIdentity (exact)\nFilter\nInclude revoked\nInclude expired\nIdentity\tClaims\tState\tCreated\tExpires\tLast seen\t\nActions\n\n\nui-keep\nk"
+  },
+  {
+    "name": "revoked entry hidden by default",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Include revoked toggle present",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Include revoked shows the revoked entry (CLI agrees)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Include expired toggle present and shows expired entries (exp-agent)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "token works before UI revoke",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI Revoke makes the token fail on the next data-plane request (401)",
+    "ok": true,
+    "detail": "ok 401"
+  },
+  {
+    "name": "other tokens unaffected",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI no longer lists the revoked entry by default (table rows)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "registry state agrees (CLI sees revoked_at set)",
+    "ok": true,
+    "detail": ""
+  }
+]

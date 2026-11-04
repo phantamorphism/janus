@@ -25,6 +25,8 @@ struct Status {
     started_at: DateTime<Utc>,
     listeners: Listeners,
     upstreams: Vec<Upstream>,
+    #[serde(default)]
+    data_plane: DataPlane,
     request_log: RequestLog,
     credentials: Credentials,
     plugin: PluginStatus,
@@ -58,11 +60,18 @@ struct Route {
     binding: String,
 }
 
+#[derive(Deserialize, Default)]
+struct DataPlane {
+    refused_connections: u64,
+}
+
 #[derive(Deserialize)]
 struct RequestLog {
     enabled: bool,
     retain: String,
     rows: u64,
+    #[serde(default)]
+    dropped_records: u64,
 }
 
 #[derive(Deserialize)]
@@ -107,6 +116,17 @@ pub async fn status(ctx: &Ctx) -> Result<(), CliError> {
         ("admin tcp", listener(&s.listeners.admin_tcp)),
         ("ui", listener(&s.listeners.ui)),
         ("request log", log),
+        (
+            "dropped records",
+            render::alert_if_nonzero(s.request_log.dropped_records, "request-log queue was full"),
+        ),
+        (
+            "refused conns",
+            render::alert_if_nonzero(
+                s.data_plane.refused_connections,
+                "over data_plane.max_connections",
+            ),
+        ),
         (
             "credentials",
             if counts.is_empty() {

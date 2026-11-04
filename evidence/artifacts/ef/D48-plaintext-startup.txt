@@ -1,0 +1,7 @@
+2026-11-04T10:19:34.118775Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d48-plain/data/credentials credentials=0
+2026-11-04T10:19:34.118792Z  WARN janus_daemon::plugin::grpc: plugin.allow_plaintext is set: the plugin channel is NEITHER encrypted NOR authenticated by Janus; this is correct only inside a service mesh that secures both ends endpoint=http://policy:7000/
+2026-11-04T10:19:34.123775Z  INFO janus_daemon::admin::token: generated the admin token path=/tmp/qa-ef/run/d48-plain/data/admin-token
+2026-11-04T10:19:34.124367Z  INFO janus_daemon::admin: admin socket ready socket=/tmp/qa-ef/run/d48-plain/data/admin.sock
+2026-11-04T10:19:34.124385Z  INFO janus_daemon::run: janus-daemon started data_plane=127.0.0.1:23110 data_dir=/tmp/qa-ef/run/d48-plain/data plugin=plaintext
+
+/v1/plugin => {"mode":"plaintext","endpoint":"http://policy:7000/","health":"unknown","last_error":null,"last_ok_at":null,"dropped_events":0}

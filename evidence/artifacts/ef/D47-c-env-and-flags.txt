@@ -1,0 +1,15 @@
+env={"JANUS_PLUGIN":"unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d47/spy.sock","JANUS_PLUGIN_ENDPOINT":"unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d47/spy.sock","JANUS_PLUGIN_LINKED":"true","JANUS_PLUGIN__ENDPOINT":"unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d47/spy.sock","PLUGIN_ENDPOINT":"unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d47/spy.sock"}
+/v1/plugin => {"mode":"none","endpoint":null,"health":"unknown","last_error":null,"last_ok_at":null,"dropped_events":0}
+help:
+The Janus credential-substituting proxy daemon
+
+Usage: janus-daemon [OPTIONS] [COMMAND]
+
+Commands:
+  check-config  Run the full startup validation and exit without binding a listener
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <PATH>  The daemon's config file: the only setting the command line supplies
+  -h, --help           Print help
+  -V, --version        Print version

@@ -1,0 +1,28 @@
+{
+  "totalEvents": 27,
+  "notifyStreamsOpened": 1,
+  "kinds": [
+    "call_completed",
+    "call_abandoned",
+    "credential_invalid",
+    "account_error"
+  ],
+  "sample": [
+    {
+      "event_type": "call_completed",
+      "request_id": "01a1a612-3ae1-7406-a94d-c7f134c0e9f1",
+      "correlation_id": "sessX",
+      "payload_json": "{\"caller_identity\":\"u28a\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":4,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    },
+    {
+      "event_type": "call_completed",
+      "request_id": "01a1a612-3ae6-71cd-9e7b-3ad08fbf7339",
+      "payload_json": "{\"caller_identity\":\"u28b\",\"upstream\":\"openai\",\"status\":200,\"credential_ref\":\"oa-1\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    },
+    {
+      "event_type": "call_completed",
+      "request_id": "01a1a612-3ae8-7446-a007-b11d062f9518",
+      "payload_json": "{\"caller_identity\":\"u28c\",\"upstream\":\"openrouter\",\"status\":200,\"credential_ref\":\"or-1\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+plugin      none
+endpoint    -
+health      unknown
+last ok     -
+last error  -

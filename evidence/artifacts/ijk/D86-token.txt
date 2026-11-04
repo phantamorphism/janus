@@ -1,0 +1,4 @@
+mode=600 len=43
+admin-token-as-caller: 401 {"error":{"code":"invalid","message":"caller identity rejected: invalid","type":"janus_error"},"type":"error"}
+caller-as-admin: 401 {"error":{"code":"unauthorized","message":"the admin token is not valid"}}
+same-after-restart: true

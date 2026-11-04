@@ -1,0 +1,13 @@
+rotated credential or-bad
+ref                 or-bad
+upstream            openrouter
+kind                api_key
+label               -
+source              pool
+status              active
+rate limited until  -
+expires             -
+last used           2026-11-04T10:19:34Z
+requests            1
+errors              1
+last error          rejected by the upstream: 401 Unauthorized: 401: User not found.

@@ -1,0 +1,47 @@
+{
+  "anthropic": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "chunkArrivalMs": [
+      0,
+      502,
+      1002,
+      1502,
+      2003,
+      2504
+    ],
+    "totalMs": 3004,
+    "identical": true,
+    "incremental": true
+  },
+  "openai": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "chunkArrivalMs": [
+      4,
+      503,
+      1004,
+      1506,
+      2005,
+      2507
+    ],
+    "totalMs": 3007,
+    "identical": true,
+    "incremental": true
+  },
+  "openrouter": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "chunkArrivalMs": [
+      1,
+      501,
+      1001,
+      1501,
+      2000,
+      2503
+    ],
+    "totalMs": 3002,
+    "identical": true,
+    "incremental": true
+  }
+}

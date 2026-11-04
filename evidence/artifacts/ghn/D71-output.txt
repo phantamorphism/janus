@@ -1,0 +1,4 @@
+D71-a PASS charge, settle, then refund -> false (expected false)
+D71-b PASS charge r1 at T, compact(T+59m) dropped 0 (expected 0), refund -> true (expected true; entry survived default 1h TTL)
+D71-c PASS charge r2 at T, compact(T+61m) dropped 1 (expected >0), refund -> false (expected false), counter still 4 (expected 4: charge stands)
+D71-d PASS record r3 (5) at T, compact(T+61m) dropped 1 (expected >0), record r3 again -> count 10 (expected 10: redelivery counted again)

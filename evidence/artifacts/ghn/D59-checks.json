@@ -1,0 +1,197 @@
+[
+  {
+    "name": "cli add or api key",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "cli add oauth anthropic",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "cli add oauth openai",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "hand-anthropic listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "hand-anthropic upstream=anthropic",
+    "ok": true,
+    "detail": "anthropic"
+  },
+  {
+    "name": "hand-anthropic source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "hand-anthropic kind non-empty",
+    "ok": true,
+    "detail": "oauth"
+  },
+  {
+    "name": "hand-openai listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "hand-openai upstream=openai",
+    "ok": true,
+    "detail": "openai"
+  },
+  {
+    "name": "hand-openai source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "hand-openai kind non-empty",
+    "ok": true,
+    "detail": "oauth"
+  },
+  {
+    "name": "hand-or listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "hand-or upstream=openrouter",
+    "ok": true,
+    "detail": "openrouter"
+  },
+  {
+    "name": "hand-or source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "hand-or kind non-empty",
+    "ok": true,
+    "detail": "api_key"
+  },
+  {
+    "name": "an-ok listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "an-ok upstream=anthropic",
+    "ok": true,
+    "detail": "anthropic"
+  },
+  {
+    "name": "an-ok source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "an-ok kind non-empty",
+    "ok": true,
+    "detail": "oauth"
+  },
+  {
+    "name": "oa-ok listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "oa-ok upstream=openai",
+    "ok": true,
+    "detail": "openai"
+  },
+  {
+    "name": "oa-ok source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "oa-ok kind non-empty",
+    "ok": true,
+    "detail": "oauth"
+  },
+  {
+    "name": "or-good listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "or-good upstream=openrouter",
+    "ok": true,
+    "detail": "openrouter"
+  },
+  {
+    "name": "or-good source=pool",
+    "ok": true,
+    "detail": "pool"
+  },
+  {
+    "name": "or-good kind non-empty",
+    "ok": true,
+    "detail": "api_key"
+  },
+  {
+    "name": "envcred listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "envcred upstream=openrouter",
+    "ok": true,
+    "detail": "openrouter"
+  },
+  {
+    "name": "envcred source=env",
+    "ok": true,
+    "detail": "env"
+  },
+  {
+    "name": "envcred kind non-empty",
+    "ok": true,
+    "detail": "api_key"
+  },
+  {
+    "name": "filecred listed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "filecred upstream=openrouter",
+    "ok": true,
+    "detail": "openrouter"
+  },
+  {
+    "name": "filecred source=file",
+    "ok": true,
+    "detail": "file"
+  },
+  {
+    "name": "filecred kind non-empty",
+    "ok": true,
+    "detail": "api_key"
+  },
+  {
+    "name": "one directory per slot, named by ref",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "anthropic slot holds .credentials.json",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "openai slot holds auth.json",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "janus.db has no credential material",
+    "ok": true,
+    "detail": ""
+  }
+]

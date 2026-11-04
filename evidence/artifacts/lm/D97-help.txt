@@ -1,0 +1,25 @@
+Admin client for janus-daemon: credentials, opaque identities, the request log and the plugin channel
+
+Usage: janus [OPTIONS] <COMMAND>
+
+Commands:
+  status        Daemon identity and health: listeners, upstreams, request log, credentials, plugin
+  credential    The credential pool
+  identity      The opaque-identity registry
+  log           The request log
+  plugin        The plugin channel
+  check-config  Run the daemon's full startup validation on --config and exit without binding anything (the stock daemon's check; a custom daemon build checks with its own `check-config`)
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+      --admin <ADDRESS>    Admin surface address: unix://<path> or http(s)://host:port [env: JANUS_ADMIN=]
+      --token-file <PATH>  File holding the admin token, for an http(s) address [env: JANUS_TOKEN_FILE]
+      --ca-file <PATH>     For an https address: the only certificate(s) to trust — a private CA, or the listener's own self-signed certificate. System roots otherwise [env: JANUS_ADMIN_CA_FILE=]
+      --config <PATH>      The daemon's config file: its data_dir locates the admin socket and token, and it is the file `check-config` validates
+      --json               Machine-readable output: the admin API's JSON documents (one JSON line per record for `log tail`); errors as JSON on stderr
+  -h, --help               Print help
+  -V, --version            Print version
+
+Connection: the default address is the daemon's admin socket, <data_dir>/admin.sock, with data_dir taken from --config's data_dir, else $JANUS_DATA_DIR, else $HOME/.janus. For an http(s) address the admin token is read from --token-file (or $JANUS_TOKEN_FILE), else from $JANUS_ADMIN_TOKEN, else from <data_dir>/admin-token. No flag takes a secret.
+
+Exit codes: 0 success; 1 the daemon refused or failed the operation, or a check did not pass; 2 bad command line or local input; 3 the daemon could not be reached.

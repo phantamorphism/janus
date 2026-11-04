@@ -1,0 +1,64 @@
+# as received by the browser (via recording proxy)
+## document /
+{
+  "url": "/",
+  "status": 200,
+  "headers": {
+    "content-type": "text/html",
+    "accept-ranges": "bytes",
+    "last-modified": "Wed, 04 Nov 2026 10:18:40 GMT",
+    "content-length": "455",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "date": "Wed, 04 Nov 2026 10:19:48 GMT"
+  }
+}
+## API /v1/status
+{
+  "url": "/v1/status",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "content-length": "1070",
+    "date": "Wed, 04 Nov 2026 10:19:49 GMT"
+  }
+}
+## asset /assets/index-WCiKb-YO.css
+{
+  "url": "/assets/index-WCiKb-YO.css",
+  "status": 200,
+  "headers": {
+    "content-type": "text/css",
+    "accept-ranges": "bytes",
+    "last-modified": "Wed, 04 Nov 2026 10:18:40 GMT",
+    "content-length": "22420",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "date": "Wed, 04 Nov 2026 10:19:48 GMT"
+  }
+}
+
+# curl UI root (headers)
+HTTP/1.1 200 OK
+content-type: text/html
+accept-ranges: bytes
+last-modified: Wed, 04 Nov 2026 10:18:40 GMT
+content-length: 455
+x-content-type-options: nosniff
+content-security-policy: default-src 'self'; frame-ancestors 'none'
+referrer-policy: no-referrer
+date: Wed, 04 Nov 2026 10:19:58 GMT
+
+# curl /v1/status with token (headers)
+HTTP/1.1 200 OK
+content-type: application/json
+x-content-type-options: nosniff
+content-security-policy: default-src 'self'; frame-ancestors 'none'
+referrer-policy: no-referrer
+content-length: 1070
+date: Wed, 04 Nov 2026 10:19:58 GMT

@@ -35,7 +35,8 @@ const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(10);
 /// Open connections one listener serves at once. A connection accepted
 /// beyond this is closed at once, so a peer that opens connections and
 /// never finishes a request cannot exhaust the daemon's file descriptors
-/// (which the data plane shares).
+/// (which the data plane shares). The data plane has its own, configurable
+/// cap (`data_plane.max_connections`).
 pub const MAX_CONNECTIONS: usize = 256;
 
 /// `http://addr/` or `https://addr/`.
@@ -301,16 +302,24 @@ async fn accept(acceptor: &Acceptor) -> std::io::Result<Accepted> {
     }
 }
 
-async fn serve_connection<I>(io: I, router: Router, cancel: CancellationToken)
-where
-    I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-{
+/// The HTTP/1 + h2 connection builder every listener uses, the data plane
+/// included: a client gets [`HEADER_READ_TIMEOUT`] to send a request's
+/// headers.
+pub(crate) fn connection_builder() -> auto::Builder<TokioExecutor> {
     let mut builder = auto::Builder::new(TokioExecutor::new());
     builder
         .http1()
         .timer(TokioTimer::new())
         .header_read_timeout(HEADER_READ_TIMEOUT);
     builder.http2().timer(TokioTimer::new());
+    builder
+}
+
+async fn serve_connection<I>(io: I, router: Router, cancel: CancellationToken)
+where
+    I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let builder = connection_builder();
     let conn = builder.serve_connection(TokioIo::new(io), TowerToHyperService::new(router));
     tokio::pin!(conn);
     let result = tokio::select! {

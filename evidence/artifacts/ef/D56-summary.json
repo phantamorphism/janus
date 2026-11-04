@@ -1,0 +1,152 @@
+{
+  "a": {
+    "cliRc": 0,
+    "cli": "plugin tls https://localhost:23156/: PASSED\n  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's\n  ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)\n  ok   no_cert_rejected: the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired)\n",
+    "api": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23156/",
+      "passed": true,
+      "steps": [
+        {
+          "step": "handshake",
+          "passed": true,
+          "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's"
+        },
+        {
+          "step": "throwaway_cert_rejected",
+          "passed": true,
+          "detail": "the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)"
+        },
+        {
+          "step": "no_cert_rejected",
+          "passed": true,
+          "detail": "the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired)"
+        }
+      ]
+    },
+    "apiStatus": 200
+  },
+  "b": {
+    "cliRc": 1,
+    "cli": "plugin tls https://localhost:23158/: FAILED\n  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's\n  FAIL throwaway_cert_rejected: the plugin accepted a throwaway self-signed client certificate: its client verification is misconfigured\n  FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certificate without requiring one\njanus: the plugin channel check did not pass\n",
+    "api": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23158/",
+      "passed": false,
+      "steps": [
+        {
+          "step": "handshake",
+          "passed": true,
+          "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's"
+        },
+        {
+          "step": "throwaway_cert_rejected",
+          "passed": false,
+          "detail": "the plugin accepted a throwaway self-signed client certificate: its client verification is misconfigured"
+        },
+        {
+          "step": "no_cert_rejected",
+          "passed": false,
+          "detail": "the plugin accepted no client certificate: it requests a certificate without requiring one"
+        }
+      ]
+    }
+  },
+  "c": {
+    "cliRc": 1,
+    "cli": "plugin tls https://localhost:23161/: FAILED\n  ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's\n  ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)\n  FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certificate without requiring one\njanus: the plugin channel check did not pass\n",
+    "api": {
+      "mode": "tls",
+      "endpoint": "https://localhost:23161/",
+      "passed": false,
+      "steps": [
+        {
+          "step": "handshake",
+          "passed": true,
+          "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's"
+        },
+        {
+          "step": "throwaway_cert_rejected",
+          "passed": true,
+          "detail": "the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)"
+        },
+        {
+          "step": "no_cert_rejected",
+          "passed": false,
+          "detail": "the plugin accepted no client certificate: it requests a certificate without requiring one"
+        }
+      ]
+    }
+  },
+  "d": {
+    "cliRc": 0,
+    "cli": "plugin unix unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock: PASSED\n  ok   path_permissions: 9 directories checked: none writable by group or others, all owned by root, the daemon's user or the socket directory's owner\n         0750 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56\n         0700 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock\n         0700 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T\n         0755 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp\n         0755 uid=0 /private/var/folders/t1\n         0755 uid=0 /private/var/folders\n         0755 uid=0 /private/var\n         0755 uid=0 /private\n         0755 uid=0 /\n  ok   connect: connected to /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock, served by an allowed uid\n",
+    "api": {
+      "mode": "unix",
+      "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock",
+      "passed": true,
+      "steps": [
+        {
+          "step": "path_permissions",
+          "passed": true,
+          "detail": "9 directories checked: none writable by group or others, all owned by root, the daemon's user or the socket directory's owner",
+          "walk": {
+            "socket": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock",
+            "dirs": [
+              {
+                "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56",
+                "uid": 502,
+                "mode": 488
+              },
+              {
+                "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock",
+                "uid": 502,
+                "mode": 448
+              },
+              {
+                "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T",
+                "uid": 502,
+                "mode": 448
+              },
+              {
+                "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp",
+                "uid": 502,
+                "mode": 493
+              },
+              {
+                "path": "/private/var/folders/t1",
+                "uid": 0,
+                "mode": 493
+              },
+              {
+                "path": "/private/var/folders",
+                "uid": 0,
+                "mode": 493
+              },
+              {
+                "path": "/private/var",
+                "uid": 0,
+                "mode": 493
+              },
+              {
+                "path": "/private",
+                "uid": 0,
+                "mode": 493
+              },
+              {
+                "path": "/",
+                "uid": 0,
+                "mode": 493
+              }
+            ]
+          }
+        },
+        {
+          "step": "connect",
+          "passed": true,
+          "detail": "connected to /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock, served by an allowed uid"
+        }
+      ]
+    }
+  }
+}

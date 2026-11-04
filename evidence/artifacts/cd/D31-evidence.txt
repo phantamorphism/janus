@@ -1,0 +1,38 @@
+{
+  "status": 403,
+  "body": "{\"error\":{\"code\":\"denied\",\"message\":\"budget exhausted\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+  "headers": {
+    "content-type": "application/json",
+    "content-length": "92",
+    "date": "Wed, 04 Nov 2026 10:19:36 GMT"
+  },
+  "log": {
+    "binding": "hmac",
+    "caller_identity": "u31",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": null,
+    "duration_ms": 0,
+    "error": "denied by the plugin: budget exhausted",
+    "method": "POST",
+    "outcome": "denied",
+    "path": "/anthropic/v1/messages",
+    "reason": "budget exhausted",
+    "received_at": "2026-11-04T10:19:36.404305Z",
+    "request_id": "01a1a612-4054-7569-8b7a-eb55d911daff",
+    "route": null,
+    "status": null,
+    "upstream": "anthropic",
+    "usage": null
+  },
+  "settle": [
+    {
+      "t": 1793787576405,
+      "ev": {
+        "event_type": "call_abandoned",
+        "request_id": "01a1a612-4054-7569-8b7a-eb55d911daff",
+        "payload_json": "{\"caller_identity\":\"u31\",\"stage\":\"resolve\",\"reason\":\"denied by the plugin: budget exhausted\"}"
+      }
+    }
+  ]
+}

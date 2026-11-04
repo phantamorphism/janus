@@ -1,0 +1,36 @@
+{
+  "block": {
+    "sts": [
+      200
+    ],
+    "maxMs": 3,
+    "medianMs": 1,
+    "notifiesSeen": 39,
+    "streams": 1,
+    "pluginStatus": {
+      "dropped_events": 0,
+      "endpoint": "unix://<repo>/evidence/.run-cd/n-block.sock",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:52.825580Z",
+      "mode": "unix"
+    }
+  },
+  "error": {
+    "sts": [
+      200
+    ],
+    "maxMs": 3,
+    "medianMs": 1,
+    "notifiesSeen": 1,
+    "streams": 1,
+    "pluginStatus": {
+      "dropped_events": 0,
+      "endpoint": "unix://<repo>/evidence/.run-cd/n-error.sock",
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:53.119044Z",
+      "mode": "unix"
+    }
+  }
+}

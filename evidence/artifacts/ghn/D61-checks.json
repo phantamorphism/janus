@@ -1,0 +1,112 @@
+[
+  {
+    "name": "add expired anthropic cred",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "add disabled-target cred",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "disable it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "disabled-ref: request fails",
+    "ok": true,
+    "detail": "503"
+  },
+  {
+    "name": "disabled-ref: not forwarded",
+    "ok": true,
+    "detail": "forwarded=0"
+  },
+  {
+    "name": "disabled-ref: no credential request_count incremented",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "disabled-ref: outcome credential_unavailable|abandoned",
+    "ok": true,
+    "detail": "credential_unavailable"
+  },
+  {
+    "name": "disabled-ref: plugin got call_abandoned",
+    "ok": true,
+    "detail": "call_abandoned"
+  },
+  {
+    "name": "disabled-ref: no call_completed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "nonexistent-ref: request fails",
+    "ok": true,
+    "detail": "503"
+  },
+  {
+    "name": "nonexistent-ref: not forwarded",
+    "ok": true,
+    "detail": "forwarded=0"
+  },
+  {
+    "name": "nonexistent-ref: no credential request_count incremented",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "nonexistent-ref: outcome credential_unavailable|abandoned",
+    "ok": true,
+    "detail": "credential_unavailable"
+  },
+  {
+    "name": "nonexistent-ref: plugin got call_abandoned",
+    "ok": true,
+    "detail": "call_abandoned"
+  },
+  {
+    "name": "nonexistent-ref: no call_completed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh-fails: request fails",
+    "ok": true,
+    "detail": "503"
+  },
+  {
+    "name": "refresh-fails: not forwarded",
+    "ok": true,
+    "detail": "forwarded=0"
+  },
+  {
+    "name": "refresh-fails: no credential request_count incremented",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh-fails: outcome credential_unavailable|abandoned",
+    "ok": true,
+    "detail": "credential_unavailable"
+  },
+  {
+    "name": "refresh-fails: plugin got call_abandoned",
+    "ok": true,
+    "detail": "call_abandoned"
+  },
+  {
+    "name": "refresh-fails: no call_completed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh-failure path really contacted the token endpoint",
+    "ok": true,
+    "detail": "tokenLog=1"
+  }
+]

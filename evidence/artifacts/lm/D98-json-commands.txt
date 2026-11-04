@@ -1,0 +1,493 @@
+### credential list
+$ janus credential list --json
+$ exit=0
+--- stdout
+{
+  "credentials": [
+    {
+      "error_count": 0,
+      "expires_at": null,
+      "kind": "api_key",
+      "label": null,
+      "last_error": null,
+      "last_used_at": null,
+      "rate_limited_until": null,
+      "ref": "or1",
+      "request_count": 0,
+      "source": "pool",
+      "status": "active",
+      "upstream": "openrouter"
+    }
+  ]
+}
+
+--- stderr
+
+
+### credential list --upstream
+$ janus credential list --upstream openrouter --json
+$ exit=0
+--- stdout
+{
+  "credentials": [
+    {
+      "error_count": 0,
+      "expires_at": null,
+      "kind": "api_key",
+      "label": null,
+      "last_error": null,
+      "last_used_at": null,
+      "rate_limited_until": null,
+      "ref": "or1",
+      "request_count": 0,
+      "source": "pool",
+      "status": "active",
+      "upstream": "openrouter"
+    }
+  ]
+}
+
+--- stderr
+
+
+### credential show
+$ janus credential show or1 --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "or1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential default
+$ janus credential default --upstream openrouter --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "or1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential add stdin
+$ janus credential add --upstream openrouter --ref jc1 --api-key-stdin --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential add file
+$ janus credential add --upstream openrouter --ref jc2 --from-file /tmp/qa-lm/run/keyfile --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc2",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential rotate
+$ janus credential rotate jc1 --api-key-stdin --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential rotate file
+$ janus credential rotate jc2 --from-file /tmp/qa-lm/run/keyfile --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc2",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential disable
+$ janus credential disable jc1 --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "disabled",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential enable
+$ janus credential enable jc1 --json
+$ exit=0
+--- stdout
+{
+  "error_count": 0,
+  "expires_at": null,
+  "kind": "api_key",
+  "label": null,
+  "last_error": null,
+  "last_used_at": null,
+  "rate_limited_until": null,
+  "ref": "jc1",
+  "request_count": 0,
+  "source": "pool",
+  "status": "active",
+  "upstream": "openrouter"
+}
+
+--- stderr
+
+
+### credential refresh (API key)
+$ janus credential refresh jc1 --json
+$ exit=1
+--- stdout
+
+--- stderr
+{"error":{"code":"not_refreshable","message":"credential \"jc1\" is an API key; there is nothing to refresh","status":409}}
+
+
+### credential rm jc1
+$ janus credential rm jc1 --json
+$ exit=0
+--- stdout
+{
+  "deleted": "jc1"
+}
+
+--- stderr
+
+
+### credential rm jc2
+$ janus credential rm jc2 --json
+$ exit=0
+--- stdout
+{
+  "deleted": "jc2"
+}
+
+--- stderr
+
+
+### identity create
+$ janus identity create --identity j-agent --label jid --json
+$ exit=0
+--- stdout
+{
+  "claims": {},
+  "created_at": "2026-11-04T10:19:35.209840Z",
+  "expires_at": null,
+  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "identity": "j-agent",
+  "label": "jid",
+  "last_seen_at": null,
+  "revoked_at": null,
+  "token": "<redacted-token>"
+}
+
+--- stderr
+
+
+### identity list
+$ janus identity list --json
+$ exit=0
+--- stdout
+{
+  "identities": [
+    {
+      "claims": {},
+      "created_at": "2026-11-04T10:19:35.209840Z",
+      "expires_at": null,
+      "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+      "identity": "j-agent",
+      "label": "jid",
+      "last_seen_at": null,
+      "revoked_at": null
+    },
+    {
+      "claims": {},
+      "created_at": "2026-11-04T10:19:34.891068Z",
+      "expires_at": null,
+      "id": "01a1a612-3a6b-744c-b755-4f10e1989290",
+      "identity": "deny-agent",
+      "label": "denied",
+      "last_seen_at": null,
+      "revoked_at": null
+    },
+    {
+      "claims": {
+        "tenant": "acme"
+      },
+      "created_at": "2026-11-04T10:19:34.884836Z",
+      "expires_at": null,
+      "id": "01a1a612-3a64-774b-8320-b098710fe4f4",
+      "identity": "agent-1",
+      "label": "a1",
+      "last_seen_at": null,
+      "revoked_at": null
+    }
+  ]
+}
+
+--- stderr
+
+
+### identity show
+$ janus identity show 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ exit=0
+--- stdout
+{
+  "claims": {},
+  "created_at": "2026-11-04T10:19:35.209840Z",
+  "expires_at": null,
+  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "identity": "j-agent",
+  "label": "jid",
+  "last_seen_at": null,
+  "revoked_at": null
+}
+
+--- stderr
+
+
+### identity revoke
+$ janus identity revoke 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ exit=0
+--- stdout
+{
+  "claims": {},
+  "created_at": "2026-11-04T10:19:35.209840Z",
+  "expires_at": null,
+  "id": "01a1a612-3ba9-72c8-b9e0-6e7102a14034",
+  "identity": "j-agent",
+  "label": "jid",
+  "last_seen_at": null,
+  "revoked_at": "2026-11-04T10:19:35.224324Z"
+}
+
+--- stderr
+
+
+### identity rm
+$ janus identity rm 01a1a612-3ba9-72c8-b9e0-6e7102a14034 --json
+$ exit=0
+--- stdout
+{
+  "deleted": "01a1a612-3ba9-72c8-b9e0-6e7102a14034"
+}
+
+--- stderr
+
+
+### log query
+$ janus log query --limit 5 --json
+$ exit=0
+--- stdout
+{
+  "disabled": false,
+  "next": null,
+  "requests": [
+    {
+      "binding": "opaque",
+      "caller_identity": "agent-1",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "credential_ref": "or1",
+      "duration_ms": 9,
+      "error": null,
+      "method": "POST",
+      "outcome": "forwarded",
+      "path": "/openrouter/v1/chat/completions",
+      "received_at": "2026-11-04T10:19:35.235126Z",
+      "request_id": "01a1a612-3bc3-7107-bd6a-4a48f662aee1",
+      "route": null,
+      "status": 200,
+      "upstream": "openrouter",
+      "usage": null
+    }
+  ]
+}
+
+--- stderr
+
+
+### log show
+$ janus log show 01a1a612-3bc3-7107-bd6a-4a48f662aee1 --json
+$ exit=0
+--- stdout
+{
+  "binding": "opaque",
+  "caller_identity": "agent-1",
+  "claimed_identity": null,
+  "correlation_id": null,
+  "credential_ref": "or1",
+  "duration_ms": 9,
+  "error": null,
+  "method": "POST",
+  "outcome": "forwarded",
+  "path": "/openrouter/v1/chat/completions",
+  "received_at": "2026-11-04T10:19:35.235126Z",
+  "request_id": "01a1a612-3bc3-7107-bd6a-4a48f662aee1",
+  "route": null,
+  "status": 200,
+  "upstream": "openrouter",
+  "usage": null
+}
+
+--- stderr
+
+
+### log tail --json
+{"binding":"opaque","caller_identity":"agent-1","claimed_identity":null,"correlation_id":null,"credential_ref":"or1","duration_ms":4,"error":null,"method":"POST","outcome":"forwarded","path":"/openrouter/v1/chat/completions","received_at":"2026-11-04T10:19:36.168046Z","request_id":"01a1a612-3f68-708c-b786-fb569b4e8d5f","route":null,"status":200,"upstream":"openrouter","usage":null}
+
+### plugin status
+$ janus plugin status --json
+$ exit=0
+--- stdout
+{
+  "client_cert_expires_at": "2027-11-04T00:00:00Z",
+  "dropped_events": 0,
+  "endpoint": "https://localhost:26020/",
+  "health": "ok",
+  "last_error": null,
+  "last_ok_at": "2026-11-04T10:19:36.170764Z",
+  "mode": "tls",
+  "server_cert_expires_at": "2027-11-04T00:00:00Z"
+}
+
+--- stderr
+
+
+### plugin check
+$ janus plugin check --json
+$ exit=0
+--- stdout
+{
+  "endpoint": "https://localhost:26020/",
+  "mode": "tls",
+  "passed": true,
+  "steps": [
+    {
+      "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's",
+      "passed": true,
+      "step": "handshake"
+    },
+    {
+      "detail": "the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)",
+      "passed": true,
+      "step": "throwaway_cert_rejected"
+    },
+    {
+      "detail": "the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired)",
+      "passed": true,
+      "step": "no_cert_rejected"
+    }
+  ]
+}
+
+--- stderr
+
+
+### plugin tls init
+$ janus plugin tls init --plugin-host p.example --out /tmp/qa-lm/run/tls-json --json
+$ exit=0
+--- stdout
+{
+  "config_block": "[plugin.tls]\npinned_cert = \"/private/tmp/qa-lm/run/tls-json/plugin.pem\"\nclient_cert = \"/private/tmp/qa-lm/run/tls-json/daemon.pem\"\nclient_key  = \"/private/tmp/qa-lm/run/tls-json/daemon-key.pem\"\n",
+  "daemon_cert": "/private/tmp/qa-lm/run/tls-json/daemon.pem",
+  "daemon_key": "/private/tmp/qa-lm/run/tls-json/daemon-key.pem",
+  "plugin_cert": "/private/tmp/qa-lm/run/tls-json/plugin.pem",
+  "plugin_instructions": "For the plugin:\n  - serve TLS 1.3 with certificate /private/tmp/qa-lm/run/tls-json/plugin.pem and key /private/tmp/qa-lm/run/tls-json/plugin-key.pem\n  - require a client certificate, and accept only /private/tmp/qa-lm/run/tls-json/daemon.pem (pin it; there is no CA)\n",
+  "plugin_key": "/private/tmp/qa-lm/run/tls-json/plugin-key.pem"
+}
+
+--- stderr
+

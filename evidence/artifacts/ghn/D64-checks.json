@@ -1,0 +1,57 @@
+[
+  {
+    "name": "ui api /v1/credentials 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "ui api /v1/credentials/or-good 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "ui api /v1/status 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "ui api /v1/requests?limit=1000 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "ui api /v1/identities 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "no secret in any data-plane/admin/CLI/UI/log output",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "credential metadata has no extra (material) fields",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "daemon log has no secret",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI asks for admin token",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "UI Credentials view lists credentials",
+    "ok": true,
+    "detail": "- generic [ref=e1] clickable [onclick]\n  - link \"Skip to content\" [ref=e5]\n  - complementary\n    - StaticText \"Janus\"\n  "
+  },
+  {
+    "name": "no secret in any UI view text",
+    "ok": true,
+    "detail": ""
+  }
+]

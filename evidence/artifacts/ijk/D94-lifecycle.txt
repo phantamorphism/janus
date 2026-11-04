@@ -1,0 +1,33 @@
+{
+  "before": {
+    "id": "01a1a612-8a01-7296-89ab-53857e34fd96",
+    "identity": "multi",
+    "claims": {},
+    "label": null,
+    "created_at": "2026-11-04T10:19:55.265410Z",
+    "expires_at": null,
+    "revoked_at": null,
+    "last_seen_at": "2026-11-04T10:19:55.266891Z"
+  },
+  "revoke": [
+    200,
+    200
+  ],
+  "default_list": 1,
+  "include_revoked": 2,
+  "include_expired": 2,
+  "last_seen": [
+    "2026-11-04T10:19:55.269171Z",
+    "2026-11-04T10:19:56.782100Z"
+  ],
+  "shown": {
+    "id": "01a1a612-8a01-7296-89ab-53857e34fd96",
+    "identity": "multi",
+    "claims": {},
+    "label": null,
+    "created_at": "2026-11-04T10:19:55.265410Z",
+    "expires_at": null,
+    "revoked_at": "2026-11-04T10:19:55.268022Z",
+    "last_seen_at": "2026-11-04T10:19:55.268799Z"
+  }
+}

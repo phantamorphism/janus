@@ -1,0 +1,15 @@
+OK   init exits 0 (rc=0)
+OK   four files exist in ./pki
+OK   daemon-key.pem mode 0600
+     plugin-key.pem mode 600
+OK   plugin.pem SAN = DNS:policy.internal
+OK   plugin.pem validity ~30 days (span 30.0d, remaining 29.6d)
+OK   stdout prints [plugin.tls] block pinning plugin.pem + plugin instructions (plugin.pem/plugin-key.pem, accept only daemon.pem)
+OK   printed block extracted
+OK   with the printed config requests succeed, health=ok
+OK   plugin accepted only daemon.pem as client (authorized pinned cert)
+OK   second init exits 0
+OK   after re-run: new cert fingerprints
+OK   after re-run: new keys
+OK   daemon-key.pem still mode 0600 after rotation
+OK   after restarting both sides requests succeed, health=ok

@@ -1,0 +1,10 @@
+[
+  {
+    "t": 1793787579316,
+    "ev": {
+      "event_type": "call_abandoned",
+      "request_id": "01a1a612-4bb3-74ac-8907-97c1379fc813",
+      "payload_json": "{\"caller_identity\":\"m-noref\",\"stage\":\"credential\",\"reason\":\"no credential \\\"does-not-exist\\\"\"}"
+    }
+  }
+]

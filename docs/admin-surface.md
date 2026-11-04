@@ -28,8 +28,9 @@ them. The reasoning behind the scope is recorded in
   opaque-identity token at creation, which is a caller's lookup key and not an
   upstream credential.
 - **Mutations are explicit and logged.** Every mutating call is recorded in the
-  daemon log with the admin principal (`socket` for the unix socket, `token` for
-  the TCP listener) and the resource touched.
+  daemon log with the admin principal (`socket` for the unix socket, `admin_tcp`
+  for the TCP admin listener, `ui` for the UI listener) and the resource
+  touched.
 - **Errors are JSON.**
   `{ "error": { "code": "<snake_case>", "message": "..." } }` with a
   conventional HTTP status. `code` is the stable contract; `message` is for
@@ -66,8 +67,13 @@ what `janus status` prints and what the UI overview renders. Its fields:
 - `upstreams` — one entry per `[[upstream]]`: `name`, `path_prefix`, `base_url`,
   `binding` (the upstream-wide binding's method, or `null` when none resolves),
   and `routes`, a list of `{ path, binding }`.
+- `data_plane` — `refused_connections`: the connections the data plane closed
+  unanswered since start for being over `data_plane.max_connections`; `0` in
+  normal operation. `janus status` prints it, flagged when non-zero.
 - `request_log` — `enabled`, `retain` (human-readable), `retain_seconds`, and
-  `rows` (the rows currently stored).
+  `rows` (the rows currently stored), and `dropped_records` (the records dropped
+  since start because the writer's queue was full; `0` in normal operation;
+  `janus status` prints it, flagged when non-zero).
 - `credentials` — `total`, and `by_status`, which counts every status (`active`,
   `invalid`, `disabled`, `rate_limited`), zeros included.
 - `plugin`:
@@ -120,7 +126,11 @@ for that upstream), `label`, `source` (`pool` | `env` | `file`), `status`
 - `POST /v1/credentials/{ref}/refresh` — force a refresh of an expiring
   credential now rather than on next use. A credential with nothing to refresh
   (an API key) is `409 not_refreshable`; a refresh the vendor refuses is
-  `502 refresh_failed`.
+  `502 refresh_failed`. A forced refresh is never held back by the back-off that
+  follows a failed refresh on use. Janus sends a refresh grant once more when it
+  fails with a transport error other than a timeout or a refused connection (a
+  keep-alive connection the token endpoint had closed); the `refresh_failed`
+  reason names the transport cause.
 - `DELETE /v1/credentials/{ref}` — remove the slot.
 
 A credential declared in config (`source` `env` or `file`, see
@@ -232,9 +242,11 @@ stored is `404 request_log_disabled` rather than `request_not_found`.
 ## The request log {#request-log}
 
 One record per request that reached the data plane, including the ones rejected
-at identity extraction. The record is what makes a call attributable to the
-identity that made it, and it is metadata only — Janus does not capture request
-or response bodies. Fields:
+at identity extraction. Records are written through a bounded queue; if the
+writer falls behind the queue, further records are dropped rather than held in
+memory, and `request_log.dropped_records` in the status endpoint counts them.
+The record is what makes a call attributable to the identity that made it, and
+it is metadata only — Janus does not capture request or response bodies. Fields:
 
 - `request_id` — Janus-assigned; the same value a plugin sees in `ResolveRoute`
   and `Notify`.
@@ -315,8 +327,10 @@ Connection: `--admin <address>` or `JANUS_ADMIN`, where the address is
 `unix://<path>` or `http(s)://host:port`; the default is the daemon's admin
 socket, `<data_dir>/admin.sock`, resolving `data_dir` the same way the daemon
 does. For a TCP address the admin token comes from `--token-file <path>` (or
-`JANUS_TOKEN_FILE`), `JANUS_ADMIN_TOKEN`, or — when the CLI runs on the daemon's
-host — `<data_dir>/admin-token`; for the same process-list reason as credential
+`JANUS_TOKEN_FILE`), `JANUS_ADMIN_TOKEN`, or — only for a loopback address
+(`localhost`, `127.0.0.0/8`, `::1`) — `<data_dir>/admin-token`; a remote address
+always needs an explicit token, and the CLI warns when it would send one over
+plain `http` to a remote host. For the same process-list reason as credential
 material, it is never taken as an argument. For an `https` address
 `--ca-file <path>` names the only certificate(s) to trust — a private CA or the
 listener's own self-signed certificate — and system roots apply otherwise.
@@ -331,7 +345,11 @@ links the extractors and upstream implementations that a config has to be
 checked against: `janus-daemon check-config --config <path>` runs the full
 startup validation described in
 <ref target="docs/caller-identity#binding">binding an extractor to a request
-type</ref> and exits without binding a listener.
+type</ref> and exits without binding a listener. It has no side effects: the
+database and pool it builds live in a scratch directory that is removed
+afterwards, so the configured data directory is neither created nor touched, and
+its credential count covers the `[[credential]]` entries the config declares,
+not pool slots already on disk.
 
 ## The UI {#ui}
 
@@ -366,6 +384,15 @@ preflighted, and the daemon answers no CORS preflight. The UI prompts for the
 token once and keeps it in session storage; the daemon logs the UI URL and the
 token file's path at startup. A non-loopback UI bind carries the same TLS
 requirement as a non-loopback admin bind.
+
+Every response from the UI listener — static assets, the single-page fallback,
+and the `/v1` API with its errors — carries `X-Content-Type-Options: nosniff`,
+`Content-Security-Policy: default-src 'self'; frame-ancestors 'none'` and
+`Referrer-Policy: no-referrer`. The built UI is one same-origin script, one
+stylesheet and same-origin `fetch` calls, with no inline script or style, so
+`default-src 'self'` needs no `unsafe-inline` allowance;
+`frame-ancestors 'none'` is set explicitly because `default-src` does not cover
+it, and keeps the token-bearing page out of any frame.
 
 ## Storage {#storage}
 

@@ -1,0 +1,11 @@
+{
+  "baseline_ms": 2,
+  "locked_ms": [
+    1,
+    1,
+    1
+  ],
+  "out": "locked\nreleased\n",
+  "records_visible_during_lock": 1,
+  "records_after": 4
+}

@@ -1,0 +1,34 @@
+## valid config (data-plane port 26041 held by another process)
+$ exit=0
+--- stdout
+config OK
+data_dir    /tmp/qa-lm/cc-good/data
+data_plane  127.0.0.1:26041
+plugin      none
+credentials 0
+upstream    openrouter /openrouter identity=opaque
+
+--- stderr
+[2m2026-11-04T10:19:45.934692Z[0m [32m INFO[0m [2mjanus_core::pool[0m[2m:[0m credential pool opened [3mdir[0m[2m=[0m/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/.tmpyVwdy4/credentials [3mcredentials[0m[2m=[0m0
+
+
+admin/ui ports listening: false,false
+admin.sock exists: false
+data dir: absent
+## binding naming a missing secret
+$ exit=1
+--- stdout
+
+--- stderr
+janus-daemon: config: upstream[openrouter].identity.secret_ref: secret "no-such-secret" is not declared under [secrets]
+
+
+admin/ui ports listening: false,false
+admin.sock exists: false
+## janus check-config (invalid)
+$ exit=1
+--- stdout
+
+--- stderr
+janus: /tmp/qa-lm/cc-bad/config.toml: config: upstream[openrouter].identity.secret_ref: secret "no-such-secret" is not declared under [secrets]
+

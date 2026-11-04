@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apiError, json, mockApi } from '@/test/http'
-import { credential, record } from '@/test/fixtures'
+import { credential, record, credentialList } from '@/test/fixtures'
 import { ApiClient, ApiError, NetworkError } from './client'
 
 function client(onUnauthorized = vi.fn()) {
@@ -9,7 +9,7 @@ function client(onUnauthorized = vi.fn()) {
 
 describe('ApiClient', () => {
   it('sends the token as a bearer header and the filter in the query, never the token', async () => {
-    const http = mockApi({ 'GET /v1/credentials': [credential()] })
+    const http = mockApi({ 'GET /v1/credentials': credentialList([credential()]) })
     const list = await client().credentials('openai')
     expect(list).toHaveLength(1)
     const [call] = http.calls
@@ -39,17 +39,37 @@ describe('ApiClient', () => {
     expect((err as Error).message).toContain('/v1/status')
   })
 
+  it('rejects drifted shapes instead of coercing them', async () => {
+    mockApi({
+      'GET /v1/requests': json({ records: [record()], next: null, disabled: false }),
+      'GET /v1/credentials': [credential()],
+      'GET /v1/identities': json({ credentials: [] }),
+      'GET /v1/status': json({ version: '1' }),
+      'GET /v1/plugin': json({ mode: 'none' }),
+    })
+    const c = client()
+    for (const call of [
+      () => c.requests({}),
+      () => c.credentials(),
+      () => c.identities({}),
+      () => c.status(),
+      () => c.plugin(),
+    ]) {
+      await expect(call()).rejects.toMatchObject({ code: 'unexpected_response' })
+    }
+  })
+
   it('reads a request page with its cursor and the disabled marker, and encodes path segments', async () => {
     const http = mockApi({
-      'GET /v1/requests': json({ records: [record()], next: 'Y3Vyc29y', disabled: false }),
+      'GET /v1/requests': json({ requests: [record()], next: 'Y3Vyc29y', disabled: false }),
       'GET /v1/requests/stream': json({}),
     })
     const page = await client().requests({ outcome: 'denied', limit: 50, before: 'abc' })
-    expect(page).toEqual({ records: [record()], next: 'Y3Vyc29y', disabled: false })
+    expect(page).toEqual({ requests: [record()], next: 'Y3Vyc29y', disabled: false })
     expect(Object.fromEntries(http.calls[0].query)).toEqual({ outcome: 'denied', limit: '50', before: 'abc' })
 
-    mockApi({ 'GET /v1/requests': json({ records: [], next: null, disabled: true }) })
-    expect(await client().requests({})).toEqual({ records: [], next: null, disabled: true })
+    mockApi({ 'GET /v1/requests': json({ requests: [], next: null, disabled: true }) })
+    expect(await client().requests({})).toEqual({ requests: [], next: null, disabled: true })
 
     const del = mockApi({})
     await client().deleteCredential('a/b').catch(() => undefined)

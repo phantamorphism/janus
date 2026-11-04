@@ -1,0 +1,24 @@
+{
+  "r429": {
+    "s": 429,
+    "b": "{\"mock_status\":429}",
+    "h": {
+      "content-type": "application/json",
+      "date": "Wed, 04 Nov 2026 10:19:50 GMT",
+      "transfer-encoding": "chunked",
+      "x-mock-status": "429"
+    }
+  },
+  "r401": {
+    "s": 401,
+    "b": "{\"mock_status\":401}",
+    "h": {
+      "content-type": "application/json",
+      "date": "Wed, 04 Nov 2026 10:19:50 GMT",
+      "transfer-encoding": "chunked",
+      "x-mock-status": "401"
+    }
+  },
+  "same": true,
+  "leak": false
+}

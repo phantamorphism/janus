@@ -1,0 +1,108 @@
+{
+  "rx": {
+    "status": 403,
+    "body": "{\"error\":{\"code\":\"denied\",\"message\":\"x is not allowed\",\"type\":\"janus_error\"},\"type\":\"error\"}"
+  },
+  "ry": {
+    "status": 200,
+    "body": "{\"ok\":true}"
+  },
+  "logs": [
+    {
+      "binding": "hmac",
+      "caller_identity": "y",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "credential_ref": "k1",
+      "duration_ms": 0,
+      "error": null,
+      "method": "POST",
+      "outcome": "forwarded",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:49.952529Z",
+      "request_id": "01a1a612-7540-7314-b0b6-73e2b9820cea",
+      "route": null,
+      "status": 200,
+      "upstream": "anthropic",
+      "usage": null
+    },
+    {
+      "binding": "hmac",
+      "caller_identity": "x",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 0,
+      "error": "denied by the plugin: x is not allowed",
+      "method": "POST",
+      "outcome": "denied",
+      "path": "/anthropic/v1/messages",
+      "reason": "x is not allowed",
+      "received_at": "2026-11-04T10:19:49.951977Z",
+      "request_id": "01a1a612-753f-7206-9234-6472f1076e9e",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    }
+  ],
+  "status": {
+    "build": "dev",
+    "credentials": {
+      "by_status": {
+        "active": 1,
+        "disabled": 0,
+        "invalid": 0,
+        "rate_limited": 0
+      },
+      "total": 1
+    },
+    "data_plane": {
+      "refused_connections": 0
+    },
+    "listeners": {
+      "admin_socket": "/tmp/qa-ef/run/d57/data/admin.sock",
+      "admin_tcp": null,
+      "data_plane": "127.0.0.1:23164",
+      "ui": null
+    },
+    "plugin": {
+      "dropped_events": 0,
+      "endpoint": null,
+      "health": "ok",
+      "last_error": null,
+      "last_ok_at": "2026-11-04T10:19:49.952539Z",
+      "mode": "linked"
+    },
+    "request_log": {
+      "dropped_records": 0,
+      "enabled": true,
+      "retain": "30days",
+      "retain_seconds": 2592000,
+      "rows": 2
+    },
+    "started_at": "2026-11-04T10:19:49.823469Z",
+    "upstreams": [
+      {
+        "base_url": "http://127.0.0.1:23002/",
+        "binding": "hmac",
+        "name": "anthropic",
+        "path_prefix": "/anthropic",
+        "routes": []
+      }
+    ],
+    "version": "0.1.0"
+  },
+  "notifyEvents": [
+    {
+      "event_type": "call_abandoned",
+      "payload": "{\"caller_identity\":\"x\",\"stage\":\"resolve\",\"reason\":\"denied by the plugin: x is not allowed\"}",
+      "request_id": "01a1a612-753f-7206-9234-6472f1076e9e"
+    },
+    {
+      "event_type": "call_completed",
+      "payload": "{\"caller_identity\":\"y\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"k1\",\"duration_ms\":0,\"usage\":null}",
+      "request_id": "01a1a612-7540-7314-b0b6-73e2b9820cea"
+    }
+  ]
+}

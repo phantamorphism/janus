@@ -1,0 +1,5 @@
+(a) [ui] with no bind: refused=true exit=1 msg=janus-daemon: config: config does not parse: TOML parse error at line 15, column 1 /    | / 15 | [ui]
+UI root -> 200 text/html 455B
+UI api no token 401; wrong 401; ok 200
+preflight -> 401 headers={"content-type":"application/json","www-authenticate":"Bearer","x-content-type-options":"nosniff","content-security-policy":"default-src 'self'; frame-ancestors 'none'","referrer-policy":"no-referrer","allow":"GET,HEAD","content-length":"119","connection":"close","date":"Wed, 04 Nov 2026 10:19:50 GMT"}
+agent-browser: 0 0 ✓ Screenshot saved to <repo>/evidence/artifacts/ijk/D87

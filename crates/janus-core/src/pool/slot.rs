@@ -131,7 +131,7 @@ impl MaterialFile {
     /// file as `api_key`; any other document under the vendor file name
     /// that identifies `upstream`, or `material.json` when none does.
     pub fn for_document(upstream: UpstreamKind, doc: &MaterialDocument) -> MaterialFile {
-        if plain_api_key(doc).is_some_and(|key| bare_key(key) == Ok(key)) {
+        if stored_api_key(doc).is_some_and(|key| bare_key(key) == Ok(key)) {
             return MaterialFile::ApiKey;
         }
         DETECTED_UPSTREAMS
@@ -152,7 +152,7 @@ impl MaterialFile {
     pub fn encode(self, doc: &MaterialDocument) -> Result<Vec<u8>, String> {
         match self {
             MaterialFile::ApiKey => {
-                let key = plain_api_key(doc)
+                let key = stored_api_key(doc)
                     .ok_or("an api_key file holds only an {\"api_key\": ...} document")?;
                 if bare_key(key) != Ok(key) {
                     return Err("this key cannot be stored as a bare key file".into());
@@ -172,7 +172,7 @@ impl MaterialFile {
 }
 
 /// The key of a plain-key document: exactly `{"api_key": "<key>"}`.
-pub fn plain_api_key(doc: &MaterialDocument) -> Option<&str> {
+pub fn stored_api_key(doc: &MaterialDocument) -> Option<&str> {
     let obj = doc.expose().as_object()?;
     if obj.len() != 1 {
         return None;
@@ -191,7 +191,7 @@ fn key_document(key: &str) -> MaterialDocument {
 pub fn canonical_document(doc: MaterialDocument) -> MaterialDocument {
     match doc.expose() {
         Value::String(key) => key_document(key),
-        _ => match plain_api_key(&doc) {
+        _ => match stored_api_key(&doc) {
             Some(key) if key.trim() != key => key_document(key),
             _ => doc,
         },
@@ -678,13 +678,13 @@ mod tests {
         );
         // A document with more than the key is not a plain key.
         let extra = MaterialDocument::new(serde_json::json!({"api_key": "k", "org": "o"}));
-        assert_eq!(plain_api_key(&extra), None);
+        assert_eq!(stored_api_key(&extra), None);
     }
 
     #[test]
     fn plain_key_files_round_trip_and_refuse_junk() {
         let doc = plain_key_document(b"  sk-or-123\n").expect("key");
-        assert_eq!(plain_api_key(&doc), Some("sk-or-123"));
+        assert_eq!(stored_api_key(&doc), Some("sk-or-123"));
         let bytes = MaterialFile::ApiKey.encode(&doc).expect("encode");
         assert_eq!(bytes, b"sk-or-123\n");
         assert!(plain_key_document(b"\n \n").is_err());
@@ -697,7 +697,7 @@ mod tests {
             .get("tokens")
             .is_some());
         assert_eq!(
-            plain_api_key(&sniff_document(b"sk-x\n").expect("key")),
+            stored_api_key(&sniff_document(b"sk-x\n").expect("key")),
             Some("sk-x")
         );
     }
@@ -705,7 +705,7 @@ mod tests {
     #[test]
     fn text_that_begins_like_json_is_never_a_bare_key() {
         let key = |doc: Result<MaterialDocument, String>| {
-            plain_api_key(&doc.expect("document")).map(str::to_owned)
+            stored_api_key(&doc.expect("document")).map(str::to_owned)
         };
         // Truncated or malformed JSON, minified (no whitespace to give it
         // away) or not, is an error from every reader of bare keys.

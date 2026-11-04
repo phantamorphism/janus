@@ -1,0 +1,1 @@
+D66 PASS memory 300 trials of 2 concurrent charges at 9/10: bad=0 ; sqlite: Allowed { used: 10, limit: 10 } Exceeded { used: 10, limit: 10 } count=10; two-quota allowed=Allowed { used: 3, limit: 10 }

@@ -1,0 +1,60 @@
+{
+  "statuses": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "upstreamAuths": [
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999",
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999",
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999",
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999",
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999",
+    "Bearer sk-oa-KEYBBBB-iiii9999iiii9999"
+  ],
+  "defaultEndpoint": {
+    "ref": "oa-b",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:20:50.532056Z",
+    "request_count": 6,
+    "error_count": 0,
+    "last_error": null
+  },
+  "defaultCli": {
+    "error_count": 0,
+    "expires_at": null,
+    "kind": "api_key",
+    "label": null,
+    "last_error": null,
+    "last_used_at": "2026-11-04T10:20:50.532056Z",
+    "rate_limited_until": null,
+    "ref": "oa-b",
+    "request_count": 6,
+    "source": "pool",
+    "status": "active",
+    "upstream": "openai"
+  },
+  "oaB": {
+    "ref": "oa-b",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": "2026-11-04T10:20:50.532056Z",
+    "request_count": 6,
+    "error_count": 0,
+    "last_error": null
+  }
+}

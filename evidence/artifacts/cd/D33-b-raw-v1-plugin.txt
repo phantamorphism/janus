@@ -1,0 +1,4 @@
+{
+  "status": 200,
+  "body": "{\"mode\":\"unix\",\"endpoint\":\"unix://<repo>/evidence/.run-cd/a.sock\",\"health\":\"timeout\",\"last_error\":\"plugin did not answer ResolveRoute within 250 ms\",\"last_ok_at\":\"2026-11-04T10:19:36.405129Z\",\"dropped_events\":0}"
+}

@@ -1,0 +1,12 @@
+OK   initial: request ok with client cert A (45:03:5C:10:79:DA:14)
+OK   /v1/status (or plugin block) shows client_cert_expires_at and server_cert_expires_at
+OK   client_cert_expires_at=2027-11-04T10:19:33Z matches cert A notAfter
+OK   server_cert_expires_at=2027-11-04T10:19:33Z matches server cert notAfter
+OK   file change picked up without restart/SIGHUP: plugin now sees client cert B (0D:4B:E6:95:71:93:2A)
+OK   SIGHUP reload: plugin sees client cert A again (45:03:5C:10:79:DA:14)
+OK   corrupt client cert on disk: traffic still works on old material (HTTP 200, fp A)
+OK   daemon still running after corrupt file
+OK   corrupt client key too: traffic still works (HTTP 200)
+OK   daemon logs a warning for a client cert within 30 days of expiry: 2026-11-04T10:19:44.812715Z  WARN janus_daemon::plugin::tls: plugin TLS certificate expires in 9 days certificate="client" expires_at=2026-11-14 10:19:33 UTC
+OK   near-expiry client cert expiry visible on /v1/status
+OK   daemon logs a warning for a plugin (server) cert within 30 days of expiry: 2026-11-04T10:19:47.480069Z  WARN janus_daemon::plugin::tls: plugin TLS certificate expires in 9 days certificate="server" expires_at=2026-11-14 10:19:33 UTC

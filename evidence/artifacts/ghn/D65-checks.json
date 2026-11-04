@@ -1,0 +1,7 @@
+[
+  {
+    "name": "D65",
+    "ok": true,
+    "detail": "new(memory,Total)=Some(\"meter \\\"requests\\\" has a Total quota, which a volatile store cannot hold; use a durable store or Meter::new_allowing_volatile_total / VolatileTotal { meter: \\\"requests\\\" }\"); allowing_volatile_total ok=true; sqlite Total ok=true"
+  }
+]

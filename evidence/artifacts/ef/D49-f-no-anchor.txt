@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin.tls: set exactly one of `ca_file` or `pinned_cert`; system roots are never used

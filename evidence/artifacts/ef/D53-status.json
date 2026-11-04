@@ -1,0 +1,83 @@
+{
+  "st": {
+    "mode": "tls",
+    "endpoint": "https://localhost:23144/",
+    "health": "no_client_auth",
+    "last_error": "the plugin at localhost:23144 did not request a client certificate; it must verify the daemon",
+    "last_ok_at": null,
+    "client_cert_expires_at": "2027-11-04T10:19:33Z",
+    "server_cert_expires_at": "2027-11-04T10:19:33Z",
+    "dropped_events": 0
+  },
+  "logs": [
+    {
+      "binding": "hmac",
+      "caller_identity": "agent-53b",
+      "claimed_identity": null,
+      "class": "plugin_no_client_auth",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 1,
+      "error": "plugin_no_client_auth: the plugin at localhost:23144 did not request a client certificate; it must verify the daemon",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:38.783478Z",
+      "request_id": "01a1a612-499f-771a-ae57-07beb5dd0a75",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    },
+    {
+      "binding": "hmac",
+      "caller_identity": "agent-d53",
+      "claimed_identity": null,
+      "class": "plugin_no_client_auth",
+      "correlation_id": null,
+      "credential_ref": null,
+      "duration_ms": 2,
+      "error": "plugin_no_client_auth: the plugin at localhost:23144 did not request a client certificate; it must verify the daemon",
+      "method": "POST",
+      "outcome": "plugin_failed",
+      "path": "/anthropic/v1/messages",
+      "received_at": "2026-11-04T10:19:38.774452Z",
+      "request_id": "01a1a612-4996-7392-abe9-411c40c19ed3",
+      "route": null,
+      "status": null,
+      "upstream": "anthropic",
+      "usage": null
+    }
+  ],
+  "body": "{\"error\":{\"code\":\"plugin_no_client_auth\",\"message\":\"the policy plugin could not be consulted (plugin_no_client_auth)\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+  "conns": [
+    {
+      "authorized": false,
+      "authError": null,
+      "clientFp": null,
+      "protocol": "TLSv1.3",
+      "at": 1793787578777
+    },
+    {
+      "authorized": false,
+      "authError": null,
+      "clientFp": null,
+      "protocol": "TLSv1.3",
+      "at": 1793787578778
+    },
+    {
+      "authorized": false,
+      "authError": null,
+      "clientFp": null,
+      "protocol": "TLSv1.3",
+      "at": 1793787578784
+    },
+    {
+      "authorized": false,
+      "authError": null,
+      "clientFp": null,
+      "protocol": "TLSv1.3",
+      "at": 1793787578790
+    }
+  ]
+}

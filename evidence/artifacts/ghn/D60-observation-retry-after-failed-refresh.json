@@ -1,0 +1,20 @@
+{
+  "nextRequestStatus": 503,
+  "tokenRequestsOnNextRequest": 1,
+  "manualRefreshExit": 1,
+  "manualRefreshOut": "{\"error\":{\"code\":\"refresh_failed\",\"message\":\"refreshing credential \\\"an-exp\\\" failed: credential refresh failed: error sending request: operation timed out\",\"status\":502}}\n",
+  "after": {
+    "ref": "an-exp",
+    "upstream": "anthropic",
+    "kind": "oauth",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": "2026-11-04T09:19:35.399Z",
+    "last_used_at": null,
+    "request_count": 0,
+    "error_count": 2,
+    "last_error": "refresh failed: credential refresh failed: error sending request: operation timed out"
+  }
+}

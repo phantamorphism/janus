@@ -74,6 +74,20 @@ export function PluginFacts({ plugin }: { plugin: PluginStatus }) {
           <Time value={plugin.last_ok_at} empty="none yet" />
         </dd>
       </div>
+      <div>
+        <dt className="text-xs text-muted">Dropped notify events</dt>
+        <dd
+          className={`mt-0.5 text-sm tabular-nums ${plugin.dropped_events > 0 ? 'text-bad' : ''}`}
+          aria-label="Dropped notify events"
+        >
+          {plugin.dropped_events.toLocaleString('en-US')}
+          {plugin.dropped_events > 0 && (
+            <span className="ml-2 text-muted">
+              events lost since start because the delivery queue was full; the plugin missed settlement
+            </span>
+          )}
+        </dd>
+      </div>
       {plugin.mode === 'tls' && (
         <>
           <CertExpiry label="Daemon client certificate expires" value={plugin.client_cert_expires_at} />

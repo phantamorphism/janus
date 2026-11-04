@@ -1,0 +1,86 @@
+{
+  "ui_rows": [
+    "2026-11-04 12:20:32 just now ui-keep openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
+    "2026-11-04 12:20:32 just now unidentified openrouter rejected identity revoked POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-04 12:20:31 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 1 ms",
+    "2026-11-04 12:20:30 2 s ago ui-revoke-me openrouter forwarded POST /openrouter/v1/chat/completions or1 200 4 ms",
+    "2026-11-04 12:20:04 28 s ago unidentified openrouter rejected identity invalid POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-04 12:20:04 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-04 12:20:04 28 s ago deny-agent openrouter denied policy says no POST /openrouter/v1/chat/completions — — 0 ms",
+    "2026-11-04 12:20:04 28 s ago agent-1 openrouter forwarded POST /openrouter/v1/chat/completions or1 200 0 ms"
+  ],
+  "cli": [
+    [
+      "2026-11-04T10:20:32.383509Z",
+      "ui-keep",
+      "openrouter",
+      "forwarded",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      200
+    ],
+    [
+      "2026-11-04T10:20:32.319827Z",
+      "",
+      "openrouter",
+      "rejected_identity",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      null
+    ],
+    [
+      "2026-11-04T10:20:31.106159Z",
+      "ui-revoke-me",
+      "openrouter",
+      "forwarded",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      200
+    ],
+    [
+      "2026-11-04T10:20:30.729580Z",
+      "ui-revoke-me",
+      "openrouter",
+      "forwarded",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      200
+    ],
+    [
+      "2026-11-04T10:20:04.417581Z",
+      "",
+      "openrouter",
+      "rejected_identity",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      null
+    ],
+    [
+      "2026-11-04T10:20:04.416486Z",
+      "deny-agent",
+      "openrouter",
+      "denied",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      null
+    ],
+    [
+      "2026-11-04T10:20:04.415390Z",
+      "deny-agent",
+      "openrouter",
+      "denied",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      null
+    ],
+    [
+      "2026-11-04T10:20:04.414025Z",
+      "agent-1",
+      "openrouter",
+      "forwarded",
+      "POST",
+      "/openrouter/v1/chat/completions",
+      200
+    ]
+  ]
+}

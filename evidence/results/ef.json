@@ -1,0 +1,145 @@
+[
+  {
+    "id": "D47",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D47-a-refusal.txt",
+      "evidence/artifacts/ef/D47-b-refusal.txt",
+      "evidence/artifacts/ef/D47-c-env-and-flags.txt",
+      "evidence/artifacts/ef/D47-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D48",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D48-https-no-tls.txt",
+      "evidence/artifacts/ef/D48-http-no-flag.txt",
+      "evidence/artifacts/ef/D48-http-loopback.txt",
+      "evidence/artifacts/ef/D48-ftp.txt",
+      "evidence/artifacts/ef/D48-plaintext-startup.txt",
+      "evidence/artifacts/ef/D48-mode-tls.txt",
+      "evidence/artifacts/ef/D48-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D49",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D49-a-missing-ca.txt",
+      "evidence/artifacts/ef/D49-b-mismatched-key.txt",
+      "evidence/artifacts/ef/D49-c-expired-cert.txt",
+      "evidence/artifacts/ef/D49-d-key-0644.txt",
+      "evidence/artifacts/ef/D49-e-both-anchors.txt",
+      "evidence/artifacts/ef/D49-f-no-anchor.txt",
+      "evidence/artifacts/ef/D49-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D50",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D50-plugin-status.json",
+      "evidence/artifacts/ef/D50-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D51",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D51-a-refusal.txt",
+      "evidence/artifacts/ef/D51-b1-status.json",
+      "evidence/artifacts/ef/D51-b2-status.json",
+      "evidence/artifacts/ef/D51-c-peer-uid.json",
+      "evidence/artifacts/ef/D51-transcript.txt"
+    ],
+    "note": "(c) emulated: no second OS user available (sudo needs a password), so \"another user\" is exercised by configuring the plugin to expect a different uid than the daemon runs as; a true cross-user connection could not be made."
+  },
+  {
+    "id": "D52",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D52-scenarios.json",
+      "evidence/artifacts/ef/D52-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D53",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D53-status.json",
+      "evidence/artifacts/ef/D53-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D54",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D54-reload.json",
+      "evidence/artifacts/ef/D54-near-expiry-client.txt",
+      "evidence/artifacts/ef/D54-near-expiry-server-status.json",
+      "evidence/artifacts/ef/D54-near-expiry-server-daemon.log",
+      "evidence/artifacts/ef/D54-near-expiry-server.txt",
+      "evidence/artifacts/ef/D54-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D55",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D55-init-1-stdout.txt",
+      "evidence/artifacts/ef/D55-rotation.json",
+      "evidence/artifacts/ef/D55-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D56",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D56-a-cli.txt",
+      "evidence/artifacts/ef/D56-a-api.json",
+      "evidence/artifacts/ef/D56-a-front-events.json",
+      "evidence/artifacts/ef/D56-a-daemon.log",
+      "evidence/artifacts/ef/D56-b-cli.txt",
+      "evidence/artifacts/ef/D56-b-api.json",
+      "evidence/artifacts/ef/D56-c-daemon.log",
+      "evidence/artifacts/ef/D56-c-front-events.json",
+      "evidence/artifacts/ef/D56-c-cli.txt",
+      "evidence/artifacts/ef/D56-c-api.json",
+      "evidence/artifacts/ef/D56-d-cli.txt",
+      "evidence/artifacts/ef/D56-d-api.json",
+      "evidence/artifacts/ef/D56-d-unsafe-cli.txt",
+      "evidence/artifacts/ef/D56-summary.json",
+      "evidence/artifacts/ef/D56-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D57",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D57-requests.json",
+      "evidence/artifacts/ef/D57-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  },
+  {
+    "id": "D58",
+    "result": "PASS",
+    "artifacts": [
+      "evidence/artifacts/ef/D58-a-stock-linked.txt",
+      "evidence/artifacts/ef/D58-b-custom-endpoint.txt",
+      "evidence/artifacts/ef/D58-c-custom-noplugin.txt",
+      "evidence/artifacts/ef/D58-transcript.txt"
+    ],
+    "note": "all acceptance assertions held"
+  }
+]

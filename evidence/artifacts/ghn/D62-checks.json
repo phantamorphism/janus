@@ -1,0 +1,52 @@
+[
+  {
+    "name": "add oa A",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "add oa B",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "sanity: some default chain pick works with both enabled",
+    "ok": true,
+    "detail": "Bearer sk-oa-KEYAAAA-hhhh8888hhhh8888,Bearer sk-oa-KEYAAAA-hhhh8888hhhh8888,Bearer sk-oa-KEYAAAA-hhhh8888hhhh8888,Bearer sk-oa-KEYAAAA-hhhh8888hhhh8888"
+  },
+  {
+    "name": "disable oa-a",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "requests succeed",
+    "ok": true,
+    "detail": "200,200,200,200,200,200"
+  },
+  {
+    "name": "only enabled credential used",
+    "ok": true,
+    "detail": "Bearer sk-oa-KEYBBBB-iiii9999iiii9999,Bearer sk-oa-KEYBBBB-iiii9999iiii9999,Bearer sk-oa-KEYBBBB-iiii9999iiii9999,Bearer sk-oa-KEYBBBB-iiii9999iiii9999,Bearer sk-oa-KEYBBBB-iiii9999iiii9999,Bearer sk-oa-KEYBBBB-iiii9999iiii9999"
+  },
+  {
+    "name": "default endpoint returns oa-b metadata",
+    "ok": true,
+    "detail": "{\"ref\":\"oa-b\",\"upstream\":\"openai\",\"kind\":\"api_key\",\"label\":null,\"source\":\"pool\",\"status\":\"active\",\"rate_limited_until\":null,\"expires_at\":null,\"last_used_at\":\"2026-11-04T10:20:50.532056Z\",\"request_count\":6,\"error_count\":0,\"last_error\":null}"
+  },
+  {
+    "name": "default endpoint metadata matches credential show",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "default peek has no material",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "with all disabled the request is not served by a disabled credential",
+    "ok": true,
+    "detail": "503"
+  }
+]

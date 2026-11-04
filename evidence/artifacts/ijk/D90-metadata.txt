@@ -1,0 +1,144 @@
+{
+  "list": {
+    "credentials": [
+      {
+        "ref": "aud-1",
+        "upstream": "openai",
+        "kind": "api_key",
+        "label": null,
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      },
+      {
+        "ref": "aud-2",
+        "upstream": "openai",
+        "kind": "api_key",
+        "label": null,
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      },
+      {
+        "ref": "lst-a",
+        "upstream": "openai",
+        "kind": "api_key",
+        "label": "A",
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      },
+      {
+        "ref": "lst-b",
+        "upstream": "openai",
+        "kind": "api_key",
+        "label": "B",
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      },
+      {
+        "ref": "lst-or",
+        "upstream": "openrouter",
+        "kind": "api_key",
+        "label": "OR",
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      }
+    ]
+  },
+  "show": {
+    "ref": "lst-a",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": "A",
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": null,
+    "request_count": 0,
+    "error_count": 0,
+    "last_error": null
+  },
+  "peek": {
+    "ref": "aud-1",
+    "upstream": "openai",
+    "kind": "api_key",
+    "label": null,
+    "source": "pool",
+    "status": "active",
+    "rate_limited_until": null,
+    "expires_at": null,
+    "last_used_at": null,
+    "request_count": 0,
+    "error_count": 0,
+    "last_error": null
+  },
+  "filtered_openrouter": {
+    "credentials": [
+      {
+        "ref": "lst-or",
+        "upstream": "openrouter",
+        "kind": "api_key",
+        "label": "OR",
+        "source": "pool",
+        "status": "active",
+        "rate_limited_until": null,
+        "expires_at": null,
+        "last_used_at": null,
+        "request_count": 0,
+        "error_count": 0,
+        "last_error": null
+      }
+    ]
+  },
+  "peeks": [
+    {
+      "peek": "aud-1",
+      "used": "aud-1",
+      "status": 200
+    },
+    {
+      "peek": "aud-1",
+      "used": "aud-1",
+      "status": 200
+    },
+    {
+      "peek": "aud-1",
+      "used": "aud-1",
+      "status": 200
+    },
+    {
+      "peek": "aud-1",
+      "used": "aud-1",
+      "status": 200
+    }
+  ]
+}

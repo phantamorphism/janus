@@ -1,0 +1,5 @@
+OK   every request fails (HTTP 503, 503)
+OK   request-log records class plugin_no_client_auth: plugin_failed/plugin_no_client_auth: the plugin at localhost:23144 did not request a client certificate; it must verify the daemon, plugin_failed/plugin_no_client_auth: the plugin at localhost:23144 did not request a client certificate; it must verify the daemon
+OK   caller-visible body: {"error":{"code":"plugin_no_client_auth","message":"the policy plugin could not be consulted (plugin_no_client_auth)","type":"janus_error"},"type":"error"}
+OK   plugin received zero ResolveRoute (0) and zero Notify
+OK   nothing forwarded to the upstream

@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin.endpoint: scheme "ftp" is not accepted: use unix://, https:// or http://

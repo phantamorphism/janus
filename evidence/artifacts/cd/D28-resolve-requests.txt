@@ -1,0 +1,26 @@
+[
+  {
+    "request_id": "01a1a612-3ae1-7406-a94d-c7f134c0e9f1",
+    "upstream": "anthropic",
+    "caller_identity": "u28a",
+    "correlation_id": "sessX",
+    "identity_claims": {
+      "session": "sessX"
+    }
+  },
+  {
+    "request_id": "01a1a612-3ae6-71cd-9e7b-3ad08fbf7339",
+    "upstream": "openai",
+    "caller_identity": "u28b"
+  },
+  {
+    "request_id": "01a1a612-3ae8-7446-a007-b11d062f9518",
+    "upstream": "openrouter",
+    "caller_identity": "u28c"
+  },
+  {
+    "request_id": "01a1a612-3ae9-710c-b8ba-11481a542bad",
+    "upstream": "anthropic",
+    "caller_identity": "u28d"
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "forwarded": {
+    "request_id": "01a1a612-360c-77e3-8b82-d81dfaeae56d",
+    "received_at": "2026-11-04T10:19:33.772278Z",
+    "duration_ms": 10,
+    "upstream": "openai",
+    "route": null,
+    "method": "POST",
+    "path": "/openai/v1/chat",
+    "binding": "opaque",
+    "caller_identity": "alice",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "outcome": "forwarded",
+    "credential_ref": "oa-main",
+    "status": 200,
+    "usage": {
+      "usage": {
+        "input_tokens": 3,
+        "output_tokens": 4
+      }
+    },
+    "error": null
+  },
+  "rejected": {
+    "request_id": "01a1a612-3618-75d9-961d-4986fe12214a",
+    "received_at": "2026-11-04T10:19:33.784236Z",
+    "duration_ms": 0,
+    "upstream": "openai",
+    "route": null,
+    "method": "POST",
+    "path": "/openai/v1/chat",
+    "binding": "opaque",
+    "caller_identity": "",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "outcome": "rejected_identity",
+    "kind": "invalid",
+    "credential_ref": null,
+    "status": null,
+    "usage": null,
+    "error": "identity material invalid: unknown opaque token"
+  },
+  "denied": {
+    "request_id": "01a1a612-3619-7058-9e50-d9be5298144c",
+    "received_at": "2026-11-04T10:19:33.785307Z",
+    "duration_ms": 0,
+    "upstream": "openai",
+    "route": null,
+    "method": "POST",
+    "path": "/openai/v1/chat",
+    "binding": "opaque",
+    "caller_identity": "denyme",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "outcome": "denied",
+    "reason": "budget exhausted",
+    "credential_ref": null,
+    "status": null,
+    "usage": null,
+    "error": "denied by the plugin: budget exhausted"
+  },
+  "shows": {
+    "forwarded": {
+      "stdout": "{\n  \"binding\": \"opaque\",\n  \"caller_identity\": \"alice\",\n  \"claimed_identity\": null,\n  \"correlation_id\": null,\n  \"credential_ref\": \"oa-main\",\n  \"duration_ms\": 10,\n  \"error\": null,\n  \"method\": \"POST\",\n  \"outcome\": \"forwarded\",\n  \"path\": \"/openai/v1/chat\",\n  \"received_at\": \"2026-11-04T10:19:33.772278Z\",\n  \"request_id\": \"01a1a612-360c-77e3-8b82-d81dfaeae56d\",\n  \"route\": null,\n  \"status\": 200,\n  \"upstream\": \"openai\",\n  \"usage\": {\n    \"usage\": {\n      \"input_tokens\": 3,\n      \"output_tokens\": 4\n    }\n  }\n}\n",
+      "stderr": "",
+      "human": "request id        01a1a612-360c-77e3-8b82-d81dfaeae56d\nreceived          2026-11-04T10:19:33Z\nduration          10 ms\nupstream          openai\nroute             -\nrequest           POST /openai/v1/chat\nbinding           opaque\nidentity          alice\nclaimed identity  -\ncorrelation id    -\noutcome           forwarded\ncredential        oa-main\nstatus            200\nusage             {\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}\nerror             -\n"
+    },
+    "rejected_identity": {
+      "stdout": "{\n  \"binding\": \"opaque\",\n  \"caller_identity\": \"\",\n  \"claimed_identity\": null,\n  \"correlation_id\": null,\n  \"credential_ref\": null,\n  \"duration_ms\": 0,\n  \"error\": \"identity material invalid: unknown opaque token\",\n  \"kind\": \"invalid\",\n  \"method\": \"POST\",\n  \"outcome\": \"rejected_identity\",\n  \"path\": \"/openai/v1/chat\",\n  \"received_at\": \"2026-11-04T10:19:33.784236Z\",\n  \"request_id\": \"01a1a612-3618-75d9-961d-4986fe12214a\",\n  \"route\": null,\n  \"status\": null,\n  \"upstream\": \"openai\",\n  \"usage\": null\n}\n",
+      "stderr": "",
+      "human": "request id        01a1a612-3618-75d9-961d-4986fe12214a\nreceived          2026-11-04T10:19:33Z\nduration          0 ms\nupstream          openai\nroute             -\nrequest           POST /openai/v1/chat\nbinding           opaque\nidentity          -\nclaimed identity  -\ncorrelation id    -\noutcome           rejected_identity(invalid)\ncredential        -\nstatus            -\nusage             -\nerror             identity material invalid: unknown opaque token\n"
+    },
+    "denied": {
+      "stdout": "{\n  \"binding\": \"opaque\",\n  \"caller_identity\": \"denyme\",\n  \"claimed_identity\": null,\n  \"correlation_id\": null,\n  \"credential_ref\": null,\n  \"duration_ms\": 0,\n  \"error\": \"denied by the plugin: budget exhausted\",\n  \"method\": \"POST\",\n  \"outcome\": \"denied\",\n  \"path\": \"/openai/v1/chat\",\n  \"reason\": \"budget exhausted\",\n  \"received_at\": \"2026-11-04T10:19:33.785307Z\",\n  \"request_id\": \"01a1a612-3619-7058-9e50-d9be5298144c\",\n  \"route\": null,\n  \"status\": null,\n  \"upstream\": \"openai\",\n  \"usage\": null\n}\n",
+      "stderr": "",
+      "human": "request id        01a1a612-3619-7058-9e50-d9be5298144c\nreceived          2026-11-04T10:19:33Z\nduration          0 ms\nupstream          openai\nroute             -\nrequest           POST /openai/v1/chat\nbinding           opaque\nidentity          denyme\nclaimed identity  -\ncorrelation id    -\noutcome           denied(budget exhausted)\ncredential        -\nstatus            -\nusage             -\nerror             denied by the plugin: budget exhausted\n"
+    }
+  }
+}

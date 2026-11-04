@@ -1,0 +1,16 @@
+OK   control: valid single-endpoint [plugin] starts with mode=unix
+OK   (a) endpoint + linked=true refuses to start (exit=1)
+OK   (a) prints a diagnostic: janus-daemon: config: plugin: set exactly one of `endpoint` or `linked = true`, not both
+OK   (a) data plane never bound, no admin socket
+OK   (b) [plugin] with neither refuses to start (exit=1)
+OK   (b) diagnostic: janus-daemon: config: plugin: a [plugin] block needs exactly one of `endpoint` or `linked = true`
+OK   (b) data plane never bound
+OK   (c) env vars JANUS_PLUGIN*/PLUGIN_ENDPOINT have no effect: plugin.mode=none
+OK   (c) traffic forwards as pass-through (HTTP 200)
+OK   (c) env-named plugin socket saw zero calls (resolve=0)
+OK   (c) janus-daemon --help lists no plugin flag
+OK   (c) CLI flag --plugin-endpoint is not accepted (exit=2), cannot set the endpoint
+     --plugin-endpoint: error: unexpected argument '--plugin-endpoint' found
+OK   (c) CLI flag --plugin is not accepted (exit=2), cannot set the endpoint
+     --plugin: error: unexpected argument '--plugin' found
+OK   (c) after flag attempts the spy plugin still saw nothing

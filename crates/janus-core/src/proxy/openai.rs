@@ -37,7 +37,7 @@ use url::Url;
 
 use super::feedback::{retry_after, ErrorBody};
 use super::material::{
-    ensure_for, jwt_expiry, plain_api_key, refresh_grant, secret_value, string_field,
+    ensure_for, jwt_expiry, refresh_grant, secret_value, string_field, validated_api_key,
 };
 use super::outbound::join_base;
 use super::usage::{ShapeObserver, UsageShape};
@@ -145,7 +145,7 @@ enum AuthJson<'d> {
 }
 
 fn read_auth_json(doc: &MaterialDocument) -> Result<AuthJson<'_>, UpstreamError> {
-    if let Some(key) = plain_api_key(doc) {
+    if let Some(key) = validated_api_key(doc) {
         return Ok(AuthJson::ApiKey(key?));
     }
     let doc = doc.expose();

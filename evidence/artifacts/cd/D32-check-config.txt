@@ -1,0 +1,5 @@
+{
+  "status": 0,
+  "stdout": "config OK\ndata_dir    /tmp/qa-cd/dC\ndata_plane  127.0.0.1:22001\nplugin      unix\ncredentials 0\nupstream    anthropic /anthropic identity=hmac\nupstream    openai /openai identity=hmac\nupstream    openrouter /openrouter identity=hmac\n",
+  "stderr": "\u001b[2m2026-11-04T10:19:52.378001Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mjanus_core::pool\u001b[0m\u001b[2m:\u001b[0m credential pool opened \u001b[3mdir\u001b[0m\u001b[2m=\u001b[0m/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/.tmpNnj0VR/credentials \u001b[3mcredentials\u001b[0m\u001b[2m=\u001b[0m0\n"
+}

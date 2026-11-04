@@ -1,0 +1,18 @@
+OK   (a) sanity: a normal request through this plugin works (HTTP 200, resolve=1)
+OK   (a) check exits 0 / API 200 (rc=0, http=200)
+OK   (a) CLI reports the full handshake and both probes: plugin tls https://localhost:23156/: PASSED |   ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's |   ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA) |   ok   no_cert_rejected: the plugin refused no client certificate: the plugin rejected the daemon's client certificate (TLS alert CertificateRequired) | 
+OK   (a) no step failed (both probes were rejected)
+OK   (a) plugin recorded zero ResolveRoute from the checks (before=1, after=1)
+OK   (a) plugin side saw the full handshake plus rejected probe handshakes: handshake_ok, handshake_ok, handshake_rejected([SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: ), handshake_rejected([SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return), handshake_ok, handshake_rejected([SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: ), handshake_rejected([SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return), handshake_ok, handshake_rejected([SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: ), handshake_rejected([SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] peer did not return)
+OK   (a) POST /v1/plugin/check returns each result
+OK   (b) check exits 1 for a plugin accepting any client cert (rc=1)
+OK   (b) reports the self-signed probe accepted/misconfigured: plugin tls https://localhost:23158/: FAILED |   ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's |   FAIL throwaway_cert_rejected: the plugin accepted a throwaway self-signed client certificate: its client verification is misconfigured |   FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certif
+OK   (b) zero ResolveRoute
+OK   (c) check exits 1 for a plugin that does not require a cert (rc=1)
+OK   (c) reports the no-cert probe accepted: plugin tls https://localhost:23161/: FAILED |   ok   handshake: TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's |   ok   throwaway_cert_rejected: the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA) |   FAIL no_cert_rejected: the plugin accepted no client certificate: it requests a certificate without requiring one | 
+OK   (c) (control) the self-signed probe was rejected by this plugin
+OK   (c) zero ResolveRoute
+OK   (d) unix check exits 0 (rc=0)
+OK   (d) reports the path-permission walk and a connection attempt: plugin unix unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock: PASSED |   ok   path_permissions: 9 directories checked: none writable by group or others, all owned by root, the daemon's user or the socket directory's owner |          0750 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56 |          0700 uid=502 /private/var/folders/
+OK   (d) zero ResolveRoute from the check
+OK   (d) after chmod o+w on the socket dir the check exits 1 (rc=1): plugin unix unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock: FAILED |   FAIL path_permissions [plugin_unreachable]: plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56 is writable by others (mode 0757) |   FAIL c

@@ -1,0 +1,4 @@
+token B after restart: 200
+token A (revoked) after restart: 401
+last_seen_at: 2026-11-04T10:20:50.629916000Z
+rows: [{"id":"01a1a613-61cd-77a4-8207-6751a1ee0ff2","token_hash":"ee1bb5f6…","identity":"caller-1","claims":"{}","last_seen_at":null},{"id":"01a1a613-6206-7145-8f22-5690f32c2783","token_hash":"0e14eaad…","identity":"hammer","claims":"{}","last_seen_at":null},{"id":"01a1a613-6240-7699-ab9d-54c2aa0a926a","token_hash":"c809393e…","identity":"d110-a","claims":"{\"tenant\":\"acme\"}","last_seen_at":null},{"id":"01a1a613-6245-730e-8b1b-8b47dcc1fffd","token_hash":"239fe586…","identity":"d110-b","claims":"{}","last_seen_at":null}]

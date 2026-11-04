@@ -1,4 +1,4 @@
-import { normalizeStatus } from './status'
+import { parsePlugin, parseStatus } from './status'
 import type {
   ChannelCheck,
   CredentialMetadata,
@@ -52,14 +52,13 @@ export function buildQuery(params: Record<string, QueryValue>): string {
   return s ? `?${s}` : ''
 }
 
-/** Accept either a bare array or an object wrapping one under `key`. */
+/** The list under `key` of a `{ [key]: [...] }` envelope; any other shape is an error. */
 function listOf<T>(json: unknown, key: string): T[] {
-  if (Array.isArray(json)) return json as T[]
-  if (typeof json === 'object' && json !== null) {
+  if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
     const inner = (json as Record<string, unknown>)[key]
     if (Array.isArray(inner)) return inner as T[]
   }
-  throw new ApiError(200, 'unexpected_response', `expected a list of ${key}`)
+  throw new ApiError(200, 'unexpected_response', `unexpected response shape: expected an object with a "${key}" list`)
 }
 
 async function decodeError(res: Response): Promise<ApiError> {
@@ -146,11 +145,11 @@ export class ApiClient {
   // ---- status / plugin ----
 
   async status(signal?: AbortSignal): Promise<DaemonStatus> {
-    return normalizeStatus(await this.send('GET', '/status', { signal }))
+    return parseStatus(await this.send('GET', '/status', { signal }))
   }
 
   async plugin(signal?: AbortSignal): Promise<PluginStatus> {
-    return (await this.send('GET', '/plugin', { signal })) as PluginStatus
+    return parsePlugin(await this.send('GET', '/plugin', { signal }))
   }
 
   async checkPlugin(signal?: AbortSignal): Promise<ChannelCheck> {
@@ -202,14 +201,13 @@ export class ApiClient {
   // ---- requests ----
 
   async requests(query: RequestQuery, signal?: AbortSignal): Promise<RequestPage> {
-    const json = (await this.send('GET', `/requests${buildQuery({ ...query })}`, {
-      signal,
-    })) as Partial<RequestPage> | null
-    return {
-      records: Array.isArray(json?.records) ? json.records : [],
-      next: typeof json?.next === 'string' && json.next ? json.next : null,
-      disabled: json?.disabled === true,
+    const json = await this.send('GET', `/requests${buildQuery({ ...query })}`, { signal })
+    const next = (json as { next?: unknown } | null)?.next
+    const disabled = (json as { disabled?: unknown } | null)?.disabled
+    if ((next !== null && typeof next !== 'string') || typeof disabled !== 'boolean') {
+      throw new ApiError(200, 'unexpected_response', 'unexpected response shape: expected { requests, next, disabled }')
     }
+    return { requests: listOf<RequestRecord>(json, 'requests'), next, disabled }
   }
 
   async request(requestId: string, signal?: AbortSignal): Promise<RequestRecord> {

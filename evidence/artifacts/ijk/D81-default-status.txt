@@ -1,0 +1,10 @@
+{
+  "status": {
+    "dropped_records": 0,
+    "enabled": true,
+    "retain": "30days",
+    "retain_seconds": 2592000,
+    "rows": 10
+  },
+  "cli": "version          0.1.0 (build dev)\nstarted          2026-11-04T10:19:33Z\ndata plane       127.0.0.1:25001\nadmin socket     /tmp/qa-ijk/run/main/data/admin.sock\nadmin tcp        -\nui               -\nrequest log      on, 10 rows, retained 30days\ndropped records  0\nrefused conns    0\ncredentials      3 (2 active, 1 disabled)\n\nUPSTREAM    PREFIX       IDENTITY  BASE URL\nopenai      /openai      opaque    http://127.0.0.1:25090/\nopenrouter  /openrouter  opaque    http://127.0.0.1:25099/\n\nplugin      unix\nendpoint    unix://<home>      ok\nlast ok     2026-11-04T10:19:40Z\nlast error  -\n"
+}

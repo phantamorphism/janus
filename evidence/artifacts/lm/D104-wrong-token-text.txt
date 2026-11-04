@@ -1,0 +1,8 @@
+Janus
+Admin token
+
+The daemon generates it into <data_dir>/admin-token and logs that path at startup. It is kept in this tab’s session storage only, and forgotten when the tab closes.
+
+The daemon rejected that token. Copy it again from the admin-token file.
+
+Connect

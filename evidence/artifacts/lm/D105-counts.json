@@ -1,0 +1,15 @@
+{
+  "cli": {
+    "total": 24,
+    "denied": 4,
+    "rejected": 5
+  },
+  "ui": {
+    "req": "24",
+    "reqRate": "0.40",
+    "denied": "4",
+    "deniedRate": "0.07",
+    "pct": "16.7",
+    "rejected": "5"
+  }
+}

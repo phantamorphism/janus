@@ -25,15 +25,18 @@ use super::{credentials, identities, requests, status, ui, AdminDeps};
 pub(crate) enum Principal {
     /// The unix socket: filesystem permissions authenticated the caller.
     Socket,
-    /// A TCP listener (admin or UI): the admin token did.
-    Token,
+    /// The TCP admin listener: the admin token did.
+    AdminTcp,
+    /// The UI listener: the admin token did.
+    Ui,
 }
 
 impl Principal {
     fn as_str(self) -> &'static str {
         match self {
             Principal::Socket => "socket",
-            Principal::Token => "token",
+            Principal::AdminTcp => "admin_tcp",
+            Principal::Ui => "ui",
         }
     }
 }
@@ -175,7 +178,10 @@ pub(crate) fn socket_router(state: AdminState) -> Router {
 
 /// The TCP admin listener's router: the token on every request.
 pub(crate) fn token_router(state: AdminState, token: Arc<AdminToken>) -> Router {
-    api(state).layer(middleware::from_fn_with_state(token, require_token))
+    api(state).layer(middleware::from_fn_with_state(
+        (token, Principal::AdminTcp),
+        require_token,
+    ))
 }
 
 /// The UI listener's router: the token-gated API under `/v1`, and the UI's
@@ -196,7 +202,34 @@ pub(crate) fn ui_router(state: AdminState, token: Arc<AdminToken>, assets: &Path
                 }
             }
         })
-        .layer(middleware::from_fn_with_state(token, require_token_on_api))
+        .layer(middleware::from_fn_with_state(
+            (token, Principal::Ui),
+            require_token_on_api,
+        ))
+        .layer(middleware::from_fn(hardening_headers))
+}
+
+/// The browser-hardening headers on every response of the UI listener, the
+/// token-gated API and its error responses included (`docs/admin-surface#ui`).
+/// The built UI loads only same-origin scripts, styles and fetches, so
+/// `default-src 'self'` is enough; `frame-ancestors` is not covered by
+/// `default-src` and is set explicitly.
+async fn hardening_headers(req: Request, next: Next) -> Response {
+    let mut res = next.run(req).await;
+    let headers = res.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        header::HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        header::HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        header::HeaderValue::from_static("no-referrer"),
+    );
+    res
 }
 
 /// `/v1` and everything below it.
@@ -206,23 +239,22 @@ fn is_api_path(path: &str) -> bool {
 }
 
 /// [`require_token`] on API paths; the UI's assets are public.
-async fn require_token_on_api(
-    State(token): State<Arc<AdminToken>>,
-    req: Request,
-    next: Next,
-) -> Response {
+async fn require_token_on_api(State(gate): State<TokenGate>, req: Request, next: Next) -> Response {
     if is_api_path(req.uri().path()) {
-        require_token(State(token), req, next).await
+        require_token(State(gate), req, next).await
     } else {
         next.run(req).await
     }
 }
 
+/// The admin token and the principal a request that presents it is audited as.
+type TokenGate = (Arc<AdminToken>, Principal);
+
 /// The admin token check. The token is taken only from the `Authorization`
 /// header, never from the query string. No CORS preflight is answered: an
 /// `OPTIONS` carries no token and is refused like any other request.
 async fn require_token(
-    State(token): State<Arc<AdminToken>>,
+    State((token, principal)): State<TokenGate>,
     mut req: Request,
     next: Next,
 ) -> Response {
@@ -243,7 +275,7 @@ async fn require_token(
             ApiError::unauthorized("the admin token is not valid").into_response()
         }
         Some(_) => {
-            req.extensions_mut().insert(Principal::Token);
+            req.extensions_mut().insert(principal);
             next.run(req).await
         }
     }

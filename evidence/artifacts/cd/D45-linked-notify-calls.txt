@@ -1,0 +1,68 @@
+{
+  "calls": 10,
+  "expected": 10,
+  "kinds": [
+    "call_abandoned",
+    "call_completed",
+    "call_completed",
+    "call_completed",
+    "call_completed",
+    "call_completed",
+    "call_abandoned",
+    "call_completed",
+    "credential_invalid",
+    "call_completed"
+  ],
+  "lines": [
+    [
+      "call_abandoned",
+      "01a1a612-8e0f-717b-9857-5e41e1c9099a",
+      "{\"caller_identity\":\"crash\",\"stage\":\"resolve\",\"reason\":\"plugin_error: linked plugin panicked: linked plugin deliberately panics\"}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e19-7213-acd7-9c89602aecc8",
+      "{\"caller_identity\":\"someone-else\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":1,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1a-7132-9ca7-f80741e853c6",
+      "{\"caller_identity\":\"ok0\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1b-7650-96ae-803859f71b1b",
+      "{\"caller_identity\":\"ok1\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1b-7650-96ae-8039fd1e6f7d",
+      "{\"caller_identity\":\"ok2\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1c-72e7-82ad-734d7a55b7f4",
+      "{\"caller_identity\":\"ok3\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "call_abandoned",
+      "01a1a612-8e1d-7168-bc37-78431d15c73f",
+      "{\"caller_identity\":\"crash\",\"stage\":\"resolve\",\"reason\":\"plugin_error: linked plugin panicked: linked plugin deliberately panics\"}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1e-743f-8d57-43755ced1b00",
+      "{\"caller_identity\":\"after-second-crash\",\"upstream\":\"anthropic\",\"status\":200,\"credential_ref\":\"acct-a\",\"duration_ms\":0,\"usage\":{\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}}"
+    ],
+    [
+      "credential_invalid",
+      "01a1a612-8e1c-72e7-82ad-734e57f99eae",
+      "{\"credential_ref\":\"acct-bad\",\"reason\":\"401 Unauthorized: authentication_error: invalid x-api-key\",\"status\":401,\"upstream\":\"anthropic\"}"
+    ],
+    [
+      "call_completed",
+      "01a1a612-8e1c-72e7-82ad-734e57f99eae",
+      "{\"caller_identity\":\"badkey\",\"upstream\":\"anthropic\",\"status\":401,\"credential_ref\":\"acct-bad\",\"duration_ms\":0,\"usage\":null}"
+    ]
+  ]
+}

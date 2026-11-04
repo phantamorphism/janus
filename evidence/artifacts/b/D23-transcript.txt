@@ -1,0 +1,4 @@
+status=401
+log={"binding":"hmac","caller_identity":"","claimed_identity":"bob","correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"identity material expired","kind":"expired","method":"POST","outcome":"rejected_identity","path":"/anthropic/v1/messages","received_at":"2026-11-04T10:19:35.858524Z","request_id":"01a1a612-3e32-72e3-9a4c-1284a69a7d3e","route":null,"status":null,"upstream":"anthropic","usage":null}
+plugin.resolves=[]
+plugin.events(new)=[]

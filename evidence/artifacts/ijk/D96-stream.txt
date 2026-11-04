@@ -1,0 +1,14 @@
+event: ping
+data: {"at":"2026-11-04T10:19:59.549373+00:00"}
+---
+event: request
+data: {"request_id":"01a1a612-9dde-71d5-abeb-64c7fd3769ca","received_at":"2026-11-04T10:20:00.350878Z","duration_ms":0,"upstream":"openai","route":null,"method":"POST","path":"/openai/v1/chat","binding":"opaque","caller_identity":"sse-a","claimed_identity":null,"correlation_id":null,"outcome":"forwarded","credential_ref":"aud-1","status":200,"usage":{"usage":{"input_tokens":3,"output_tokens":4}},"error":null}
+---
+event: request
+data: {"request_id":"01a1a612-9de1-72ed-beff-60f1a90dc8d1","received_at":"2026-11-04T10:20:00.353239Z","duration_ms":0,"upstream":"openai","route":null,"method":"POST","path":"/openai/v1/chat","binding":"opaque","caller_identity":"sse-a","claimed_identity":null,"correlation_id":null,"outcome":"forwarded","credential_ref":"aud-1","status":200,"usage":{"usage":{"input_tokens":3,"output_tokens":4}},"error":null}
+---
+event: request
+data: {"request_id":"01a1a612-9de2-7644-8747-076b3f0e431f","received_at":"2026-11-04T10:20:00.354538Z","duration_ms":0,"upstream":"openai","route":null,"method":"POST","path":"/openai/v1/chat","binding":"opaque","caller_identity":"sse-a","claimed_identity":null,"correlation_id":null,"outcome":"forwarded","credential_ref":"aud-1","status":200,"usage":{"usage":{"input_tokens":3,"output_tokens":4}},"error":null}
+---
+event: ping
+data: {"at":"2026-11-04T10:20:09.550727+00:00"}

@@ -28,7 +28,7 @@ use serde_json::{json, Value};
 use url::Url;
 
 use super::feedback::{retry_after, ErrorBody};
-use super::material::{ensure_for, plain_api_key, refresh_grant, secret_value, string_field};
+use super::material::{ensure_for, refresh_grant, secret_value, string_field, validated_api_key};
 use super::usage::{ShapeObserver, UsageShape};
 use super::{http_client, ClientInitError};
 use crate::contract::credential::{
@@ -145,7 +145,7 @@ impl UpstreamImpl for AnthropicUpstream {
     }
 
     fn decode_material(&self, doc: &MaterialDocument) -> Result<DecodedMaterial, UpstreamError> {
-        if let Some(key) = plain_api_key(doc) {
+        if let Some(key) = validated_api_key(doc) {
             return Ok(DecodedMaterial {
                 kind: CredentialKind::ApiKey,
                 secret: key?,

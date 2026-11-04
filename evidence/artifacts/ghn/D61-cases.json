@@ -1,0 +1,86 @@
+{
+  "disabled-ref": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"credential_unavailable\",\"message\":\"no usable upstream credential for this request\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "forwarded": 0,
+    "countsChanged": [],
+    "outcome": "credential_unavailable",
+    "rec": {
+      "request_id": "01a1a612-3cbf-734e-8936-ce1e9f5d34ed",
+      "received_at": "2026-11-04T10:19:35.487531Z",
+      "duration_ms": 0,
+      "upstream": "openrouter",
+      "route": null,
+      "method": "POST",
+      "path": "/openrouter/v1/chat/completions",
+      "binding": "opaque",
+      "caller_identity": "ref:or-dis",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "outcome": "credential_unavailable",
+      "credential_ref": null,
+      "status": null,
+      "usage": null,
+      "error": "credential \"or-dis\" is Disabled"
+    },
+    "events": [
+      "call_abandoned"
+    ]
+  },
+  "nonexistent-ref": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"credential_unavailable\",\"message\":\"no usable upstream credential for this request\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "forwarded": 0,
+    "countsChanged": [],
+    "outcome": "credential_unavailable",
+    "rec": {
+      "request_id": "01a1a612-3f1d-7335-a5d4-d6f4a1ecb4f2",
+      "received_at": "2026-11-04T10:19:36.093227Z",
+      "duration_ms": 1,
+      "upstream": "openrouter",
+      "route": null,
+      "method": "POST",
+      "path": "/openrouter/v1/chat/completions",
+      "binding": "opaque",
+      "caller_identity": "ref:nonexistent",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "outcome": "credential_unavailable",
+      "credential_ref": null,
+      "status": null,
+      "usage": null,
+      "error": "no credential \"nonexistent\""
+    },
+    "events": [
+      "call_abandoned"
+    ]
+  },
+  "refresh-fails": {
+    "status": 503,
+    "body": "{\"error\":{\"code\":\"credential_unavailable\",\"message\":\"no usable upstream credential for this request\",\"type\":\"janus_error\"},\"type\":\"error\"}",
+    "forwarded": 0,
+    "countsChanged": [],
+    "outcome": "credential_unavailable",
+    "rec": {
+      "request_id": "01a1a612-4178-72d9-9f9a-eca0ab447f31",
+      "received_at": "2026-11-04T10:19:36.696304Z",
+      "duration_ms": 2,
+      "upstream": "anthropic",
+      "route": null,
+      "method": "POST",
+      "path": "/anthropic/v1/messages",
+      "binding": "opaque",
+      "caller_identity": "ref:an-exp",
+      "claimed_identity": null,
+      "correlation_id": null,
+      "outcome": "credential_unavailable",
+      "credential_ref": null,
+      "status": null,
+      "usage": null,
+      "error": "refreshing credential \"an-exp\" failed: credential refresh failed: token endpoint answered 400 Bad Request: invalid_grant"
+    },
+    "events": [
+      "call_abandoned"
+    ]
+  }
+}

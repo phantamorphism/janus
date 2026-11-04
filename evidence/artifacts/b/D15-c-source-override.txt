@@ -1,0 +1,2 @@
+daemon started; status=401
+[{"binding":"hmac","caller_identity":"","claimed_identity":null,"correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"identity material invalid: not an hmac token: expected <claims-hex>.<signature-hex>","kind":"invalid","method":"POST","outcome":"rejected_identity","path":"/anthropic/v1/m","received_at":"2026-11-04T10:19:40.540467Z","request_id":"01a1a612-507c-7795-b65d-076764304170","route":null,"status":null,"upstream":"anthropic","usage":null}]

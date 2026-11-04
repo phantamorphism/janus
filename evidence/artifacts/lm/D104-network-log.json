@@ -1,0 +1,86 @@
+[
+  {
+    "method": "GET",
+    "url": "/v1/status",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/status",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/credentials",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/requests?since=2026-11-04T09%3A19%3A49.225Z&limit=1000",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/status",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/credentials",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/requests?since=2026-11-04T09%3A19%3A50.772Z&limit=1000",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/credentials",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/identities",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/requests?limit=100",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/plugin",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/status",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/credentials",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  },
+  {
+    "method": "GET",
+    "url": "/v1/requests?since=2026-11-04T09%3A19%3A57.257Z&limit=1000",
+    "authorization": "Bearer <present:matches admin token>",
+    "cookie": null
+  }
+]

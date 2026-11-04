@@ -1,0 +1,15 @@
+plugin unix unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock: PASSED
+  ok   path_permissions: 9 directories checked: none writable by group or others, all owned by root, the daemon's user or the socket directory's owner
+         0750 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56
+         0700 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock
+         0700 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T
+         0755 uid=502 /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp
+         0755 uid=0 /private/var/folders/t1
+         0755 uid=0 /private/var/folders
+         0755 uid=0 /private/var
+         0755 uid=0 /private
+         0755 uid=0 /
+  ok   connect: connected to /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock, served by an allowed uid
+
+
+rc=0

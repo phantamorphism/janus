@@ -20,6 +20,7 @@ mod settle;
 mod tracker;
 
 use std::future::Future;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use janus_core::contract::credential::CredentialPool;
@@ -64,6 +65,11 @@ pub(crate) struct DataPlane {
     pub(crate) plugin: Option<Arc<PluginHandle>>,
     pub(crate) requests: Arc<RequestLog>,
     pub(crate) tracker: Tracker,
+    /// `data_plane.max_connections`.
+    pub(crate) max_connections: usize,
+    /// Connections closed unanswered for being over `max_connections`;
+    /// shared with the admin surface (`data_plane.refused_connections`).
+    pub(crate) refused: Arc<AtomicU64>,
 }
 
 impl DataPlane {

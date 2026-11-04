@@ -1,0 +1,36 @@
+{
+  "sent": "POST /anthropic/v1/messages?beta=true&k=v",
+  "upstreamSaw": {
+    "method": "POST",
+    "url": "/v1/messages?beta=true&k=v"
+  },
+  "sent2": "GET /openai/v1/models/gpt-x/info",
+  "upstream2Saw": {
+    "method": "GET",
+    "url": "/v1/models/gpt-x/info"
+  },
+  "logRecord": {
+    "binding": "hmac",
+    "caller_identity": "agent-1",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "qa-cred-anthropic",
+    "duration_ms": 0,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:34.218071Z",
+    "request_id": "01a1a612-37ca-7163-b0e1-2f7efe861148",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "model": "claude-qa",
+      "usage": {
+        "input_tokens": 3,
+        "output_tokens": 4
+      }
+    }
+  }
+}

@@ -19,7 +19,7 @@ use http::header::{self, HeaderMap};
 use http::StatusCode;
 
 use super::feedback::{retry_after, ErrorBody};
-use super::material::{ensure_for, plain_api_key, secret_value};
+use super::material::{ensure_for, secret_value, validated_api_key};
 use super::usage::{ShapeObserver, UsageShape};
 use crate::contract::credential::{
     CredentialKind, CredentialMaterial, MaterialDocument, UpstreamFeedback,
@@ -67,7 +67,7 @@ impl UpstreamImpl for OpenRouterUpstream {
     }
 
     fn decode_material(&self, doc: &MaterialDocument) -> Result<DecodedMaterial, UpstreamError> {
-        let secret = plain_api_key(doc).ok_or_else(|| {
+        let secret = validated_api_key(doc).ok_or_else(|| {
             UpstreamError::InvalidMaterial("expected an OpenRouter API key".into())
         })??;
         Ok(DecodedMaterial {

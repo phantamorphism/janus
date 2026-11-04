@@ -1,0 +1,6 @@
+variant1 failed=true exit=1
+janus-daemon: config: upstream[anthropic].identity: `secret_ref` does not apply to method "custom:missing"
+
+variant2 failed=true exit=1
+janus-daemon: config: upstream[anthropic].identity.method: custom extractor "missing" is not registered in this build
+

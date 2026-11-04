@@ -6,6 +6,8 @@
 mod harness;
 #[path = "dataplane/plugin.rs"]
 mod plugin;
+#[path = "dataplane/refresh.rs"]
+mod refresh;
 #[path = "dataplane/upstream.rs"]
 mod upstream;
 
@@ -265,6 +267,141 @@ async fn admin_paths_on_the_data_plane_are_404() {
     }
     assert!(up.seen().is_empty());
     rt.stop().await;
+}
+
+/// A stalled request-log writer never slows or fails the data plane, and the
+/// records it cannot take are dropped and counted rather than queued in
+/// memory.
+#[tokio::test(flavor = "multi_thread")]
+async fn stalled_request_log_writer_does_not_affect_requests() {
+    let env = Env::new();
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let rt = env.start(&Opts::new(&base), Embedded::default()).await;
+
+    // Hold the database's write lock so the writer cannot commit.
+    let blocker = rusqlite::Connection::open(env.path("data").join("janus.db")).expect("open");
+    blocker.execute_batch("BEGIN IMMEDIATE").expect("lock");
+
+    let client = client();
+    let tasks = tokio::runtime::Handle::current()
+        .metrics()
+        .num_alive_tasks();
+    for _ in 0..5000 {
+        let response = client
+            .get(rt.url("/nowhere"))
+            .send()
+            .await
+            .expect("response");
+        assert_eq!(response.status().as_u16(), 404);
+    }
+    let after = tokio::runtime::Handle::current()
+        .metrics()
+        .num_alive_tasks();
+    assert!(after < tasks + 50, "tasks grew from {tasks} to {after}");
+    assert!(rt.daemon.requests().stats().dropped > 0);
+
+    blocker.execute_batch("COMMIT").expect("unlock");
+    rt.stop().await;
+}
+
+/// One `GET /nowhere` on a fresh connection that closes after the answer:
+/// the status code, or `None` when the connection was closed unanswered.
+async fn raw_status(addr: &str) -> Option<u16> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(addr).await.ok()?;
+    let request = "GET /nowhere HTTP/1.1\r\nhost: x\r\nconnection: close\r\n\r\n";
+    let _ = stream.write_all(request.as_bytes()).await;
+    let mut reply = Vec::new();
+    let _ = tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut reply)).await;
+    String::from_utf8_lossy(&reply)
+        .split(' ')
+        .nth(1)
+        .and_then(|code| code.parse().ok())
+}
+
+/// `data_plane.max_connections` is enforced on the data plane itself:
+/// connections beyond it are closed unanswered and counted, and service
+/// resumes once slots free up.
+#[tokio::test(flavor = "multi_thread")]
+async fn data_plane_refuses_connections_beyond_its_cap_and_recovers() {
+    const CAP: usize = 3;
+    let env = Env::new();
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let opts = Opts {
+        max_connections: Some(CAP),
+        ..Opts::new(&base)
+    };
+    let rt = env.start(&opts, Embedded::default()).await;
+    let addr = rt.base.trim_start_matches("http://").to_owned();
+
+    // Idle connections that never send a request fill every slot.
+    let mut idle = Vec::new();
+    for _ in 0..CAP {
+        idle.push(
+            tokio::net::TcpStream::connect(&addr)
+                .await
+                .expect("connect"),
+        );
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    // Once every idle connection is accepted, a new one is closed unanswered.
+    while raw_status(&addr).await.is_some() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the cap never applied"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(rt.daemon.refused_connections() >= 1);
+    let refused = rt.daemon.refused_connections();
+    assert_eq!(raw_status(&addr).await, None);
+    assert!(rt.daemon.refused_connections() > refused);
+
+    // Freeing the slots restores service.
+    idle.clear();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        if raw_status(&addr).await == Some(404) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the slots never freed"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    rt.stop().await;
+}
+
+/// A stalled request-log writer cannot hold shutdown: the flush gives up
+/// after its timeout and the daemon still stops.
+#[tokio::test(flavor = "multi_thread")]
+async fn shutdown_returns_within_its_bound_when_the_log_writer_is_stalled() {
+    let env = Env::new();
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let rt = env.start(&Opts::new(&base), Embedded::default()).await;
+
+    // Hold the write lock and queue several batches behind it, so the
+    // writer stays blocked for far longer than the shutdown bound.
+    let blocker = rusqlite::Connection::open(env.path("data").join("janus.db")).expect("open");
+    blocker.execute_batch("BEGIN IMMEDIATE").expect("lock");
+    let client = client();
+    for _ in 0..3000 {
+        client
+            .get(rt.url("/nowhere"))
+            .send()
+            .await
+            .expect("response");
+    }
+    let started = std::time::Instant::now();
+    tokio::time::timeout(Duration::from_secs(45), rt.stop())
+        .await
+        .expect("shutdown must return while the writer is stalled");
+    assert!(started.elapsed() < Duration::from_secs(45));
+    blocker.execute_batch("COMMIT").expect("unlock");
 }
 
 /// Send `target` as the raw request-target (no client-side normalisation)
@@ -720,6 +857,52 @@ async fn upstream_unreachable_is_upstream_error_and_abandoned_at_forward() {
     rt.stop().await;
 }
 
+/// An upstream that closes a kept-alive connection under the proxy's next
+/// request (what Node's 5 s keep-alive does after an idle gap) must not
+/// surface as a 502: the proxy sends the request again on a new connection.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_request_on_a_connection_the_upstream_closed_still_succeeds() {
+    use std::sync::atomic::AtomicUsize;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let accepted = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&accepted);
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let n = count.fetch_add(1, Ordering::SeqCst) + 1;
+            tokio::spawn(async move {
+                let mut served = 0;
+                let mut buf = vec![0u8; 16384];
+                // Each request here is small and arrives in one read.
+                while let Ok(read) = socket.read(&mut buf).await {
+                    if read == 0 || (n == 1 && served == 1) {
+                        return; // closed under the second request
+                    }
+                    served += 1;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{COMPLETION}",
+                        COMPLETION.len()
+                    );
+                    socket.write_all(response.as_bytes()).await.unwrap();
+                }
+            });
+        }
+    });
+    let env = Env::new();
+    let mut rt = env.start(&Opts::new(&base), Embedded::default()).await;
+
+    for _ in 0..2 {
+        let response = post_alice(&rt).await;
+        let (status, body) = caller_view(response).await;
+        assert_eq!(status, 200, "{body}");
+        assert_eq!(rt.record().await.outcome, Outcome::Forwarded);
+    }
+    assert_eq!(accepted.load(Ordering::SeqCst), 2);
+    rt.stop().await;
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn no_plugin_makes_zero_proto_calls() {
     let env = Env::new();
@@ -1034,6 +1217,115 @@ async fn shutdown_lets_inflight_streams_finish_and_records_them() {
         .expect("the record was committed before shutdown returned");
     assert_eq!(record.outcome, Outcome::Forwarded);
     assert_eq!(record.error, None);
+}
+
+/// Send `count` concurrent chat requests to `base` and read each response
+/// to its end; returns how many were answered.
+async fn answer_requests(base: &str, count: usize) -> usize {
+    let caller = token("alice");
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..count {
+        let request = client()
+            .post(format!("{base}{CHAT}"))
+            .bearer_auth(&caller)
+            .body("{}");
+        tasks.spawn(async move {
+            let response = request.send().await.expect("response");
+            response.bytes().await.expect("body");
+        });
+    }
+    let mut answered = 0;
+    while let Some(done) = tasks.join_next().await {
+        done.expect("caller task");
+        answered += 1;
+    }
+    answered
+}
+
+/// How many records the daemon's request log holds.
+fn logged_requests(rt: &Running) -> usize {
+    rt.daemon
+        .requests()
+        .query(&janus_daemon::store::RequestQuery {
+            limit: Some(1000),
+            ..Default::default()
+        })
+        .expect("query")
+        .records
+        .len()
+}
+
+/// D110: every request whose response reached its caller has a request-log
+/// record after an immediate shutdown and a restart on the same data dir.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn answered_requests_survive_immediate_shutdown_and_restart() {
+    const ROUNDS: usize = 25;
+    const PER_ROUND: usize = 20;
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let o = Opts::new(&base);
+    let env = Env::new();
+    let mut answered = 0;
+    for round in 0..ROUNDS {
+        let rt = env.start(&o, Embedded::default()).await;
+        answered += answer_requests(&rt.base, PER_ROUND).await;
+        rt.stop().await;
+        let restarted = env.start(&o, Embedded::default()).await;
+        assert_eq!(
+            logged_requests(&restarted),
+            answered,
+            "round {round}: a request that was answered has no record after restart"
+        );
+        restarted.stop().await;
+    }
+}
+
+/// The same guarantee through the real binary and a real SIGTERM, which is
+/// how D110 stops the daemon.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn answered_requests_survive_sigterm_of_the_binary() {
+    const ROUNDS: usize = 40;
+    const PER_ROUND: usize = 5;
+    let up = Upstream::start(ok_upstream()).await;
+    let base = up.base_url();
+    let env = Env::new();
+    let mut answered = 0;
+    for round in 0..ROUNDS {
+        let mut o = Opts::new(&base);
+        let bind = free_addr().await;
+        o.data_plane = &bind;
+        let config = env.write_config(&o);
+        let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_janus-daemon"))
+            .arg("--config")
+            .arg(&config)
+            .env("RUST_LOG", "warn")
+            .spawn()
+            .expect("spawn janus-daemon");
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while not_listening(&bind).await {
+            assert!(tokio::time::Instant::now() < deadline, "daemon never bound");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        answered += answer_requests(&format!("http://{bind}"), PER_ROUND).await;
+        let pid = child.id().expect("pid") as libc::pid_t;
+        // SAFETY: signalling a child process this test owns.
+        assert_eq!(unsafe { libc::kill(pid, libc::SIGTERM) }, 0);
+        let status = tokio::time::timeout(Duration::from_secs(15), child.wait())
+            .await
+            .expect("exits on SIGTERM")
+            .expect("wait");
+        assert!(status.success(), "round {round}: {status}");
+
+        let mut o = Opts::new(&base);
+        o.data_plane = "127.0.0.1:0";
+        let restarted = env.start(&o, Embedded::default()).await;
+        assert_eq!(
+            logged_requests(&restarted),
+            answered,
+            "round {round}: a request that was answered has no record after SIGTERM and restart"
+        );
+        restarted.stop().await;
+    }
 }
 
 /// A small deterministic generator, so a failing run can be replayed from
@@ -1359,6 +1651,10 @@ async fn check_config_validates_without_binding() {
     assert!(
         !env.path("data").join("admin.sock").exists(),
         "no socket created"
+    );
+    assert!(
+        !env.path("data").exists(),
+        "check-config must not create the data directory"
     );
 
     std::fs::remove_file(env.path("caller.secret")).expect("remove secret");

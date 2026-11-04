@@ -1,0 +1,118 @@
+{
+  "sdkResult": {
+    "id": "msg_01QA",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-qa",
+    "content": [
+      {
+        "type": "text",
+        "text": "hello from mock upstream"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 3,
+      "output_tokens": 4
+    }
+  },
+  "directMockResult": {
+    "id": "msg_01QA",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-qa",
+    "content": [
+      {
+        "type": "text",
+        "text": "hello from mock upstream"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 3,
+      "output_tokens": 4
+    }
+  },
+  "upstreamSaw": {
+    "t": 1793787574186,
+    "url": "/v1/messages",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "81",
+      "accept": "application/json",
+      "user-agent": "Anthropic/JS 1.4.0",
+      "x-stainless-arch": "arm64",
+      "x-stainless-lang": "js",
+      "x-stainless-os": "MacOS",
+      "x-stainless-package-version": "1.4.0",
+      "x-stainless-retry-count": "0",
+      "x-stainless-runtime": "node",
+      "x-stainless-runtime-version": "v24.22.2",
+      "x-stainless-timeout": "600",
+      "anthropic-version": "2026-10-21",
+      "x-api-key": "sk-ant-QAREALKEY-0001",
+      "host": "127.0.0.1:20100"
+    },
+    "rawHeaders": [
+      "content-type",
+      "application/json",
+      "content-length",
+      "81",
+      "accept",
+      "application/json",
+      "user-agent",
+      "Anthropic/JS 1.4.0",
+      "x-stainless-arch",
+      "arm64",
+      "x-stainless-lang",
+      "js",
+      "x-stainless-os",
+      "MacOS",
+      "x-stainless-package-version",
+      "1.4.0",
+      "x-stainless-retry-count",
+      "0",
+      "x-stainless-runtime",
+      "node",
+      "x-stainless-runtime-version",
+      "v24.22.2",
+      "x-stainless-timeout",
+      "600",
+      "anthropic-version",
+      "2026-10-21",
+      "x-api-key",
+      "sk-ant-QAREALKEY-0001",
+      "host",
+      "127.0.0.1:20100"
+    ],
+    "body": "{\"model\":\"claude-qa\",\"max_tokens\":16,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"
+  },
+  "logRecord": {
+    "binding": "hmac",
+    "caller_identity": "agent-1",
+    "claimed_identity": null,
+    "correlation_id": null,
+    "credential_ref": "qa-cred-anthropic",
+    "duration_ms": 2,
+    "error": null,
+    "method": "POST",
+    "outcome": "forwarded",
+    "path": "/anthropic/v1/messages",
+    "received_at": "2026-11-04T10:19:34.185238Z",
+    "request_id": "01a1a612-37a9-745e-aa3b-340617061fd3",
+    "route": null,
+    "status": 200,
+    "upstream": "anthropic",
+    "usage": {
+      "model": "claude-qa",
+      "usage": {
+        "input_tokens": 3,
+        "output_tokens": 4
+      }
+    }
+  },
+  "sdkVersion": "1.4.0"
+}

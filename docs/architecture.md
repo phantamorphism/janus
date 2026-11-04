@@ -58,8 +58,9 @@ process lifecycle of its own. Its responsibilities:
 - **Forwarding.** Executing the upstream call and relaying the response,
   including streaming responses, without buffering the whole body where the
   upstream streams it.
-- **The request log.** The per-request record that makes a call attributable to
-  the identity that made it.
+- **The request-log contract.** The per-request record and outcome types that
+  make a call attributable to the identity that made it. Core defines the
+  record; the daemon owns its persistence (writer, retention, tail).
 - **Metering primitives.** Per-identity counters and quota helpers that a policy
   plugin can link rather than reimplement. Janus ships the counting code and
   does none of the counting itself — see

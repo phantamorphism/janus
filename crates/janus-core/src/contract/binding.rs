@@ -548,6 +548,16 @@ pub enum JwtKey {
     PublicKeyFile(PathBuf),
 }
 
+/// Whether `url`'s host is a loopback IP literal (`127.0.0.0/8`, `[::1]`);
+/// `localhost` is a name, not a literal.
+pub(crate) fn is_loopback_ip_literal(url: &Url) -> bool {
+    match url.host() {
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    }
+}
+
 /// Why `url` may not serve a `jwt` binding's key set, or `None` when it may.
 ///
 /// The key set is the root of trust for every identity the binding
@@ -566,12 +576,7 @@ pub fn jwks_url_refusal(url: &Url) -> Option<&'static str> {
     match url.scheme() {
         "https" => None,
         "http" => {
-            let loopback = match url.host() {
-                Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
-                Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
-                _ => false,
-            };
-            (!loopback).then_some(
+            (!is_loopback_ip_literal(url)).then_some(
                 "plain http:// is accepted only for a loopback IP literal (127.0.0.1, [::1]); \
                  anyone on the path to the endpoint could serve their own keys and forge any identity — use https://",
             )

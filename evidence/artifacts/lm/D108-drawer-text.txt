@@ -1,0 +1,29 @@
+Request
+Request id
+01a1a613-30a7-7546-8e7c-201b5b69c119
+Received
+2026-11-04 12:20:374 s ago
+Duration
+0 ms
+Outcome
+forwarded
+Upstream
+openrouter
+Method and path
+POST /openrouter/v1/chat/completions
+Route
+—
+Binding
+opaque
+Caller identity
+live-agent
+Correlation id
+—
+Credential
+or1
+Upstream status
+200
+Error
+—
+Usage
+—

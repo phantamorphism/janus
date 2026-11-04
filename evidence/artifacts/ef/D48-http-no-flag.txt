@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin.endpoint: an http:// endpoint is refused unless `allow_plaintext = true` is set

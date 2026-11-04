@@ -1,0 +1,2 @@
+status=401
+log={"binding":"hmac","caller_identity":"","claimed_identity":null,"correlation_id":null,"credential_ref":null,"duration_ms":0,"error":"no identity material presented","kind":"no_material","method":"POST","outcome":"rejected_identity","path":"/openai/v1/qry","received_at":"2026-11-04T10:19:40.893238Z","request_id":"01a1a612-51dd-71eb-b2f8-b8d13f771047","route":"/v1/qry","status":null,"upstream":"openai","usage":null}

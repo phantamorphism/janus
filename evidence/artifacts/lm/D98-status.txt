@@ -1,0 +1,27 @@
+$ exit=0
+--- stdout
+version          0.1.0 (build dev)
+started          2026-11-04T10:19:34Z
+data plane       127.0.0.1:26001
+admin socket     /tmp/qa-lm/run/data/admin.sock
+admin tcp        http://127.0.0.1:26002/
+ui               http://127.0.0.1:26003/
+request log      on, 0 rows, retained 30days
+dropped records  0
+refused conns    0
+credentials      1 (1 active)
+
+UPSTREAM    PREFIX       IDENTITY  BASE URL
+openrouter  /openrouter  opaque    http://127.0.0.1:26010/
+anthropic   /anthropic   opaque    http://127.0.0.1:26010/
+
+plugin               tls
+endpoint             https://localhost:26020/
+health               unknown
+last ok              -
+last error           -
+client cert expires  2027-11-04T00:00:00Z
+server cert expires  -
+
+--- stderr
+

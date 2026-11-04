@@ -1,21 +1,24 @@
-//! The data-plane accept loop. One task per connection (HTTP/1.1 and h2c);
+//! The data-plane accept loop. One task per connection (HTTP/1.1 and h2c),
+//! capped at `data_plane.max_connections` (refusals counted in
+//! [`DataPlane::refused`]) with the admin listeners' header-read timeout;
 //! on cancellation the listener closes, every connection is told to finish
 //! its in-flight requests and close, and whatever is still running after
 //! [`SHUTDOWN_GRACE`] is aborted — which drops its request futures and
 //! relay bodies, so their settlement still runs (`abandoned`, or a
 //! relay that ended with the caller gone).
 
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use hyper_util::rt::{TokioExecutor, TokioIo};
-use hyper_util::server::conn::auto;
+use hyper_util::rt::TokioIo;
 use hyper_util::service::TowerToHyperService;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 
 use super::{router, DataPlane};
+use crate::admin::listen::connection_builder;
 
 /// How long in-flight requests (streamed responses included) may run after
 /// shutdown begins before their connections are aborted.
@@ -28,12 +31,21 @@ const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
 /// Serve `listener` until `cancel` fires and every connection has finished
 /// or been aborted.
 pub(crate) async fn serve(listener: TcpListener, dp: Arc<DataPlane>, cancel: CancellationToken) {
-    let app = router(dp);
+    let limit = dp.max_connections;
+    let app = router(Arc::clone(&dp));
     let mut connections = JoinSet::new();
     loop {
         tokio::select! {
             () = cancel.cancelled() => break,
             accepted = listener.accept() => match accepted {
+                Ok(_) if connections.len() >= limit => {
+                    // Dropping the accepted stream closes it. Warn at each
+                    // power-of-two total so an overload is not a log flood.
+                    let total = dp.refused.fetch_add(1, Ordering::Relaxed) + 1;
+                    if total.is_power_of_two() {
+                        tracing::warn!(limit, refused = total, "data plane at its connection limit; closing new connections");
+                    }
+                }
                 Ok((stream, _peer)) => {
                     if let Err(e) = stream.set_nodelay(true) {
                         tracing::debug!(error = %e, "cannot set TCP_NODELAY on a data-plane connection");
@@ -41,7 +53,7 @@ pub(crate) async fn serve(listener: TcpListener, dp: Arc<DataPlane>, cancel: Can
                     let service = TowerToHyperService::new(app.clone());
                     let cancel = cancel.clone();
                     connections.spawn(async move {
-                        let builder = auto::Builder::new(TokioExecutor::new());
+                        let builder = connection_builder();
                         let connection = builder.serve_connection(TokioIo::new(stream), service);
                         tokio::pin!(connection);
                         let result = tokio::select! {

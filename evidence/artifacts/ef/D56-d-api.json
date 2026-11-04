@@ -1,0 +1,67 @@
+{
+  "mode": "unix",
+  "endpoint": "unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock",
+  "passed": true,
+  "steps": [
+    {
+      "step": "path_permissions",
+      "passed": true,
+      "detail": "9 directories checked: none writable by group or others, all owned by root, the daemon's user or the socket directory's owner",
+      "walk": {
+        "socket": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock",
+        "dirs": [
+          {
+            "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56",
+            "uid": 502,
+            "mode": 488
+          },
+          {
+            "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock",
+            "uid": 502,
+            "mode": 448
+          },
+          {
+            "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T",
+            "uid": 502,
+            "mode": 448
+          },
+          {
+            "path": "/private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp",
+            "uid": 502,
+            "mode": 493
+          },
+          {
+            "path": "/private/var/folders/t1",
+            "uid": 0,
+            "mode": 493
+          },
+          {
+            "path": "/private/var/folders",
+            "uid": 0,
+            "mode": 493
+          },
+          {
+            "path": "/private/var",
+            "uid": 0,
+            "mode": 493
+          },
+          {
+            "path": "/private",
+            "uid": 0,
+            "mode": 493
+          },
+          {
+            "path": "/",
+            "uid": 0,
+            "mode": 493
+          }
+        ]
+      }
+    },
+    {
+      "step": "connect",
+      "passed": true,
+      "detail": "connected to /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock, served by an allowed uid"
+    }
+  ]
+}

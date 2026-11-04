@@ -1,0 +1,2 @@
+exit=1
+janus-daemon: config: plugin.tls: an https:// endpoint requires [plugin.tls]

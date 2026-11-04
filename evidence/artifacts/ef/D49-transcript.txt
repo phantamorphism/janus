@@ -1,0 +1,13 @@
+OK   control: correct [plugin.tls] starts (plugin not running)
+OK   missing ca_file: refuses to start (exit=1) -> janus-daemon: plugin: plugin.tls.ca_file: cannot read /tmp/qa-ef/run/pki/does-not-exist.pem: No such file or directory (os error 2)
+OK   missing ca_file: diagnostic emitted
+OK   client key does not match client cert: refuses to start (exit=1) -> janus-daemon: plugin: plugin.tls.client_key: /tmp/qa-ef/run/pki/client-b-key.pem does not match /tmp/qa-ef/run/pki/client-a.pem: keys may not be consistent: KeyMismatch
+OK   client key does not match client cert: diagnostic emitted
+OK   expired client cert: refuses to start (exit=1) -> janus-daemon: plugin: plugin.tls.client_cert: /tmp/qa-ef/run/pki/client-expired.pem expired at 2020-02-01 00:00:00 UTC
+OK   expired client cert: diagnostic emitted
+OK   client_key mode 0644: refuses to start (exit=1) -> janus-daemon: plugin: plugin.tls.client_key: /tmp/qa-ef/run/pki/client-a-key-0644.pem must be mode 0600 (owner-only); it is 0644
+OK   client_key mode 0644: diagnostic emitted
+OK   both ca_file and pinned_cert: refuses to start (exit=1) -> janus-daemon: config: plugin.tls: set exactly one of `ca_file` or `pinned_cert`, not both
+OK   both ca_file and pinned_cert: diagnostic emitted
+OK   neither ca_file nor pinned_cert: refuses to start (exit=1) -> janus-daemon: config: plugin.tls: set exactly one of `ca_file` or `pinned_cert`; system roots are never used
+OK   neither ca_file nor pinned_cert: diagnostic emitted

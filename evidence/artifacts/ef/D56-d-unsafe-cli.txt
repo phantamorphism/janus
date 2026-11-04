@@ -1,0 +1,4 @@
+plugin unix unix:///private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56/p.sock: FAILED
+  FAIL path_permissions [plugin_unreachable]: plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d56 is writable by others (mode 0757)
+  FAIL connect: not attempted: the socket path failed the permission walk
+janus: the plugin channel check did not pass

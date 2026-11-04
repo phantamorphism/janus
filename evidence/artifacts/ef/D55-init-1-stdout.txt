@@ -1,0 +1,14 @@
+wrote /private/tmp/qa-ef/run/d55-pki/daemon.pem, /private/tmp/qa-ef/run/d55-pki/daemon-key.pem (mode 0600), /private/tmp/qa-ef/run/d55-pki/plugin.pem, /private/tmp/qa-ef/run/d55-pki/plugin-key.pem (mode 0600)
+
+Add to the daemon's config, under [plugin]:
+
+[plugin.tls]
+pinned_cert = "/private/tmp/qa-ef/run/d55-pki/plugin.pem"
+client_cert = "/private/tmp/qa-ef/run/d55-pki/daemon.pem"
+client_key  = "/private/tmp/qa-ef/run/d55-pki/daemon-key.pem"
+
+For the plugin:
+  - serve TLS 1.3 with certificate /private/tmp/qa-ef/run/d55-pki/plugin.pem and key /private/tmp/qa-ef/run/d55-pki/plugin-key.pem
+  - require a client certificate, and accept only /private/tmp/qa-ef/run/d55-pki/daemon.pem (pin it; there is no CA)
+
+--- stderr ---

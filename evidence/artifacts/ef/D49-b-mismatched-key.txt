@@ -1,0 +1,3 @@
+exit=1
+2026-11-04T10:19:35.281052Z  INFO janus_core::pool: credential pool opened dir=/tmp/qa-ef/run/d49-b-mismatched-key/data/credentials credentials=0
+janus-daemon: plugin: plugin.tls.client_key: /tmp/qa-ef/run/pki/client-b-key.pem does not match /tmp/qa-ef/run/pki/client-a.pem: keys may not be consistent: KeyMismatch

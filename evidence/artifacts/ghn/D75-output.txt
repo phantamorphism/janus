@@ -1,0 +1,15 @@
+durability=Durable
+charge=Allowed { used: 7, limit: 100 }
+
+check=Allowed { used: 7, limit: 100 }
+count=7
+
+second-process-open while held: OPEN_ERR usage store is locked by another process: /tmp/qa-ghn/run/s75/u.db / Locked("/tmp/qa-ghn/run/s75/u.db")
+
+after holder killed: OPEN_OK
+
+closed
+
+journal_mode: wal
+
+ls: c.db c.db-lock c.db-shm c.db-wal u.db u.db-lock

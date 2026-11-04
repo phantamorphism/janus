@@ -374,6 +374,39 @@ fn write_assets(dir: &std::path::Path) {
     std::fs::write(ui.join("assets/app.js"), "console.log('janus')").expect("write");
 }
 
+fn assert_hardened(headers: &http::HeaderMap, what: &str) {
+    for (name, want) in [
+        ("x-content-type-options", "nosniff"),
+        (
+            "content-security-policy",
+            "default-src 'self'; frame-ancestors 'none'",
+        ),
+        ("referrer-policy", "no-referrer"),
+    ] {
+        assert_eq!(
+            headers.get(name).and_then(|v| v.to_str().ok()),
+            Some(want),
+            "{name} on {what}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn ui_listener_sets_hardening_headers_on_assets_and_api() {
+    let b = Builder::new(UI);
+    write_assets(b.dir());
+    let d = b.start().await;
+    let token = d.token();
+    let anon = d.ui(None);
+    assert_hardened(&anon.get("/").await.headers, "index");
+    assert_hardened(&anon.get("/assets/app.js").await.headers, "asset");
+    assert_hardened(&anon.get("/some/spa/route").await.headers, "SPA fallback");
+    assert_hardened(&anon.get("/v1/status").await.headers, "401");
+    let authed = d.ui(Some(&token));
+    assert_hardened(&authed.get("/v1/status").await.headers, "API 200");
+    assert_hardened(&authed.get("/v1/nope").await.headers, "API 404");
+}
+
 const UI: &str = "[ui]\nbind = \"127.0.0.1:0\"\nassets_dir = \"{dir}/ui\"\n";
 
 #[tokio::test]
@@ -1637,10 +1670,13 @@ async fn request_log_disabled_answers_empty_with_a_marker() {
 #[tokio::test]
 async fn mutations_are_audited_with_principal_and_resource() {
     let (logs, _guard) = Logs::capture();
-    let d = Builder::new(ADMIN_TCP).start().await;
+    let b = Builder::new(&format!("{ADMIN_TCP}{UI}"));
+    write_assets(b.dir());
+    let d = b.start().await;
     let token = d.token();
     let socket = d.socket();
     let tcp = d.tcp(Some(&token));
+    let ui = d.ui(Some(&token));
     socket
         .post(
             "/v1/credentials",
@@ -1680,6 +1716,12 @@ async fn mutations_are_audited_with_principal_and_resource() {
         200
     );
     assert_eq!(socket.get("/v1/credentials/audited").await.status, 200);
+    assert_eq!(
+        ui.post("/v1/credentials/audited/disable", None)
+            .await
+            .status,
+        200
+    );
 
     let text = logs.text();
     let audit: Vec<&str> = text
@@ -1703,16 +1745,25 @@ async fn mutations_are_audited_with_principal_and_resource() {
         "{text}"
     );
     assert!(
-        find("credential.enable", "token", "credential/audited", "ok"),
+        find("credential.enable", "admin_tcp", "credential/audited", "ok"),
         "{text}"
     );
     assert!(
-        find("credential.disable", "token", "credential/missing", "error"),
+        find(
+            "credential.disable",
+            "admin_tcp",
+            "credential/missing",
+            "error"
+        ),
         "{text}"
     );
-    assert!(find("identity.create", "token", id, "ok"), "{text}");
+    assert!(find("identity.create", "admin_tcp", id, "ok"), "{text}");
     assert!(find("identity.revoke", "socket", id, "ok"), "{text}");
-    assert_eq!(audit.len(), 6, "reads are not audited: {audit:#?}");
+    assert!(
+        find("credential.disable", "ui", "credential/audited", "ok"),
+        "{text}"
+    );
+    assert_eq!(audit.len(), 7, "reads are not audited: {audit:#?}");
     assert!(!text.contains(identity_token), "identity token logged");
     assert!(!text.contains(&token), "admin token logged");
     assert!(!text.contains("sk-or-audit-1"), "material logged");
@@ -2064,7 +2115,11 @@ async fn check_config_refuses_what_start_refuses_and_creates_nothing() {
     }
 
     let gone = tempfile::tempdir().expect("tempdir").path().join("missing");
-    let err = check_config(&Builder::new("").config(), &gone).expect_err("no data dir");
-    assert!(matches!(err, AdminError::DataDir { .. }), "{err}");
+    // A first start's data directory does not exist yet: that passes, and
+    // the check does not create it.
+    check_config(&Builder::new("").config(), &gone).expect("absent data dir is a first start");
     assert!(!gone.exists(), "check_config created the data directory");
+    let file = tempfile::NamedTempFile::new().expect("file");
+    let err = check_config(&Builder::new("").config(), file.path()).expect_err("not a dir");
+    assert!(matches!(err, AdminError::DataDir { .. }), "{err}");
 }

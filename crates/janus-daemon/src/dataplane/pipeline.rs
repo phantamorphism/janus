@@ -167,6 +167,8 @@ pub(super) async fn proxy(State(dp): State<Arc<DataPlane>>, request: Request) ->
             relayed.response.map(Body::new)
         }
         Err(ForwardError::Upstream(e)) => {
+            // The cause chain carries no URL, query or credential.
+            tracing::warn!(upstream = %upstream.path_prefix, error = %e, "upstream request failed");
             settle.abandon(
                 Outcome::UpstreamError,
                 format!("upstream request failed: {e}"),

@@ -100,14 +100,16 @@ request-log record shows `upstream = "anthropic"`, `method` and `path`.
 the real credential is applied using each upstream's own auth scheme (header
 name and scheme, or signing procedure), so the upstream sees a normal, correctly
 authenticated request and has no knowledge a proxy or a distinct caller identity
-is involved. This file does not state each upstream's header/scheme; the real
-upstream is the judge of "expected form". Exercise: with real credentials in the
-pool, make one authenticated call through each of the three upstreams to the
-real upstream; additionally route each through a recording upstream at
-`base_url`. Acceptance: each real upstream accepts the call (it does not answer
-with an authentication error); at the recording upstream, each outbound request
-contains the pool credential's bytes and does not contain the caller's identity
-token anywhere.
+is involved. Exercise: route a call through each of the three upstreams to a
+recording upstream at `base_url` (no real vendor is contacted). Acceptance: at
+the recording upstream, each outbound request carries the pool credential in the
+vendor's documented auth form (Anthropic: `x-api-key` for API keys, or
+`Authorization: Bearer` for OAuth tokens; OpenAI and OpenRouter:
+`Authorization: Bearer`; ChatGPT-account (Codex) credentials go to a fixed
+vendor host that `base_url` does not redirect, so their account header is
+outside black-box evidence), contains the pool credential's bytes, and does not
+contain the caller's identity token anywhere. Acceptance against the live
+vendors is an operator check outside automated evidence.
 
 **D5 — Outbound request is constructed from a per-upstream forwarding
 allowlist.** What: the outbound request is built from scratch; only headers on
@@ -124,12 +126,12 @@ headers; allowlisted headers (e.g. content type) are present.
 top of the allowlist, the substitution stage checks that the exact location the
 identity was read from is empty on the outbound request. A misconfigured
 allowlist that wrongly includes the identity-bearing header fails loudly rather
-than leaking the caller's token upstream. Exercise: (test build / test
-configuration) make an upstream allowlist include the header the identity
-binding reads from, then send a request. Acceptance: the request is not
-forwarded with the token — it fails with an error (visible in the request log
-`error` / daemon log) and the upstream never receives the caller's identity
-token.
+than leaking the caller's token upstream. Exercise: the daemon config exposes no
+allowlist knob, so exercise this at library level: a scratch crate using
+`janus-core`'s public outbound-request builder with an allowlist that includes
+the header the identity binding reads from. Acceptance: building the outbound
+request fails with an error rather than producing a request that carries the
+caller's identity token.
 
 **D7 — Response relayed unmodified.** What: Janus never transforms responses:
 the caller receives the upstream's own response, relayed unmodified. Janus also
@@ -446,10 +448,12 @@ handshake failures fail requests closed with a specific class:
 name), `plugin_no_client_auth` (plugin did not request a client certificate),
 `plugin_rejected_client_cert` (plugin rejected the daemon's client cert).
 Exercise: run three TLS plugins: one with an untrusted cert, one that requests
-no client cert, one that trusts a different client CA. Acceptance: requests fail
-with log classes `plugin_tls_error`, `plugin_no_client_auth`,
-`plugin_rejected_client_cert` respectively; `/v1/plugin` health shows
-`tls_error`, `no_client_auth`, `rejected_client_cert`.
+no client cert, one that trusts a different client CA and rejects the daemon's
+certificate with a TLS alert (a rejection signalled only by resetting the TCP
+connection carries no TLS information and is classed `plugin_unreachable`).
+Acceptance: requests fail with log classes `plugin_tls_error`,
+`plugin_no_client_auth`, `plugin_rejected_client_cert` respectively;
+`/v1/plugin` health shows `tls_error`, `no_client_auth`, `rejected_client_cert`.
 
 **D36 — Fail-closed: linked plugin panic.** What: a panic inside a linked
 plugin's `resolve_route` is caught and turned into a plugin error, which fails
@@ -520,9 +524,11 @@ becomes `invalid` (visible in `janus credential show <ref>`).
 **D43 — `account_error` event.** What: when the upstream reports a problem with
 the account behind the credential (rather than with the request), the daemon
 emits `account_error`. The spec defines no payload for it. Exercise: use a test
-upstream that returns an account-level error (e.g. billing/account disabled) for
-a specific key; route a request to that key. Acceptance: plugin receives a
-Notify event with `event_type = "account_error"`.
+upstream that returns a billing-class account error (HTTP 402, a `billing_error`
+body, or a "credit balance too low" 400) for a specific key; a 403 permission
+error is a per-request refusal, not an account error, and does not emit it;
+route a request to that key. Acceptance: plugin receives a Notify event with
+`event_type = "account_error"`.
 
 **D44 — Notify is off the critical path.** What: Notify is fire-and-forget: the
 caller's response never waits on it; a slow, blocking or absent Notify listener
@@ -722,10 +728,14 @@ no credential material.
 
 **D60 — OAuth refresh before use.** What: when the selected credential has
 expired, the pool refreshes it before use (Anthropic Keychain-backed OAuth;
-OpenAI/Codex `auth.json`-backed OAuth). Exercise: use an OAuth credential whose
-access token has expired but whose refresh token is valid; send a request.
-Acceptance: request succeeds; `expires_at` moves into the future; the caller
-never sees the refreshed token.
+OpenAI/Codex `auth.json`-backed OAuth). The Codex backend host is fixed and is
+not redirected by `base_url`, so for OpenAI/Codex the observable clause is the
+refresh itself (token endpoint called, `expires_at` moves); the forwarded
+request's success is observable for Anthropic. Exercise: use an OAuth credential
+whose access token has expired but whose refresh token is valid, with the
+upstream's optional `token_url` pointed at a local mock token endpoint; send a
+request. Acceptance: request succeeds; `expires_at` moves into the future; the
+caller never sees the refreshed token.
 
 **D61 — Unusable credential fails the request, never falls through.** What: if
 the selected credential cannot be made usable (refresh fails, disabled,
@@ -964,32 +974,34 @@ caller identity; present a valid caller identity as the admin bearer.
 Acceptance: file exists, mode `0600`, reused across restarts; data plane rejects
 the admin token with 401; the admin listener refuses the caller identity.
 
-**D87 — UI listener.** What: `ui.bind` (loopback by default) is a third listener
-serving the UI's static assets plus the same admin API; it does not exist when
-the UI is not enabled; the admin socket stays available either way. Its API
-requires the admin token on every call, loopback included; the daemon answers no
-CORS preflight; a non-loopback UI bind carries the same TLS rule as a
+**D87 — UI listener.** What: `ui.bind` (a required explicit address) is a third
+listener serving the UI's static assets plus the same admin API; it does not
+exist when the UI is not enabled; the admin socket stays available either way.
+Its API requires the admin token on every call, loopback included; the daemon
+answers no CORS preflight; a non-loopback UI bind carries the same TLS rule as a
 non-loopback admin bind. At startup the daemon logs the UI URL and the token
-file's path. Exercise: (a) enable the UI without setting a `ui.bind` address;
-(b) `curl` the UI root; `curl <ui>/v1/status` without/with token; send an
-`OPTIONS` preflight with `Origin` and
-`Access-Control-Request-Headers: authorization`; (c) set a non-loopback
-`ui.bind` with no TLS and no `allow_plaintext`; (d) disable the UI and probe the
-port, and query the admin socket. Acceptance: (a) the UI listener reported in
-`/v1/status` and in the logged UI URL is a loopback address (`127.0.0.1` or
-`::1`); (b) assets served; API refused without token and 200 with it; the
-preflight response carries no `Access-Control-Allow-*` headers; (c) refuses to
-start; (d) the port refuses connections and the admin socket still answers; the
-daemon log contains the UI URL and the admin-token path.
+file's path. Exercise: (a) enable the UI with `ui.bind = "127.0.0.1:<port>"`,
+and separately a `[ui]` section with no `bind`; (b) `curl` the UI root;
+`curl <ui>/v1/status` without/with token; send an `OPTIONS` preflight with
+`Origin` and `Access-Control-Request-Headers: authorization`; (c) set a
+non-loopback `ui.bind` with no TLS and no `allow_plaintext`; (d) disable the UI
+and probe the port, and query the admin socket. Acceptance: (a) a `[ui]` section
+with no `bind` is refused at startup; with a loopback `bind` the UI listener
+reported in `/v1/status` and in the logged UI URL is that address; (b) assets
+served; API refused without token and 200 with it; the preflight response
+carries no `Access-Control-Allow-*` headers; (c) refuses to start; (d) the port
+refuses connections and the admin socket still answers; the daemon log contains
+the UI URL and the admin-token path.
 
 **D88 — Admin errors and mutation audit.** What: all admin errors are JSON
 `{ "error": { "code": "<snake_case>", "message": "..." } }` with a conventional
 HTTP status (`code` is the stable contract). Every mutating admin call is
-recorded in the daemon log with the principal (`socket` or `token`) and the
+recorded in the daemon log with the principal (`socket` for the unix socket,
+`admin_tcp` for the admin TCP listener, `ui` for the UI listener) and the
 resource touched. Exercise: `GET /v1/credentials/does-not-exist`; disable a
 credential over the socket and over TCP. Acceptance: the 404-class error has the
 JSON shape with a snake_case `code`; daemon log shows two mutation entries
-naming the credential, with principals `socket` and `token`.
+naming the credential, with principals `socket` and `admin_tcp`.
 
 ---
 

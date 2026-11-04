@@ -245,6 +245,10 @@ const MAX_BACKOFF: Duration = Duration::from_secs(5);
 /// only after the response finished, so a long request that was in flight
 /// at the drop has an earlier timestamp than the drop itself.
 const GAP_LOOKBACK: Duration = Duration::from_secs(300);
+/// How long the stream may be silent before it is treated as dead. The
+/// daemon pings every 10 seconds, so this is more than three missed pings;
+/// it catches a half-open connection that would otherwise hang forever.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(35);
 /// Request ids remembered for de-duplication between the gap query and the
 /// stream.
 const SEEN_CAP: usize = 10_000;
@@ -304,6 +308,8 @@ struct Tail {
     connected_once: bool,
     /// When the stream first dropped, while the gap since is not closed.
     gap_from: Option<DateTime<Utc>>,
+    /// Silence after which the stream counts as lost.
+    idle_timeout: Duration,
 }
 
 impl Tail {
@@ -316,6 +322,7 @@ impl Tail {
             seen: Seen::new(),
             connected_once: false,
             gap_from: None,
+            idle_timeout: IDLE_TIMEOUT,
         }
     }
 
@@ -356,10 +363,18 @@ impl Tail {
         let mut decoder = sse::Decoder::default();
         let mut subscribed = false;
         loop {
-            let chunk = match body.chunk().await {
-                Ok(Some(chunk)) => chunk,
-                Ok(None) => return Ok(Ended::Dropped("the daemon closed the stream".to_owned())),
-                Err(e) => return Ok(Ended::Dropped(e)),
+            let chunk = match tokio::time::timeout(self.idle_timeout, body.chunk()).await {
+                Ok(Ok(Some(chunk))) => chunk,
+                Ok(Ok(None)) => {
+                    return Ok(Ended::Dropped("the daemon closed the stream".to_owned()))
+                }
+                Ok(Err(e)) => return Ok(Ended::Dropped(e)),
+                Err(_) => {
+                    return Ok(Ended::Dropped(format!(
+                        "nothing received for {}s",
+                        self.idle_timeout.as_secs()
+                    )))
+                }
             };
             for event in decoder.feed(&chunk) {
                 match event.event.as_str() {
@@ -485,5 +500,65 @@ mod tests {
         }
         assert!(seen.insert("a"), "the oldest id was forgotten");
         assert_eq!(seen.order.len(), SEEN_CAP);
+    }
+
+    #[tokio::test]
+    async fn a_silent_stream_is_dropped_after_the_idle_timeout() {
+        use crate::client::{Address, HttpOptions};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        // A server that opens the event stream, sends the opening ping, and
+        // then goes silent without closing: a half-open connection.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\
+                      transfer-encoding: chunked\r\n\r\n",
+                )
+                .await
+                .unwrap();
+            let ping = b"event: ping\ndata: {}\n\n";
+            socket
+                .write_all(format!("{:x}\r\n", ping.len()).as_bytes())
+                .await
+                .unwrap();
+            socket.write_all(ping).await.unwrap();
+            socket.write_all(b"\r\n").await.unwrap();
+            std::future::pending::<()>().await;
+        });
+
+        let admin = Admin::new(
+            Address::parse(&format!("http://{addr}")).unwrap(),
+            HttpOptions {
+                ca_file: None,
+                token: None,
+            },
+        )
+        .unwrap();
+        let mut tail = Tail::new(
+            admin,
+            StreamFilter {
+                identity: None,
+                upstream: None,
+                outcome: None,
+            },
+            true,
+        );
+        tail.idle_timeout = Duration::from_millis(200);
+        let ended =
+            tokio::time::timeout(Duration::from_secs(10), tail.follow("/v1/requests/stream"))
+                .await
+                .expect("follow returns instead of hanging")
+                .expect("not a hard error");
+        match ended {
+            Ended::Dropped(why) => assert!(why.contains("nothing received"), "{why}"),
+            Ended::Refused(e) => panic!("expected a dropped stream, got {e}"),
+        }
+        assert!(tail.connected_once);
     }
 }

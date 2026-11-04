@@ -57,6 +57,22 @@ pub fn text(t: Option<&str>) -> String {
     }
 }
 
+/// A counter that should be zero. Zero prints as `0`; anything else is
+/// flagged with `!` and the reason, in bold red when stdout is a terminal
+/// and `NO_COLOR` is unset.
+pub fn alert_if_nonzero(count: u64, why: &str) -> String {
+    use std::io::IsTerminal;
+    if count == 0 {
+        return "0".to_owned();
+    }
+    let text = format!("{count}  ! {why}");
+    if std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none() {
+        format!("\x1b[1;31m{text}\x1b[0m")
+    } else {
+        text
+    }
+}
+
 /// `key  value` lines, keys aligned.
 pub fn fields(rows: &[(&str, String)]) -> String {
     let width = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
@@ -116,6 +132,13 @@ impl Table {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_nonzero_counter_is_flagged_and_zero_is_plain() {
+        assert_eq!(alert_if_nonzero(0, "why"), "0");
+        // Not a terminal under test, so no colour codes.
+        assert_eq!(alert_if_nonzero(3, "why"), "3  ! why");
+    }
 
     #[test]
     fn table_aligns_columns_and_fields_align_keys() {

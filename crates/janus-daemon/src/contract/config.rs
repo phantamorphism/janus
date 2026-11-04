@@ -43,6 +43,7 @@
 //!
 //! [data_plane]
 //! bind = "127.0.0.1:7600"
+//! max_connections = 1024                  # default; above zero
 //!
 //! [admin]                                 # optional; the unix socket always exists
 //! bind = "127.0.0.1:7601"                 # opt-in TCP admin listener
@@ -80,11 +81,14 @@ use janus_core::contract::credential::validate_credential_ref;
 use janus_core::contract::paths;
 use janus_core::contract::plugin::PluginMode;
 use janus_core::contract::upstream::UpstreamKind;
+use janus_core::proxy::token_url_refusal;
 use serde::Deserialize;
 use url::Url;
 
 /// `plugin.timeout_ms` when unset.
 pub const DEFAULT_PLUGIN_TIMEOUT_MS: u64 = 250;
+/// `data_plane.max_connections` when unset.
+pub const DEFAULT_DATA_PLANE_MAX_CONNECTIONS: usize = 1024;
 /// `request_log.retain` when unset: 30 days.
 pub const DEFAULT_REQUEST_LOG_RETAIN: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
@@ -119,6 +123,13 @@ pub struct DaemonConfig {
 #[serde(deny_unknown_fields)]
 pub struct DataPlaneConfig {
     pub bind: SocketAddr,
+    /// Open data-plane connections served at once; a connection accepted
+    /// beyond this is closed unanswered and counted
+    /// (`data_plane.refused_connections` in the status endpoint). An
+    /// HTTP/1.1 call holds its connection for its whole life, so this bounds
+    /// concurrent HTTP/1.1 calls. Must be above zero.
+    #[serde(default = "default_max_connections")]
+    pub max_connections: usize,
 }
 
 /// `[admin]`. The unix socket at `<data_dir>/admin.sock` always exists; this
@@ -179,6 +190,10 @@ impl Default for RequestLogConfig {
     }
 }
 
+fn default_max_connections() -> usize {
+    DEFAULT_DATA_PLANE_MAX_CONNECTIONS
+}
+
 fn default_true() -> bool {
     true
 }
@@ -237,6 +252,10 @@ pub struct UpstreamConfig {
     /// Data-plane path prefix routed to this upstream, e.g. `/anthropic`.
     pub path_prefix: String,
     pub base_url: Url,
+    /// Where this upstream's OAuth credentials are refreshed, in place of the
+    /// vendor's endpoint. Only for an upstream with an OAuth refresh
+    /// (`anthropic`, `openai`).
+    pub token_url: Option<Url>,
     /// `[upstream.identity]`: merged over `[identity]` field by field.
     pub identity: Option<IdentityBindingConfig>,
     /// `[[upstream.route]]`: path-specific bindings.
@@ -632,6 +651,12 @@ impl DaemonConfig {
     }
 
     fn validate_listeners(&self) -> Result<(), ConfigError> {
+        if self.data_plane.max_connections == 0 {
+            return Err(invalid(
+                "data_plane.max_connections",
+                "must be above zero (the data plane would refuse every connection)",
+            ));
+        }
         let admin = &self.admin;
         if admin.bind.is_none() {
             let stray = [
@@ -771,6 +796,18 @@ impl DaemonConfig {
                         up.base_url
                     ),
                 ));
+            }
+            if let Some(token_url) = &up.token_url {
+                let at = format!("{at}.token_url");
+                if up.name == UpstreamKind::OpenRouter {
+                    return Err(invalid(
+                        at,
+                        "openrouter has no OAuth refresh; remove `token_url`",
+                    ));
+                }
+                if let Some(reason) = token_url_refusal(token_url) {
+                    return Err(invalid(at, format!("{token_url}: {reason}")));
+                }
             }
             let mut paths = BTreeSet::new();
             for route in &up.routes {
@@ -1218,6 +1255,44 @@ linked = true
     }
 
     #[test]
+    fn token_url_is_validated() {
+        let up = |name: &str, line: &str| {
+            format!("[[upstream]]\nname = \"{name}\"\npath_prefix = \"/u\"\nbase_url = \"https://example.com\"\n{line}\n")
+        };
+        for ok in [
+            "token_url = \"https://auth.example.com/oauth/token\"",
+            "token_url = \"http://127.0.0.1:9000/token\"",
+            "token_url = \"http://[::1]:9000/token\"",
+        ] {
+            let cfg = with_base(&up("anthropic", ok)).expect(ok);
+            assert!(cfg.upstreams[0].token_url.is_some());
+        }
+        assert!(with_base(&up("openai", "")).expect("default").upstreams[0]
+            .token_url
+            .is_none());
+        for bad in [
+            "token_url = \"http://auth.example.com/token\"",
+            "token_url = \"http://localhost:9000/token\"",
+            "token_url = \"ftp://127.0.0.1/token\"",
+        ] {
+            assert_eq!(err_at(&up("openai", bad)), "upstream[openai].token_url");
+        }
+        // Not absolute: refused at parse.
+        assert_eq!(
+            err_at(&up("anthropic", "token_url = \"/oauth/token\"")),
+            "<parse>"
+        );
+        // No OAuth refresh on openrouter.
+        assert_eq!(
+            err_at(&up(
+                "openrouter",
+                "token_url = \"https://auth.example.com/t\""
+            )),
+            "upstream[openrouter].token_url"
+        );
+    }
+
+    #[test]
     fn upstream_binding_and_credential_errors_are_refused() {
         let up = |extra: &str| {
             format!("[[upstream]]\nname = \"openrouter\"\npath_prefix = \"/openrouter\"\nbase_url = \"https://openrouter.ai/api\"\n{extra}")
@@ -1276,6 +1351,25 @@ linked = true
             ok.credentials[0].source(),
             Some(MaterialSource::Env("OPENROUTER_API_KEY".into()))
         );
+    }
+
+    #[test]
+    fn data_plane_max_connections_defaults_parses_and_must_be_above_zero() {
+        let default = with_base("").expect("valid");
+        assert_eq!(
+            default.data_plane.max_connections,
+            DEFAULT_DATA_PLANE_MAX_CONNECTIONS
+        );
+        let text = BASE.replacen("[data_plane]\n", "[data_plane]\nmax_connections = 7\n", 1);
+        assert!(
+            text.contains("max_connections = 7"),
+            "BASE has [data_plane]"
+        );
+        let cfg = DaemonConfig::from_toml_str(&text).expect("valid");
+        assert_eq!(cfg.data_plane.max_connections, 7);
+        let zero = BASE.replacen("[data_plane]\n", "[data_plane]\nmax_connections = 0\n", 1);
+        let err = DaemonConfig::from_toml_str(&zero).expect_err("zero is refused");
+        assert_eq!(err.at(), Some("data_plane.max_connections"));
     }
 
     #[test]

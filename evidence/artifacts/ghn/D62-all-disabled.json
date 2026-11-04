@@ -1,0 +1,7 @@
+{
+  "disableStatus": 200,
+  "defaultStatus": 404,
+  "defaultBody": "{\"error\":{\"code\":\"no_default_credential\",\"message\":\"no usable default credential for openai\"}}",
+  "requestStatus": 503,
+  "requestBody": "{\"error\":{\"code\":\"credential_unavailable\",\"message\":\"no usable upstream credential for this request\",\"type\":\"janus_error\"},\"type\":\"error\"}"
+}

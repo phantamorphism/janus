@@ -1,0 +1,3 @@
+daemon refused config at startup, exit=1
+janus-daemon: config: upstream[anthropic].identity: binding has no `method` (use method = "none" for a route that takes no identity)
+

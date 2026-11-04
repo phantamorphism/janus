@@ -1,0 +1,4 @@
+POST status 201
+{"ref":"or-leakprobe2","upstream":"openrouter","kind":"api_key","label":null,"source":"pool","status":"active","rate_limited_until":null,"expires_at":null,"last_used_at":null,"request_count":0,"error_count":0,"last_error":null}
+PUT status 200
+{"ref":"or-leakprobe2","upstream":"openrouter","kind":"api_key","label":null,"source":"pool","status":"active","rate_limited_until":null,"expires_at":null,"last_used_at":null,"request_count":0,"error_count":0,"last_error":null}

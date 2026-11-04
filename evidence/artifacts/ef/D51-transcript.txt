@@ -1,0 +1,12 @@
+OK   (a) parent dir mode 0777 refuses start (exit=1) -> janus-daemon: plugin: plugin.endpoint: plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51/open is writable by group and others (mode 0777)
+OK   (a) diagnostic names the offending directory
+OK   (a) socket under world-writable /tmp refuses start (exit=1)
+OK   layout: socket 0660, dir 0750
+OK   (b) start correctly, chmod o+w the dir, send a request -> fails plugin_unreachable (HTTP 503)
+OK   (b) /v1/plugin last_error names the offending directory: plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51/goodb is writable by others (mode 0757)
+OK   correctly permissioned layout (socket 0660, dir 0750) works (HTTP 200)
+OK   (b) reconnection after chmod o+w fails plugin_unreachable (HTTP 503)
+OK   (b) reconnect last_error names the offending directory: plugin socket path is unsafe: /private/var/folders/t1/7pc07l7s7rgb0fbhqdthh2q80000gp/T/qa-ef-sock/d51/good is writable by others (mode 0757)
+OK   (b) restoring 0750 recovers (HTTP 200)
+OK   (c) interceptor admits the daemon's own uid 502 (HTTP 200)
+OK   (c) interceptor rejects a peer whose uid != expected (HTTP 503); service never reached

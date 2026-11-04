@@ -1,0 +1,59 @@
+{
+  "anthropic": {
+    "hasKey": true,
+    "hasTok": false,
+    "credentialHeader": "sk-ant-QAREALKEY-0001",
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "7",
+      "accept": "*/*",
+      "user-agent": "node",
+      "x-api-key": "sk-ant-QAREALKEY-0001",
+      "host": "127.0.0.1:20100"
+    }
+  },
+  "openai": {
+    "hasKey": true,
+    "hasTok": false,
+    "credentialHeader": "Bearer sk-QAREALKEY-0002",
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "7",
+      "accept": "*/*",
+      "user-agent": "node",
+      "authorization": "Bearer sk-QAREALKEY-0002",
+      "host": "127.0.0.1:20101"
+    }
+  },
+  "openrouter": {
+    "hasKey": true,
+    "hasTok": false,
+    "credentialHeader": "Bearer sk-or-QAREALKEY-0003",
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "7",
+      "accept": "*/*",
+      "user-agent": "node",
+      "authorization": "Bearer sk-or-QAREALKEY-0003",
+      "host": "127.0.0.1:20102"
+    }
+  },
+  "anthropic_oauth": {
+    "addExit": 0,
+    "addOut": "added credential qa-cred-anthropic-oauth\nref                 qa-cred-anthropic-oauth\nupstream            anthropic\nkind                oauth\nlabel               -\nsource              pool\nstatus              active\nrate limited until  -\nexpires             2026-11-04T16:19:34Z\nlast used           -\nrequests            0\nerrors              0\nlast error          -\n",
+    "callerStatus": 200,
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "7",
+      "accept": "*/*",
+      "user-agent": "node",
+      "authorization": "Bearer sk-ant-oat01-QAOAUTHACCESS-0005",
+      "anthropic-beta": "oauth-2025-04-20",
+      "host": "127.0.0.1:20100"
+    },
+    "hasAccessToken": true,
+    "hasRefreshToken": false,
+    "hasApiKey": false,
+    "hasCallerToken": false
+  }
+}

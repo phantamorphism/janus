@@ -1,0 +1,22 @@
+{
+  "endpoint": "https://localhost:26020/",
+  "mode": "tls",
+  "passed": false,
+  "steps": [
+    {
+      "detail": "TLS 1.3 handshake completed: the plugin's certificate verified, and it requested and accepted the daemon's",
+      "passed": true,
+      "step": "handshake"
+    },
+    {
+      "detail": "the plugin refused a throwaway self-signed client certificate: the plugin rejected the daemon's client certificate (TLS alert UnknownCA)",
+      "passed": true,
+      "step": "throwaway_cert_rejected"
+    },
+    {
+      "detail": "the plugin accepted no client certificate: it requests a certificate without requiring one",
+      "passed": false,
+      "step": "no_cert_rejected"
+    }
+  ]
+}
