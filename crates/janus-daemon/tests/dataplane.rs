@@ -1371,10 +1371,16 @@ async fn concurrent_requests_with_random_aborts_settle_exactly_once() {
     let mut tasks = tokio::task::JoinSet::new();
     for _ in 0..REQUESTS {
         // Abort anywhere from before the head is sent to mid-stream.
-        let abort_after = Duration::from_millis(rng.below(120));
+        let mut abort_after = Duration::from_millis(rng.below(120));
+        // One caller in four is patient: it waits far longer than a loaded CI
+        // runner needs, so some quick-upstream requests always complete.
+        let patient = rng.below(4) == 0;
         let request = if rng.below(2) == 0 {
             client().post(rt.url(CHAT)).bearer_auth(&caller).body("{}")
         } else {
+            if patient {
+                abort_after = Duration::from_secs(4);
+            }
             client()
                 .post(rt.url("/anthropic/v1/messages"))
                 .header("x-api-key", &caller)
