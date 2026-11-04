@@ -416,11 +416,18 @@ impl RequestLog {
                 params![cutoff, chunk],
             )? as u64;
             // Saturating: never wrap if the count was ever off.
-            let _ = self
-                .rows
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
-                    Some(n.saturating_sub(deleted))
-                });
+            // A CAS loop rather than `fetch_update`: that method is deprecated
+            // in newer toolchains in favour of `try_update`, which the 1.89
+            // floor does not have.
+            let mut current = self.rows.load(Ordering::Relaxed);
+            while let Err(seen) = self.rows.compare_exchange_weak(
+                current,
+                current.saturating_sub(deleted),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                current = seen;
+            }
             total += deleted;
             if deleted < chunk as u64 {
                 return Ok(total);
