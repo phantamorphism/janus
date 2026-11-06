@@ -72,13 +72,20 @@ Built and running; see <ref target="docs/status">status</ref> for the
 authoritative list.
 
 - **Upstreams:** Anthropic, OpenAI (API keys and ChatGPT-account OAuth) and
-  OpenRouter, relayed unmodified, streaming included.
+  OpenRouter, relayed unmodified, streaming included. Claude Code and Codex CLI
+  run through Janus on their subscription logins.
+- **Several endpoints per vendor:** an `[[upstream]]` is an instance, so
+  `/anthropic` (API keys only) and `/claude` (subscription only) are separate
+  endpoints with separate budgets, each with its own credential filter.
 - **Caller identity, verified locally:** `hmac`, `jwt` (JWKS or public key),
   `opaque` (a daemon-managed registry with expiry and instant revocation),
   `trusted_header`, and `none` for explicitly open routes. Bound per daemon, per
   upstream or per path.
 - **Credential pool:** config credentials and pool slots added live; OAuth
-  refresh; enable, disable, rotate; a default chain when no plugin chooses.
+  refresh; enable, disable, rotate; tags; a default chain when no plugin
+  chooses, with a per-instance strategy (`ordered`, `round_robin`,
+  `least_recently_used`, `sticky`) and optional failover to the next credential
+  when the vendor rejects one.
 - **Policy plugins:** `ResolveRoute` (sync, fails closed) and `Notify` (async)
   over a unix socket, mutual TLS, or linked into a custom build; metering
   primitives with in-memory and SQLite stores.
@@ -129,6 +136,78 @@ The agent only ever holds `$TOKEN`. To serve the web UI, build `ui/` and place
 it in a `ui` directory beside the executable (or set `ui.assets_dir`). The
 <ref target="docs/quickstart">full walkthrough</ref> runs against a local
 stand-in upstream you can inspect, and covers the log, revocation and the UI.
+
+## Subscriptions, several accounts and Docker
+
+An `[[upstream]]` is an *instance*: it has its own path prefix and a filter on
+which credentials it may spend, so one vendor can be exposed as several
+endpoints. A pool of several keys or accounts is spread by a strategy; anything
+that depends on who is calling is the policy plugin's job.
+
+```toml
+[[upstream]]                       # API keys, spread, failing over on rejection
+name = "anthropic"
+path_prefix = "/anthropic"
+base_url = "https://api.anthropic.com"
+strategy = "round_robin"
+failover = true
+[upstream.credentials]
+kind = "api_key"
+
+[[upstream]]                       # Claude subscription logins, one per caller
+name = "claude"
+implementation = "anthropic"
+path_prefix = "/claude"
+base_url = "https://api.anthropic.com"
+strategy = "sticky"
+[upstream.credentials]
+kind = "oauth"
+
+[[upstream]]                       # Codex (ChatGPT) subscription logins
+name = "codex"
+implementation = "openai"
+path_prefix = "/codex"
+base_url = "https://api.openai.com"
+strategy = "least_recently_used"
+[upstream.credentials]
+kind = "oauth"
+```
+
+Add a subscription login with
+`janus credential add --upstream anthropic --from-file <credentials.json>`
+(Claude Code) or `--upstream openai --from-file ~/.codex/auth.json` (Codex).
+Janus refreshes its copy, so a refresh token may rotate: use a dedicated login
+rather than the one your own CLI depends on. The caller still sends its own
+client headers (Claude Code sends its system prompt), because Janus relays
+requests unmodified.
+
+```sh
+# Claude Code on the subscription endpoint
+ANTHROPIC_BASE_URL=http://127.0.0.1:7600/claude ANTHROPIC_AUTH_TOKEN=$TOKEN claude
+
+# Codex CLI: base_url has no /v1; websockets are off because Janus relays HTTP
+codex exec -c 'model_providers.janus={name="janus",base_url="http://127.0.0.1:7600/codex",env_key="JANUS_TOKEN",wire_api="responses",supports_websockets=false}' \
+           -c model_provider=janus "..."   # with JANUS_TOKEN=$TOKEN
+```
+
+To run the daemon in a container with a persistent volume, mount your config and
+a volume at `/var/lib/janus`, and publish the ports to loopback:
+
+```sh
+docker run -d --name janus --restart unless-stopped \
+  -p 127.0.0.1:7600:7600 -p 127.0.0.1:7601:7601 \
+  -v janus-data:/var/lib/janus -v "$PWD/janus.toml:/etc/janus/janus.toml:ro" \
+  janus:local        # built with: docker build -t janus:local .
+docker exec -i janus janus credential add --upstream openrouter --api-key-stdin
+docker exec janus janus identity create --identity agent-1 --expires-in 24h
+```
+
+Inside the container the UI binds `0.0.0.0`, which Janus refuses in plaintext
+unless `allow_plaintext = true` is set in `[ui]`; that is safe only while the
+port is published to loopback. The reference is
+<ref target="docs/configuration#upstreams">upstreams and credential
+filters</ref>; the reasoning is in
+<ref target="docs/decisions#upstream-instances">upstream instances</ref>.
 
 ## How it works
 
