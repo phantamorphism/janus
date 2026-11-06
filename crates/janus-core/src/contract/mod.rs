@@ -42,4 +42,5 @@ pub mod plugin;
 pub mod proto;
 pub mod registry;
 pub mod request_log;
+pub mod selection;
 pub mod upstream;

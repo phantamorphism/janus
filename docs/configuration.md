@@ -162,6 +162,10 @@ credentials endpoints</ref> without a restart; they are never listed in config.
   (reserved for the default-chain peek), and unique.
 - `upstream` (required) — `anthropic`, `openai` or `openrouter`.
 - `label` (optional) — for operators.
+- `tags` (optional) — a list of distinct tags, each non-empty and only
+  `[A-Za-z0-9._-]`, that an instance's credential filter can select on (see
+  <ref target="#upstream-instances">upstream instances</ref>). A pool slot's
+  tags are set when it is added and replaced through the admin surface.
 - exactly one of:
   - `env = "VAR"` — a bare API key in an environment variable (surrounding
     whitespace is not part of the key);
@@ -171,16 +175,28 @@ credentials endpoints</ref> without a restart; they are never listed in config.
 
 A config credential's existence and material belong to the config: the admin
 surface can enable, disable and refresh it, but not replace its material or
-delete it. The default chain for an upstream tries config credentials in
-declaration order, then pool slots oldest first, and picks the first `active`
-one.
+delete it. A credential belongs to an implementation (its `upstream`), not to an
+`[[upstream]]` instance. An implementation's **chain order** is its config
+credentials in declaration order, then its pool slots oldest first. Which of
+them an instance uses, and how it picks among them, is set per instance (see
+<ref target="#upstream-instances">upstream instances</ref>); by default an
+instance takes the first `active` credential in chain order.
 
 ## Upstreams, bindings and routes {#upstreams}
 
-Each `[[upstream]]` mounts one upstream implementation on the data plane:
+Each `[[upstream]]` mounts one **instance** of an upstream implementation on the
+data plane:
 
-- `name` (required) — `anthropic`, `openai` or `openrouter`; each at most once.
-  It is also the `upstream` value of the plugin contract and the request log.
+- `name` (required) — the instance name: non-empty, only `[A-Za-z0-9_-]`, and
+  unique. It is the `upstream` value of the plugin contract, the request log and
+  the admin surface's `?upstream=`.
+- `implementation` (required unless `name` is an implementation name) —
+  `anthropic`, `openai` or `openrouter`. An instance named after an
+  implementation is an instance of that implementation; naming a different one
+  in `implementation` is refused.
+- `strategy`, `failover`, `[upstream.credentials]` (optional) — which
+  credentials the instance uses and how it picks; see
+  <ref target="#upstream-instances">upstream instances</ref>.
 - `path_prefix` (required) — the data-plane path prefix routed to this upstream,
   such as `/anthropic`. It starts with `/`, does not end with `/`, and is not
   `/` alone.
@@ -197,7 +213,9 @@ Each `[[upstream]]` mounts one upstream implementation on the data plane:
   sent to this endpoint and the tokens it returns become the credential. It is
   refused on an upstream with no OAuth refresh (`openrouter`). Omitted, the
   vendor's endpoint is used. Example:
-  `token_url = "https://auth.internal.example/oauth/token"`.
+  `token_url = "https://auth.internal.example/oauth/token"`. Credentials, and so
+  their refresh, belong to the implementation: every instance of one
+  implementation must name the same `token_url` (or none does).
 - `[upstream.identity]` (optional) — this upstream's binding.
 - `[[upstream.route]]` (optional, repeatable) — `path` and `identity`: a
   path-specific binding.
@@ -223,6 +241,71 @@ upstream-level binding, so only its routes accept requests. The fields each
 method takes, and how a route path is matched, are in
 <ref target="docs/caller-identity#binding">binding an extractor to a request
 type</ref>.
+
+## Upstream instances and credential selection {#upstream-instances}
+
+An implementation can be mounted more than once, each instance at its own prefix
+and with its own selection rules. A typical use splits one vendor's credentials
+by kind:
+
+```toml
+[[upstream]]                     # API keys only, spread across them
+name        = "anthropic"
+path_prefix = "/anthropic"
+base_url    = "https://api.anthropic.com"
+strategy    = "round_robin"
+failover    = true
+  [upstream.credentials]
+  kind = "api_key"
+
+[[upstream]]                     # Claude subscriptions only
+name           = "claude"
+implementation = "anthropic"
+path_prefix    = "/claude"
+base_url       = "https://api.anthropic.com"
+strategy       = "sticky"
+  [upstream.credentials]
+  kind = "oauth"
+```
+
+- `[upstream.credentials]` (optional) — the **credential filter**: which of the
+  implementation's credentials this instance may use. Absent, it may use all of
+  them. Each key that is set must hold (they combine with AND):
+  - `kind` — `api_key` or `oauth`. `oauth` is refused on `openrouter`, which has
+    no OAuth credentials.
+  - `refs` — a non-empty list of distinct credential refs. A ref naming a config
+    credential, or (checked at startup) a pool slot, of another implementation
+    is refused; a ref naming no credential is logged as a warning, since a pool
+    slot of that name can be added later.
+  - `tags` — a non-empty list of distinct tags; a credential passes when it
+    carries any one of them.
+
+  An empty table is refused: it would restrict nothing. An instance whose filter
+  admits no credential at startup is logged as a warning; its requests fail as
+  `credential_unavailable` until one is added.
+- `strategy` (default `ordered`) — how a request whose credential is not named
+  by the plugin picks among the admitted, usable credentials:
+  - `ordered` — the first in chain order;
+  - `round_robin` — the next in chain order after the previous pick on this
+    instance, wrapping around;
+  - `least_recently_used` — the one picked longest ago (never-picked first),
+    ties in chain order;
+  - `sticky` — one credential per verified caller identity, chosen by
+    rendezvous hashing of the identity and the ref, so an identity keeps its
+    credential while that credential is usable and removing one moves only the
+    identities it held. A request with no verified identity (a `none` route)
+    picks as `ordered`.
+- `failover` (default `false`) — with `true`, a request that the upstream
+  answers with a rate limit, an invalid credential or an account error is sent
+  again with the next admitted credential, when the body allows it. The rules
+  are in <ref target="docs/credential-substitution#failover">failover</ref>.
+
+A config with one `[[upstream]]` per implementation, each named after its
+implementation and with none of these keys, behaves as before instances existed:
+every credential of the implementation, `ordered`, no failover. How selection
+fits the request lifecycle is in
+<ref target="docs/credential-substitution#credential-selection">credential
+selection</ref>.
 
 ## Plugin {#plugin}
 

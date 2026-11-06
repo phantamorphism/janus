@@ -44,9 +44,12 @@ process lifecycle of its own. Its responsibilities:
   config-driven bindings that select one per request type. Fully designed in
   <ref target="docs/caller-identity">caller identity extraction</ref>.
 - **The credential pool.** Storage and lookup of real upstream credentials,
-  detection of what kind each one is, and refreshing the ones that expire. This
-  is the only component with read access to credential material; nothing above
-  it hands a credential back toward a caller.
+  detection of what kind each one is, refreshing the ones that expire, and
+  picking one for an upstream instance by that instance's filter and strategy
+  (see
+  <ref target="docs/credential-substitution#credential-selection">credential
+  selection</ref>). This is the only component with read access to credential
+  material; nothing above it hands a credential back toward a caller.
 - **The substitution itself.** Turning an inbound request that carries a caller
   identity into an outbound request that carries a real credential: constructing
   the outbound request from a per-upstream forwarding allowlist so the caller's
@@ -215,7 +218,10 @@ decision actually gets made; everything else is mechanical.
 1. **A caller issues a request.** The agent calls the upstream's own API, with
    the base URL pointed at `janus-daemon`'s data plane and its own caller
    identity presented instead of a real upstream credential. From the caller's
-   side this is an ordinary upstream call.
+   side this is an ordinary upstream call. The path prefix it calls names one
+   `[[upstream]]` instance, and so one implementation and one set of selection
+   rules (see <ref target="docs/configuration#upstream-instances">upstream
+   instances</ref>).
 2. **Janus extracts and verifies the caller identity.** *(Decision: Janus
    alone.)* The extractor bound to this request type reads the identity material
    from wherever that binding says it sits and verifies it locally. If it does
@@ -229,11 +235,13 @@ decision actually gets made; everything else is mechanical.
 3. **Janus resolves which credential to use.** *(Decision: the plugin, or the
    default chain.)* If a plugin is configured, `janus-daemon` calls
    <ref target="docs/plugin-contract#resolve-route">ResolveRoute</ref> with the
-   verified caller identity and the intended upstream, and gets back one of
-   three answers: use this specific credential, defer to the daemon's default
-   chain, or deny with a reason. A denial ends the request here. If no plugin is
-   configured, the default chain decides and this round trip does not happen at
-   all.
+   verified caller identity and the intended upstream instance, and gets back
+   one of three answers: use this specific credential, defer to the daemon's
+   default chain, or deny with a reason. A denial ends the request here. If no
+   plugin is configured, the default chain decides and this round trip does not
+   happen at all. The default chain is the instance's: the credentials its
+   filter admits, picked by its strategy. A plugin's choice must also pass the
+   filter.
 4. **The credential is fetched from the pool.** The pool resolves the selected
    reference to live credential material, refreshing it first if it has expired.
    A credential that cannot be made usable is a failure of the request, not a
@@ -248,7 +256,12 @@ decision actually gets made; everything else is mechanical.
    request goes upstream and the response comes back to the caller as the
    upstream produced it, streaming if the upstream streams. Janus does not
    transform responses — see
-   <ref target="docs/architecture#proxy-behaviors">proxy behaviors</ref>.
+   <ref target="docs/architecture#proxy-behaviors">proxy behaviors</ref>. The
+   one exception is failover on an instance that enables it: when the default
+   chain picked the credential and the upstream rejects it as invalid, rate
+   limited or out of account, and the body can be sent again whole, steps 4–6
+   repeat with the next credential and only the last answer is relayed (see
+   <ref target="docs/credential-substitution#failover">failover</ref>).
 7. **Settlement and observation are emitted.** Outcomes a plugin may care about
    — how the call ended, a credential the upstream rejected — go out over
    <ref target="docs/plugin-contract#notify">Notify</ref>, which is

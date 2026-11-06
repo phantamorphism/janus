@@ -29,10 +29,11 @@ rpc ResolveRoute(ResolveRouteRequest) returns (ResolveRouteResponse);
 
 message ResolveRouteRequest {
   string request_id = 1;      // Janus-assigned, unique to this request
-  string upstream = 2;        // "anthropic" | "openai" | "openrouter"
+  string upstream = 2;        // the [[upstream]] instance name ("claude")
   string caller_identity = 3; // the verified identity that is asking
   string correlation_id = 4;  // optional grouping hint; may be untrusted
   map<string, string> identity_claims = 5; // other verified claims, if any
+  string implementation = 6;  // "anthropic" | "openai" | "openrouter"
 }
 
 message ResolveRouteResponse {
@@ -62,7 +63,14 @@ pieces of bookkeeping:
   identity — an agent-type or tenant marker, for instance. It is the supported
   way to make a decision on more than the bare id, and exists precisely so that
   "treat `caller_identity` as opaque" is advice a plugin can actually follow.
-- `upstream` names the destination. New upstreams are new values, not a proto
+- `upstream` names the destination: the name of the `[[upstream]]` instance the
+  request arrived on (see
+  <ref target="docs/configuration#upstream-instances">upstream instances</ref>),
+  and `implementation` the upstream implementation it is an instance of. In a
+  config with one instance per implementation, named after it, the two are
+  equal, which is what every earlier daemon sent in `upstream`. A plugin that
+  decodes a request with an empty `implementation` (from such a daemon) takes it
+  to be `upstream`. New upstreams and new instances are new values, not a proto
   change.
 - `correlation_id` is a grouping hint and may be empty. Depending on the
   deployment's binding it may have come from a verified claim or from an
@@ -80,10 +88,17 @@ The three response outcomes cover the three things policy can usefully say:
 - `credential_ref` — use this specific credential. The reference is opaque to
   `janus-daemon`; the plugin and the credential pool agree on what it names.
   This is how per-caller account separation works: two identities calling the
-  same upstream can be routed to different credentials.
+  same upstream can be routed to different credentials. The ref must be a
+  credential of `implementation` that the instance's credential filter admits;
+  any other ref fails the request as `credential_unavailable`, as an unknown ref
+  does. A named credential is never failed over: if the upstream rejects it, the
+  rejection is the caller's (see
+  <ref target="docs/credential-substitution#failover">failover</ref>).
 - `use_default` — this caller is fine, Janus should pick from its own default
-  chain. The explicit "yes, and I don't care which" answer, distinct from a
-  denial and from naming a credential.
+  chain, with the instance's filter and strategy (see
+  <ref target="docs/credential-substitution#credential-selection">credential
+  selection</ref>). The explicit "yes, and I don't care which" answer, distinct
+  from a denial and from naming a credential.
 - `deny_reason` — refuse the request. This is the single policy-enforcement
   hook, and deliberately not subdivided: a revoked identity, a caller not
   authorized for this upstream, and an exhausted credit or rate budget all come
@@ -138,10 +153,14 @@ itself, because they describe what happened *after* `ResolveRoute` answered:
 
 - **`call_completed`** — the request reached the upstream and a response came
   back. Payload: `caller_identity` (the same value `ResolveRoute` was given),
-  `upstream`, `status`, `credential_ref` (what was actually used, including when
-  the plugin said `use_default`), `duration_ms`, and `usage` — whatever the
-  per-upstream implementation was able to observe about what the call consumed.
-  `usage` is the "what in a response is worth observing" slot from
+  `upstream` (the instance name) and `implementation`, `status`,
+  `credential_ref` (what was actually used, including when the plugin said
+  `use_default`), `duration_ms`, `usage` — whatever the per-upstream
+  implementation was able to observe about what the call consumed — and
+  `attempts`, the credentials this request failed over from, in order, each
+  `{credential_ref, status, verdict}` with `verdict` one of
+  `credential_invalid`, `rate_limited`, `account_error` (empty without
+  failover). `usage` is the "what in a response is worth observing" slot from
   <ref target="docs/credential-substitution#general-purpose"> not specific to
   LLM providers</ref>, and is the only route by which a real cost figure reaches
   a plugin.
@@ -159,6 +178,10 @@ itself, because they describe what happened *after* `ResolveRoute` answered:
   substituted in.
 - **`account_error`** — the upstream reported a problem with the account behind
   the credential rather than with the request.
+
+  Both carry `credential_ref`, `upstream` (the instance), `implementation`,
+  `status` and `reason`, and are emitted for every rejected attempt, including
+  one a request then failed over from.
 
 Both of the first two carry the `request_id` of the `ResolveRoute` they follow.
 Exactly one of them is emitted for every request `ResolveRoute` was sent for, so

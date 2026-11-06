@@ -5,6 +5,7 @@
 //! its contents.
 
 use std::future::Future;
+use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -12,6 +13,7 @@ use axum::{Extension, Json};
 use janus_core::contract::credential::{
     CredentialKind, CredentialMetadata, MaterialDocument, NewCredential, PoolError,
 };
+use janus_core::contract::selection::Selection;
 use janus_core::contract::upstream::UpstreamKind;
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +23,22 @@ use super::error::{ApiError, Body, PathParam, Query};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListParams {
-    upstream: Option<UpstreamKind>,
+    upstream: Option<String>,
+}
+
+/// What `?upstream=<name>` selects: the `[[upstream]]` instance of that
+/// name, else (an implementation name no instance has) every credential of
+/// that implementation in chain order, else a `400`.
+pub(crate) fn selection_for(state: &AdminState, name: &str) -> Result<Arc<Selection>, ApiError> {
+    if let Some(s) = state.deps.selections.iter().find(|s| s.instance() == name) {
+        return Ok(Arc::clone(s));
+    }
+    match name.parse::<UpstreamKind>() {
+        Ok(kind) => Ok(Arc::new(Selection::implementation_wide(kind))),
+        Err(_) => Err(ApiError::bad_request(format!(
+            "unknown upstream {name:?}: not an [[upstream]] name or an implementation"
+        ))),
+    }
 }
 
 #[derive(Serialize)]
@@ -33,7 +50,19 @@ pub(crate) async fn list(
     State(state): State<AdminState>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<CredentialList>, ApiError> {
-    let credentials = state.deps.pool.list(params.upstream).await?;
+    let credentials = match params.upstream {
+        None => state.deps.pool.list(None).await?,
+        Some(name) => {
+            let selection = selection_for(&state, &name)?;
+            let mut all = state
+                .deps
+                .pool
+                .list(Some(selection.implementation()))
+                .await?;
+            all.retain(|meta| selection.admits(meta));
+            all
+        }
+    };
     Ok(Json(CredentialList { credentials }))
 }
 
@@ -47,11 +76,13 @@ pub(crate) async fn show(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DefaultParams {
-    upstream: Option<UpstreamKind>,
+    upstream: Option<String>,
+    /// For a `sticky` instance: the caller identity to peek for.
+    identity: Option<String>,
 }
 
 /// The credential the default chain would pick now, without touching its
-/// material.
+/// material or advancing a round-robin cursor.
 pub(crate) async fn peek_default(
     State(state): State<AdminState>,
     Query(params): Query<DefaultParams>,
@@ -59,7 +90,13 @@ pub(crate) async fn peek_default(
     let upstream = params
         .upstream
         .ok_or_else(|| ApiError::bad_request("`upstream` is required"))?;
-    Ok(Json(state.deps.pool.peek_default(upstream).await?))
+    let selection = selection_for(&state, &upstream)?;
+    let meta = state
+        .deps
+        .pool
+        .peek_default(&selection, params.identity.as_deref())
+        .await?;
+    Ok(Json(meta))
 }
 
 pub(crate) async fn add(
@@ -83,6 +120,25 @@ pub(crate) async fn add(
 #[serde(deny_unknown_fields)]
 pub(crate) struct MaterialBody {
     material: MaterialDocument,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TagsBody {
+    tags: Vec<String>,
+}
+
+/// Replace a pool slot's selection tags.
+pub(crate) async fn set_tags(
+    State(state): State<AdminState>,
+    Extension(principal): Extension<Principal>,
+    PathParam(credential_ref): PathParam,
+    Body(body): Body<TagsBody>,
+) -> Result<Json<CredentialMetadata>, ApiError> {
+    let change = state.deps.pool.set_tags(&credential_ref, body.tags);
+    audited(principal, "credential.set_tags", &credential_ref, change)
+        .await
+        .map(Json)
 }
 
 /// Rotation: replace the material and clear an `invalid` status.

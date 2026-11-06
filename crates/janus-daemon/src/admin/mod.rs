@@ -75,6 +75,7 @@ use std::time::SystemTime;
 
 use janus_core::contract::credential::CredentialPool;
 use janus_core::contract::paths;
+use janus_core::contract::selection::Selection;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 
@@ -96,6 +97,9 @@ pub struct AdminDeps {
     /// here. Must exist.
     pub data_dir: PathBuf,
     pub pool: Arc<dyn CredentialPool>,
+    /// Every `[[upstream]]` instance's credential selection, shared with
+    /// the data plane (so a peek sees its round-robin position).
+    pub selections: Vec<Arc<Selection>>,
     pub registry: Arc<store::Registry>,
     pub requests: Arc<store::RequestLog>,
     /// `None` without a `[plugin]` block (`plugin.mode = "none"`), the case

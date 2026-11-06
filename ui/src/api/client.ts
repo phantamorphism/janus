@@ -10,7 +10,6 @@ import type {
   RequestPage,
   RequestQuery,
   RequestRecord,
-  UpstreamKind,
 } from './types'
 
 /** A non-2xx answer from the admin API, decoded from its JSON error body. */
@@ -158,7 +157,8 @@ export class ApiClient {
 
   // ---- credentials ----
 
-  async credentials(upstream?: UpstreamKind, signal?: AbortSignal): Promise<CredentialMetadata[]> {
+  /** `upstream`: an instance name, or an implementation name no instance has. */
+  async credentials(upstream?: string, signal?: AbortSignal): Promise<CredentialMetadata[]> {
     const json = await this.send('GET', `/credentials${buildQuery({ upstream })}`, { signal })
     return listOf<CredentialMetadata>(json, 'credentials')
   }

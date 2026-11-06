@@ -17,6 +17,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::binding::Method;
+use super::credential::UpstreamFeedback;
 use super::identity::RejectionKind;
 use super::plugin::PluginFailureClass;
 use super::upstream::UpstreamKind;
@@ -100,6 +101,44 @@ impl Outcome {
     }
 }
 
+/// What the upstream's answer said about a credential a request tried and
+/// then failed over from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Verdict {
+    CredentialInvalid,
+    RateLimited,
+    AccountError,
+}
+
+impl Verdict {
+    pub fn of(feedback: &UpstreamFeedback) -> Verdict {
+        match feedback {
+            UpstreamFeedback::CredentialInvalid { .. } => Verdict::CredentialInvalid,
+            UpstreamFeedback::RateLimited { .. } => Verdict::RateLimited,
+            UpstreamFeedback::AccountError { .. } => Verdict::AccountError,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Verdict::CredentialInvalid => "credential_invalid",
+            Verdict::RateLimited => "rate_limited",
+            Verdict::AccountError => "account_error",
+        }
+    }
+}
+
+/// One credential a request tried before the one that answered it
+/// (`docs/credential-substitution#failover`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FailedAttempt {
+    pub credential_ref: String,
+    /// The upstream's HTTP status for that attempt.
+    pub status: u16,
+    pub verdict: Verdict,
+}
+
 /// One record per request that reached the data plane, including the ones
 /// rejected at identity extraction. Metadata only: never a request or
 /// response body.
@@ -109,8 +148,12 @@ pub struct RequestRecord {
     pub request_id: String,
     pub received_at: DateTime<Utc>,
     pub duration_ms: u64,
-    /// `None` when the path matched no upstream's `path_prefix`.
-    pub upstream: Option<UpstreamKind>,
+    /// The upstream instance name; `None` when the path matched no
+    /// upstream's `path_prefix`.
+    pub upstream: Option<String>,
+    /// The instance's implementation; `None` exactly when `upstream` is.
+    #[serde(default)]
+    pub implementation: Option<UpstreamKind>,
     /// The matched route path, if a route binding applied.
     pub route: Option<String>,
     /// The HTTP method.
@@ -135,6 +178,10 @@ pub struct RequestRecord {
     pub usage: Option<serde_json::Value>,
     /// A short diagnostic.
     pub error: Option<String>,
+    /// Credentials tried and failed over from before `credential_ref`, in
+    /// order; empty when the first credential answered or none was used.
+    #[serde(default)]
+    pub attempts: Vec<FailedAttempt>,
 }
 
 #[cfg(test)]
@@ -146,7 +193,8 @@ mod tests {
             request_id: "req-1".into(),
             received_at: DateTime::from_timestamp(1_700_000_000, 0).expect("ts"),
             duration_ms: 12,
-            upstream: Some(UpstreamKind::OpenAi),
+            upstream: Some("codex".into()),
+            implementation: Some(UpstreamKind::OpenAi),
             route: None,
             method: "POST".into(),
             path: "/openai/v1/chat/completions".into(),
@@ -159,6 +207,11 @@ mod tests {
             status: None,
             usage: None,
             error: None,
+            attempts: vec![FailedAttempt {
+                credential_ref: "codex-1".into(),
+                status: 401,
+                verdict: Verdict::CredentialInvalid,
+            }],
         }
     }
 
@@ -210,7 +263,9 @@ mod tests {
                 assert_eq!(json[key], value, "{name}");
             }
             assert_eq!(json["binding"], "hmac");
-            assert_eq!(json["upstream"], "openai");
+            assert_eq!(json["upstream"], "codex");
+            assert_eq!(json["implementation"], "openai");
+            assert_eq!(json["attempts"][0]["verdict"], "credential_invalid");
             assert_eq!(
                 serde_json::from_value::<RequestRecord>(json).expect("de"),
                 rec

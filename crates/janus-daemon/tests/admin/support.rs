@@ -171,6 +171,7 @@ impl Builder {
                 credential_ref: c.credential_ref.clone(),
                 upstream: c.upstream,
                 label: c.label.clone(),
+                tags: janus_core::pool::normalize_tags(c.tags.clone()),
                 source: match c.source().expect("credential source") {
                     MaterialSource::Env(var) => ConfiguredSource::Env(var),
                     MaterialSource::File(path) => ConfiguredSource::File(path),
@@ -196,6 +197,11 @@ impl Builder {
             pool: Arc::clone(&pool) as Arc<dyn CredentialPool>,
             registry: Arc::clone(store.registry()),
             requests: Arc::clone(store.requests()),
+            selections: config
+                .upstreams
+                .iter()
+                .map(|u| Arc::new(u.selection()))
+                .collect(),
             plugin,
             started_at: SystemTime::now(),
             data_plane_addr: self.data_plane_bound.unwrap_or(self.data_plane),
@@ -550,7 +556,9 @@ pub fn record(
         request_id: id.into(),
         received_at,
         duration_ms: 7,
-        upstream: Some(upstream),
+        upstream: Some(upstream.as_str().to_owned()),
+        implementation: Some(upstream),
+        attempts: Vec::new(),
         route: None,
         method: "POST".into(),
         path: format!("/{upstream}/v1/chat/completions"),

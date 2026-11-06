@@ -150,12 +150,7 @@ impl Env {
         let daemon = Daemon::start(config, embedded)
             .await
             .expect("daemon starts");
-        let records = daemon.requests().subscribe();
-        Running {
-            base: format!("http://{}", daemon.data_plane_addr()),
-            daemon,
-            records,
-        }
+        Running::new(daemon)
     }
 }
 
@@ -167,6 +162,15 @@ pub struct Running {
 }
 
 impl Running {
+    pub fn new(daemon: Daemon) -> Running {
+        let records = daemon.requests().subscribe();
+        Running {
+            base: format!("http://{}", daemon.data_plane_addr()),
+            daemon,
+            records,
+        }
+    }
+
     pub fn url(&self, path: &str) -> String {
         format!("{}{path}", self.base)
     }

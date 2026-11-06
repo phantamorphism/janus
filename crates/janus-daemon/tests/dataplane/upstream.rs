@@ -17,6 +17,10 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, Notify};
 use tokio_stream::wrappers::ReceiverStream;
 
+/// Status, response headers and body for a request's headers.
+pub type Answerer =
+    dyn Fn(&HeaderMap) -> (StatusCode, Vec<(&'static str, String)>, String) + Send + Sync;
+
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, Infallible>;
 
 /// One request as the upstream saw it.
@@ -45,6 +49,9 @@ pub enum Script {
     },
     /// Send `chunk` every 20 ms until the reader goes away.
     Endless { chunk: &'static str },
+    /// Answer by the request's headers (which upstream key it carries):
+    /// status, response headers, body.
+    ByHeaders(Arc<Answerer>),
 }
 
 pub struct Upstream {
@@ -90,6 +97,21 @@ impl Upstream {
                             .await
                             .map(|b| b.to_bytes())
                             .unwrap_or_default();
+                        let script = match script {
+                            Script::ByHeaders(answer) => {
+                                let (status, headers, body) = answer(&parts.headers);
+                                let mut response =
+                                    Response::new(Full::new(Bytes::from(body)).boxed());
+                                *response.status_mut() = status;
+                                for (name, value) in headers {
+                                    response
+                                        .headers_mut()
+                                        .insert(name, value.parse().expect("header value"));
+                                }
+                                Answer::Ready(response)
+                            }
+                            other => Answer::Scripted(other),
+                        };
                         seen.lock().expect("seen").push(Seen {
                             method: parts.method,
                             target: parts
@@ -100,7 +122,10 @@ impl Upstream {
                             headers: parts.headers,
                             body,
                         });
-                        Ok::<_, Infallible>(respond(script, abandoned))
+                        Ok::<_, Infallible>(match script {
+                            Answer::Ready(response) => response,
+                            Answer::Scripted(script) => respond(script, abandoned),
+                        })
                     }
                 });
                 tokio::spawn(async move {
@@ -131,8 +156,14 @@ impl Upstream {
     }
 }
 
+enum Answer {
+    Ready(Response<BoxBody>),
+    Scripted(Script),
+}
+
 fn respond(script: Script, abandoned: Arc<AtomicBool>) -> Response<BoxBody> {
     match script {
+        Script::ByHeaders(_) => unreachable!("answered from the request headers"),
         Script::Fixed {
             status,
             headers,

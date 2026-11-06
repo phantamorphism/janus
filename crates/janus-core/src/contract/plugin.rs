@@ -24,14 +24,20 @@ use serde::{Deserialize, Serialize};
 
 use super::proto;
 use super::request_log::AbandonStage;
+use super::request_log::FailedAttempt;
+#[cfg(test)]
+use super::request_log::Verdict;
 
 /// The `ResolveRoute` request: who is asking, for which upstream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolveRoute {
     /// Janus-assigned, unique per proxied request, never caller-supplied.
     pub request_id: String,
-    /// `"anthropic"` | `"openai"` | `"openrouter"`; additive.
+    /// The upstream instance name (`[[upstream]].name`); additive.
     pub upstream: String,
+    /// `"anthropic"` | `"openai"` | `"openrouter"`: the instance's
+    /// implementation, which a `credential_ref` answer must belong to.
+    pub implementation: String,
     /// The verified identity. Never empty: the daemon does not call
     /// `ResolveRoute` without one.
     pub caller_identity: String,
@@ -122,7 +128,12 @@ pub mod event_type {
 pub struct CallCompleted {
     /// The same value `ResolveRoute` was given.
     pub caller_identity: String,
+    /// The instance name, as in `ResolveRoute.upstream`.
     pub upstream: String,
+    /// The instance's implementation, as in `ResolveRoute.implementation`;
+    /// empty from a daemon that predates upstream instances.
+    #[serde(default)]
+    pub implementation: String,
     /// The upstream's HTTP status.
     pub status: u16,
     /// What was actually used, including when the plugin said `use_default`.
@@ -131,6 +142,11 @@ pub struct CallCompleted {
     /// Whatever the per-upstream implementation observed about what the call
     /// consumed; the same object the request log records.
     pub usage: serde_json::Value,
+    /// The credentials tried and rejected before `credential_ref`, in order
+    /// (`docs/credential-substitution#failover`); empty when the first
+    /// credential answered.
+    #[serde(default)]
+    pub attempts: Vec<FailedAttempt>,
 }
 
 /// `payload_json` of a `call_abandoned` event.
@@ -307,6 +323,7 @@ impl From<ResolveRoute> for proto::ResolveRouteRequest {
             caller_identity: r.caller_identity,
             correlation_id: r.correlation_id.unwrap_or_default(),
             identity_claims: r.identity_claims.into_iter().collect(),
+            implementation: r.implementation,
         }
     }
 }
@@ -315,8 +332,16 @@ impl TryFrom<proto::ResolveRouteRequest> for ResolveRoute {
     type Error = ProtocolError;
 
     fn try_from(r: proto::ResolveRouteRequest) -> Result<Self, Self::Error> {
+        // A daemon that predates `implementation` sends it empty; its
+        // `upstream` was always an implementation name.
+        let implementation = if r.implementation.is_empty() {
+            r.upstream.clone()
+        } else {
+            r.implementation
+        };
         let req = ResolveRoute {
             request_id: r.request_id,
+            implementation,
             upstream: r.upstream,
             caller_identity: r.caller_identity,
             correlation_id: non_empty(r.correlation_id),
@@ -548,7 +573,8 @@ mod tests {
         claims.insert("tenant".to_owned(), "acme".to_owned());
         ResolveRoute {
             request_id: "req-1".into(),
-            upstream: "anthropic".into(),
+            upstream: "claude".into(),
+            implementation: "anthropic".into(),
             caller_identity: "session-42".into(),
             correlation_id: correlation.map(str::to_owned),
             identity_claims: claims,
@@ -570,6 +596,23 @@ mod tests {
             let back = ResolveRoute::try_from(decoded).expect("valid");
             assert_eq!(back, rust);
         }
+    }
+
+    #[test]
+    fn a_request_without_implementation_is_of_the_implementation_it_names() {
+        // What a daemon that predates upstream instances sends.
+        let mut wire: proto::ResolveRouteRequest = sample_request(None).into();
+        assert_eq!(wire.implementation, "anthropic");
+        wire.upstream = "anthropic".into();
+        wire.implementation.clear();
+        let back = ResolveRoute::try_from(wire).expect("valid");
+        assert_eq!(back.upstream, "anthropic");
+        assert_eq!(back.implementation, "anthropic");
+        // A CallCompleted payload without the new fields still decodes.
+        let old = r#"{"caller_identity":"a","upstream":"openai","status":200,"credential_ref":"k","duration_ms":1,"usage":null}"#;
+        let completed: CallCompleted = serde_json::from_str(old).expect("decodes");
+        assert_eq!(completed.implementation, "");
+        assert!(completed.attempts.is_empty());
     }
 
     #[test]
@@ -681,11 +724,17 @@ mod tests {
     fn settlement_events_carry_documented_payloads() {
         let completed = CallCompleted {
             caller_identity: "session-42".into(),
-            upstream: "openai".into(),
+            upstream: "codex".into(),
+            implementation: "openai".into(),
             status: 200,
             credential_ref: "default-openai".into(),
             duration_ms: 812,
             usage: serde_json::json!({"input_tokens": 10, "output_tokens": 3}),
+            attempts: vec![FailedAttempt {
+                credential_ref: "codex-1".into(),
+                status: 429,
+                verdict: Verdict::RateLimited,
+            }],
         };
         let ev = NotifyEvent::call_completed("req-1", Some("conv".into()), &completed);
         assert_eq!(ev.event_type, event_type::CALL_COMPLETED);
@@ -698,9 +747,12 @@ mod tests {
             "credential_ref",
             "duration_ms",
             "usage",
+            "implementation",
+            "attempts",
         ] {
             assert!(raw.get(key).is_some(), "missing {key}");
         }
+        assert_eq!(raw["attempts"][0]["verdict"], "rate_limited");
         assert_eq!(ev.payload::<CallCompleted>().expect("decode"), completed);
 
         let abandoned = CallAbandoned {

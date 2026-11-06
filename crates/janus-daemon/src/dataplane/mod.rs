@@ -24,6 +24,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use janus_core::contract::credential::CredentialPool;
+use janus_core::contract::selection::Selection;
 use janus_core::contract::upstream::UpstreamKind;
 use janus_core::identity::BindingTable;
 use janus_core::proxy::{Forwarder, UpstreamSet};
@@ -37,20 +38,31 @@ pub(crate) use serve::serve;
 pub use serve::SHUTDOWN_GRACE;
 pub(crate) use tracker::Tracker;
 
-/// One `[[upstream]]` as the router sees it.
+/// One `[[upstream]]` instance as the router sees it.
 #[derive(Debug, Clone)]
 pub(crate) struct UpstreamRoute {
     pub(crate) kind: UpstreamKind,
     pub(crate) path_prefix: String,
     pub(crate) base_url: Url,
+    /// The instance's name, credential filter and strategy; shared with the
+    /// admin surface.
+    pub(crate) selection: Arc<Selection>,
+}
+
+impl UpstreamRoute {
+    /// The instance name.
+    pub(crate) fn name(&self) -> &str {
+        self.selection.instance()
+    }
 }
 
 impl From<&UpstreamConfig> for UpstreamRoute {
     fn from(up: &UpstreamConfig) -> Self {
         UpstreamRoute {
-            kind: up.name,
+            kind: up.implementation,
             path_prefix: up.path_prefix.clone(),
             base_url: up.base_url.clone(),
+            selection: Arc::new(up.selection()),
         }
     }
 }

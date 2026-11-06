@@ -20,7 +20,9 @@ use http::StatusCode;
 use janus_core::contract::binding::Method;
 use janus_core::contract::credential::UpstreamFeedback;
 use janus_core::contract::plugin::{event_type, CallAbandoned, CallCompleted, NotifyEvent};
-use janus_core::contract::request_log::{AbandonStage, Outcome, RequestRecord};
+use janus_core::contract::request_log::{
+    AbandonStage, FailedAttempt, Outcome, RequestRecord, Verdict,
+};
 use janus_core::contract::upstream::UpstreamKind;
 use janus_core::proxy::{RelayEnd, RelayOutcome};
 use serde_json::json;
@@ -36,13 +38,17 @@ struct Facts {
     started: Instant,
     method: String,
     path: String,
-    upstream: Option<UpstreamKind>,
+    /// The instance name, and its implementation.
+    upstream: Option<String>,
+    implementation: Option<UpstreamKind>,
     route: Option<String>,
     binding: Option<Method>,
     caller_identity: String,
     claimed_identity: Option<String>,
     correlation_id: Option<String>,
     credential_ref: Option<String>,
+    /// Credentials failed over from, in order.
+    attempts: Vec<FailedAttempt>,
     /// The lifecycle step the request is in; what `abandoned` names.
     stage: AbandonStage,
     /// `ResolveRoute` was sent: a settlement event is owed.
@@ -79,12 +85,14 @@ impl Settlement {
                 method: method.as_str().to_owned(),
                 path: path.to_owned(),
                 upstream: None,
+                implementation: None,
                 route: None,
                 binding: None,
                 caller_identity: String::new(),
                 claimed_identity: None,
                 correlation_id: None,
                 credential_ref: None,
+                attempts: Vec::new(),
                 stage: AbandonStage::Resolve,
                 resolve_sent: false,
             }),
@@ -101,8 +109,10 @@ impl Settlement {
         self.facts().request_id.clone()
     }
 
-    pub(super) fn upstream(&mut self, upstream: UpstreamKind) {
-        self.facts().upstream = Some(upstream);
+    pub(super) fn upstream(&mut self, instance: &str, implementation: UpstreamKind) {
+        let facts = self.facts();
+        facts.upstream = Some(instance.to_owned());
+        facts.implementation = Some(implementation);
     }
 
     pub(super) fn binding(&mut self, route: Option<&str>, method: &Method) {
@@ -135,6 +145,26 @@ impl Settlement {
         self.facts().credential_ref = Some(credential_ref.to_owned());
     }
 
+    /// The upstream answered `credential_ref` with `status`, which
+    /// `feedback` classifies, and the request is moving on to another
+    /// credential: the verdict is applied now, as it would have been had
+    /// the response been relayed, and the attempt is recorded.
+    pub(super) async fn failed_over(
+        &mut self,
+        credential_ref: String,
+        status: StatusCode,
+        feedback: &UpstreamFeedback,
+    ) {
+        let dp = Arc::clone(&self.dp);
+        let facts = self.facts();
+        apply_verdict(&dp, facts, &credential_ref, status.as_u16(), feedback).await;
+        facts.attempts.push(FailedAttempt {
+            credential_ref,
+            status: status.as_u16(),
+            verdict: Verdict::of(feedback),
+        });
+    }
+
     /// The pipeline stopped the request: record `outcome` with `reason` as
     /// its diagnostic, and send `call_abandoned` (at the current stage) if
     /// `ResolveRoute` was sent.
@@ -149,7 +179,6 @@ impl Settlement {
     /// once when it ends or is dropped.
     pub(super) fn relayed(
         mut self,
-        upstream: UpstreamKind,
         credential_ref: String,
         status: StatusCode,
         outcome: oneshot::Receiver<RelayOutcome>,
@@ -169,7 +198,7 @@ impl Settlement {
                 feedback: None,
                 end: RelayEnd::CallerDisconnected,
             });
-            settle_relayed(&dp, facts, upstream, credential_ref, outcome).await;
+            settle_relayed(&dp, facts, credential_ref, outcome).await;
         });
     }
 }
@@ -220,10 +249,52 @@ fn settle_unforwarded(dp: &Arc<DataPlane>, facts: Facts, outcome: Outcome, reaso
     );
 }
 
+/// Record what the upstream's answer said about `credential_ref` in the
+/// pool, and tell the plugin about a `credential_invalid` / `account_error`.
+async fn apply_verdict(
+    dp: &Arc<DataPlane>,
+    facts: &Facts,
+    credential_ref: &str,
+    status: u16,
+    feedback: &UpstreamFeedback,
+) {
+    if let Err(e) = dp.pool.report(credential_ref, feedback).await {
+        tracing::warn!(
+            request_id = %facts.request_id,
+            error = %e,
+            "could not record the upstream's verdict on the credential"
+        );
+    }
+    // `credential_invalid` / `account_error` go to the plugin whether or
+    // not this request was resolved through it (a `none` route's credential
+    // can be rejected too); a rate limit is the pool's business only.
+    let event = match feedback {
+        UpstreamFeedback::CredentialInvalid { reason } => {
+            Some((event_type::CREDENTIAL_INVALID, reason))
+        }
+        UpstreamFeedback::AccountError { reason } => Some((event_type::ACCOUNT_ERROR, reason)),
+        UpstreamFeedback::RateLimited { .. } => None,
+    };
+    if let (Some((event_type, reason)), Some(plugin)) = (event, &dp.plugin) {
+        plugin.notify(NotifyEvent {
+            event_type: event_type.to_owned(),
+            request_id: Some(facts.request_id.clone()),
+            correlation_id: facts.correlation_id.clone(),
+            payload_json: json!({
+                "credential_ref": credential_ref,
+                "upstream": facts.upstream,
+                "implementation": facts.implementation.map(UpstreamKind::as_str),
+                "status": status,
+                "reason": reason,
+            })
+            .to_string(),
+        });
+    }
+}
+
 async fn settle_relayed(
     dp: &Arc<DataPlane>,
     facts: Facts,
-    upstream: UpstreamKind,
     credential_ref: String,
     relay: RelayOutcome,
 ) {
@@ -231,38 +302,7 @@ async fn settle_relayed(
     let status = relay.status.as_u16();
 
     if let Some(feedback) = &relay.feedback {
-        if let Err(e) = dp.pool.report(&credential_ref, feedback).await {
-            tracing::warn!(
-                request_id = %facts.request_id,
-                error = %e,
-                "could not record the upstream's verdict on the credential"
-            );
-        }
-        // `credential_invalid` / `account_error` go to the plugin whether
-        // or not this request was resolved through it (a `none` route's
-        // credential can be rejected too); a rate limit is the pool's
-        // business only.
-        let event = match feedback {
-            UpstreamFeedback::CredentialInvalid { reason } => {
-                Some((event_type::CREDENTIAL_INVALID, reason))
-            }
-            UpstreamFeedback::AccountError { reason } => Some((event_type::ACCOUNT_ERROR, reason)),
-            UpstreamFeedback::RateLimited { .. } => None,
-        };
-        if let (Some((event_type, reason)), Some(plugin)) = (event, &dp.plugin) {
-            plugin.notify(NotifyEvent {
-                event_type: event_type.to_owned(),
-                request_id: Some(facts.request_id.clone()),
-                correlation_id: facts.correlation_id.clone(),
-                payload_json: json!({
-                    "credential_ref": credential_ref,
-                    "upstream": upstream.as_str(),
-                    "status": status,
-                    "reason": reason,
-                })
-                .to_string(),
-            });
-        }
+        apply_verdict(dp, &facts, &credential_ref, status, feedback).await;
     }
 
     if facts.resolve_sent {
@@ -272,11 +312,16 @@ async fn settle_relayed(
                 facts.correlation_id.clone(),
                 &CallCompleted {
                     caller_identity: facts.caller_identity.clone(),
-                    upstream: upstream.as_str().to_owned(),
+                    upstream: facts.upstream.clone().unwrap_or_default(),
+                    implementation: facts
+                        .implementation
+                        .map(|i| i.as_str().to_owned())
+                        .unwrap_or_default(),
                     status,
                     credential_ref: credential_ref.clone(),
                     duration_ms: duration,
                     usage: relay.usage.clone(),
+                    attempts: facts.attempts.clone(),
                 },
             ));
         }
@@ -314,6 +359,7 @@ fn submit(dp: &Arc<DataPlane>, facts: Facts, duration_ms: u64, ending: Ending) {
         received_at: facts.received_at,
         duration_ms,
         upstream: facts.upstream,
+        implementation: facts.implementation,
         route: facts.route,
         method: facts.method,
         path: facts.path,
@@ -326,6 +372,7 @@ fn submit(dp: &Arc<DataPlane>, facts: Facts, duration_ms: u64, ending: Ending) {
         status: ending.status,
         usage: ending.usage,
         error: ending.error,
+        attempts: facts.attempts,
     };
     dp.requests.try_submit(record);
 }

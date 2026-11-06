@@ -20,7 +20,6 @@ use axum::response::sse::{Event, Sse};
 use axum::Json;
 use chrono::{DateTime, Utc};
 use janus_core::contract::request_log::RequestRecord;
-use janus_core::contract::upstream::UpstreamKind;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
@@ -41,7 +40,7 @@ pub const MAX_TAILS: usize = 64;
 #[serde(deny_unknown_fields)]
 pub(crate) struct QueryParams {
     identity: Option<String>,
-    upstream: Option<UpstreamKind>,
+    upstream: Option<String>,
     outcome: Option<String>,
     credential: Option<String>,
     since: Option<DateTime<Utc>>,
@@ -107,7 +106,7 @@ pub(crate) async fn show(
 #[serde(deny_unknown_fields)]
 pub(crate) struct StreamParams {
     identity: Option<String>,
-    upstream: Option<UpstreamKind>,
+    upstream: Option<String>,
     outcome: Option<String>,
 }
 

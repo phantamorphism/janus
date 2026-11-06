@@ -48,6 +48,12 @@ struct TcpListener {
 #[derive(Deserialize)]
 struct Upstream {
     name: String,
+    implementation: String,
+    strategy: String,
+    failover: bool,
+    /// The credentials the instance may use right now, in chain order.
+    #[serde(default)]
+    eligible: Vec<String>,
     path_prefix: String,
     base_url: String,
     binding: Option<String>,
@@ -137,19 +143,43 @@ pub async fn status(ctx: &Ctx) -> Result<(), CliError> {
         ),
     ]);
     text.push('\n');
-    let mut upstreams = Table::new(&["UPSTREAM", "PREFIX", "IDENTITY", "BASE URL"]);
+    let mut upstreams = Table::new(&[
+        "UPSTREAM",
+        "IMPLEMENTATION",
+        "PREFIX",
+        "IDENTITY",
+        "STRATEGY",
+        "CREDENTIALS",
+        "BASE URL",
+    ]);
     for up in &s.upstreams {
+        let strategy = if up.failover {
+            format!("{} +failover", up.strategy)
+        } else {
+            up.strategy.clone()
+        };
+        let eligible = if up.eligible.is_empty() {
+            "-".to_owned()
+        } else {
+            up.eligible.join(",")
+        };
         upstreams.row(vec![
             up.name.clone(),
+            up.implementation.clone(),
             up.path_prefix.clone(),
             render::text(up.binding.as_deref()),
+            strategy,
+            eligible,
             up.base_url.clone(),
         ]);
         for route in &up.routes {
             upstreams.row(vec![
                 String::new(),
+                String::new(),
                 format!("{}{}", up.path_prefix, route.path),
                 route.binding.clone(),
+                String::new(),
+                String::new(),
                 String::new(),
             ]);
         }

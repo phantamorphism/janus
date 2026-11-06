@@ -29,7 +29,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use janus_core::contract::binding::Method;
-use janus_core::contract::request_log::{Outcome, RequestRecord};
+use janus_core::contract::request_log::{FailedAttempt, Outcome, RequestRecord};
 use janus_core::contract::upstream::UpstreamKind;
 use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter, Connection, ErrorCode, OptionalExtension, Row};
@@ -74,7 +74,7 @@ const PRUNE_CHUNK: i64 = 5_000;
 
 const COLUMNS: &str = "seq, request_id, received_at, duration_ms, upstream, route, method, path, \
      binding, caller_identity, claimed_identity, correlation_id, outcome, outcome_detail, \
-     credential_ref, status, usage, error";
+     credential_ref, status, usage, error, implementation, attempts";
 
 /// The filters shared by `GET /v1/requests` and `GET /v1/requests/stream`
 /// (which uses only `identity`, `upstream` and `outcome`).
@@ -82,7 +82,8 @@ const COLUMNS: &str = "seq, request_id, received_at, duration_ms, upstream, rout
 pub struct RequestFilter {
     /// Exact match on `caller_identity`.
     pub identity: Option<String>,
-    pub upstream: Option<UpstreamKind>,
+    /// Exact match on the instance name.
+    pub upstream: Option<String>,
     /// One of [`OUTCOMES`].
     pub outcome: Option<String>,
     /// Exact match on `credential_ref`.
@@ -111,7 +112,10 @@ impl RequestFilter {
         self.identity
             .as_ref()
             .is_none_or(|i| *i == record.caller_identity)
-            && self.upstream.is_none_or(|u| record.upstream == Some(u))
+            && self
+                .upstream
+                .as_ref()
+                .is_none_or(|u| record.upstream.as_ref() == Some(u))
             && self
                 .outcome
                 .as_ref()
@@ -337,7 +341,7 @@ impl RequestLog {
             }
         };
         push("caller_identity = ?", f.identity.clone());
-        push("upstream = ?", f.upstream.map(|u| u.as_str().to_owned()));
+        push("upstream = ?", f.upstream.clone());
         push("outcome = ?", f.outcome.clone());
         push("credential_ref = ?", f.credential.clone());
         push("received_at >= ?", f.since.map(ts_to_sql));
@@ -520,15 +524,16 @@ fn insert_batch(conn: &mut Connection, batch: &[RequestRecord]) -> Result<(), St
         let mut stmt = tx.prepare(
             "INSERT INTO requests (request_id, received_at, duration_ms, upstream, route, method, \
              path, binding, caller_identity, claimed_identity, correlation_id, outcome, \
-             outcome_detail, credential_ref, status, usage, error) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+             outcome_detail, credential_ref, status, usage, error, implementation, attempts) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, \
+             ?18, ?19)",
         )?;
         for r in batch {
             stmt.execute(params![
                 r.request_id,
                 ts_to_sql(r.received_at),
                 i64::try_from(r.duration_ms).unwrap_or(i64::MAX),
-                r.upstream.map(UpstreamKind::as_str),
+                r.upstream,
                 r.route,
                 r.method,
                 r.path,
@@ -542,6 +547,8 @@ fn insert_batch(conn: &mut Connection, batch: &[RequestRecord]) -> Result<(), St
                 r.status,
                 r.usage.as_ref().map(serde_json::Value::to_string),
                 r.error,
+                r.implementation.map(UpstreamKind::as_str),
+                attempts_column(&r.attempts)?,
             ])?;
         }
     }
@@ -561,6 +568,16 @@ fn outcome_detail(outcome: &Outcome) -> Result<Option<String>, StoreError> {
         .ok_or_else(|| StoreError::Invalid("outcome is not an object".into()))?;
     obj.remove("outcome");
     Ok((!obj.is_empty()).then(|| value.to_string()))
+}
+
+/// `attempts` as stored: a JSON array, or `NULL` when there were none.
+fn attempts_column(attempts: &[FailedAttempt]) -> Result<Option<String>, StoreError> {
+    if attempts.is_empty() {
+        return Ok(None);
+    }
+    serde_json::to_string(attempts)
+        .map(Some)
+        .map_err(|e| StoreError::Invalid(format!("attempts do not serialize: {e}")))
 }
 
 fn from_row(row: &Row<'_>) -> Result<(Cursor, RequestRecord), StoreError> {
@@ -585,11 +602,18 @@ fn from_row(row: &Row<'_>) -> Result<(Cursor, RequestRecord), StoreError> {
     let record = RequestRecord {
         received_at: ts_from_sql(&received_text)?,
         duration_ms: row.get::<_, i64>("duration_ms")?.max(0) as u64,
-        upstream: row
-            .get::<_, Option<String>>("upstream")?
+        upstream: row.get("upstream")?,
+        implementation: row
+            .get::<_, Option<String>>("implementation")?
             .map(|u| u.parse::<UpstreamKind>())
             .transpose()
-            .map_err(|e| corrupt("upstream", &e))?,
+            .map_err(|e| corrupt("implementation", &e))?,
+        attempts: row
+            .get::<_, Option<String>>("attempts")?
+            .map(|a| serde_json::from_str(&a))
+            .transpose()
+            .map_err(|e| corrupt("attempts", &e))?
+            .unwrap_or_default(),
         route: row.get("route")?,
         method: row.get("method")?,
         path: row.get("path")?,
@@ -640,7 +664,9 @@ mod tests {
             request_id: id.into(),
             received_at: at(secs),
             duration_ms: 7,
-            upstream: Some(UpstreamKind::OpenAi),
+            upstream: Some("openai".into()),
+            implementation: Some(UpstreamKind::OpenAi),
+            attempts: Vec::new(),
             route: None,
             method: "POST".into(),
             path: "/openai/v1/chat/completions".into(),
@@ -1004,7 +1030,13 @@ mod tests {
             rec("a", 1_000, Outcome::Forwarded),
             RequestRecord {
                 caller_identity: "sandbox-8".into(),
-                upstream: Some(UpstreamKind::Anthropic),
+                upstream: Some("claude".into()),
+                implementation: Some(UpstreamKind::Anthropic),
+                attempts: vec![FailedAttempt {
+                    credential_ref: "claude-1".into(),
+                    status: 429,
+                    verdict: janus_core::contract::request_log::Verdict::RateLimited,
+                }],
                 ..rec("b", 1_001, Outcome::Forwarded)
             },
             RequestRecord {
@@ -1042,7 +1074,7 @@ mod tests {
             ),
             (
                 RequestFilter {
-                    upstream: Some(UpstreamKind::Anthropic),
+                    upstream: Some("claude".into()),
                     ..Default::default()
                 },
                 vec!["b"],

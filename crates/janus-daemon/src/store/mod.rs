@@ -201,6 +201,8 @@ mod tests {
             received_at,
             duration_ms: 1,
             upstream: None,
+            implementation: None,
+            attempts: Vec::new(),
             route: None,
             method: "GET".into(),
             path: "/nowhere".into(),

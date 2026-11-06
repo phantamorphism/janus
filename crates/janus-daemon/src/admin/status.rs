@@ -12,6 +12,7 @@ use axum::Json;
 use chrono::{DateTime, Utc};
 use janus_core::contract::credential::CredentialStatus;
 use janus_core::contract::plugin::{PluginMode, PluginStatus};
+use janus_core::contract::selection::{CredentialFilter, Strategy};
 use janus_core::contract::upstream::UpstreamKind;
 use serde::Serialize;
 use url::Url;
@@ -49,7 +50,14 @@ pub(crate) struct TcpListenerInfo {
 /// One `[[upstream]]` with the identity binding methods that apply to it.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct UpstreamSummary {
-    name: UpstreamKind,
+    /// The instance name.
+    name: String,
+    implementation: UpstreamKind,
+    strategy: Strategy,
+    failover: bool,
+    /// `[upstream.credentials]`; `None` admits every credential of the
+    /// implementation.
+    credentials: Option<CredentialFilter>,
     path_prefix: String,
     base_url: Url,
     /// The upstream-wide binding's method; `None` when no binding resolves
@@ -74,7 +82,11 @@ pub(crate) fn upstream_summaries(
         .iter()
         .zip(bindings)
         .map(|(up, resolved)| UpstreamSummary {
-            name: up.name,
+            name: up.name.clone(),
+            implementation: up.implementation,
+            strategy: up.strategy,
+            failover: up.failover,
+            credentials: up.credentials.clone(),
             path_prefix: up.path_prefix.clone(),
             base_url: up.base_url.clone(),
             binding: resolved.binding.map(|b| b.method().name()),
@@ -88,6 +100,15 @@ pub(crate) fn upstream_summaries(
                 .collect(),
         })
         .collect())
+}
+
+/// An upstream as `/v1/status` reports it: its config, plus the credentials
+/// it admits now, usable or not, in chain order.
+#[derive(Serialize)]
+struct UpstreamStatus<'a> {
+    #[serde(flatten)]
+    summary: &'a UpstreamSummary,
+    eligible: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -122,7 +143,7 @@ struct Status<'a> {
     build: &'static str,
     started_at: DateTime<Utc>,
     listeners: &'a Listeners,
-    upstreams: &'a [UpstreamSummary],
+    upstreams: Vec<UpstreamStatus<'a>>,
     data_plane: DataPlaneSummary,
     request_log: RequestLogSummary,
     credentials: PoolSummary,
@@ -167,7 +188,26 @@ pub(crate) async fn status(
         build: BUILD,
         started_at: DateTime::<Utc>::from(state.deps.started_at),
         listeners: &state.listeners,
-        upstreams: &state.upstreams,
+        upstreams: state
+            .upstreams
+            .iter()
+            .map(|summary| UpstreamStatus {
+                summary,
+                eligible: state
+                    .deps
+                    .selections
+                    .iter()
+                    .find(|s| s.instance() == summary.name)
+                    .map(|s| {
+                        credentials
+                            .iter()
+                            .filter(|m| s.admits(m))
+                            .map(|m| m.credential_ref.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            })
+            .collect(),
         data_plane: DataPlaneSummary {
             refused_connections: state.deps.data_plane_refused.load(Ordering::Relaxed),
         },

@@ -267,6 +267,9 @@ pub struct SlotState {
     pub upstream: UpstreamKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Selection tags; absent in a slot written before tags existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// Orders the slot in the default chain: oldest first.
     pub created_at: DateTime<Utc>,
     #[serde(default)]

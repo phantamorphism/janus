@@ -22,9 +22,15 @@
 //! - `[data_plane] bind`, and `bind` / `assets_dir` of `[ui]`;
 //! - `[secrets.<name>]` (`env` or `file`): where an `hmac` binding's
 //!   `secret_ref` is resolved;
-//! - `[[credential]]` (`ref`, `upstream`, `label`, `env` or `file`): the
-//!   `env` and `file` credential sources the admin surface reports (pool
-//!   slots are discovered from the data directory instead);
+//! - `[[credential]]` (`ref`, `upstream`, `label`, `tags`, `env` or
+//!   `file`): the `env` and `file` credential sources the admin surface
+//!   reports (pool slots are discovered from the data directory instead);
+//! - `[[upstream]]` instances (`docs/configuration#upstream-instances`):
+//!   `name` is the instance name and `implementation` its implementation,
+//!   which may be left out when `name` is an implementation name;
+//!   `strategy`, `failover` and `[upstream.credentials]` are its credential
+//!   selection (`docs/credential-substitution#credential-selection`). A
+//!   filter `ref` that names a pool slot is checked when the pool opens.
 //! - upstream routing: a request belongs to the upstream whose
 //!   `path_prefix` is a whole-segment prefix of its path. `/` and nested
 //!   prefixes are refused, so at most one upstream matches. A route `path`
@@ -78,8 +84,10 @@ use std::time::Duration;
 
 use janus_core::contract::binding::{BindingError, BindingSpec, IdentityBindingConfig};
 use janus_core::contract::credential::validate_credential_ref;
+use janus_core::contract::credential::CredentialKind;
 use janus_core::contract::paths;
 use janus_core::contract::plugin::PluginMode;
+use janus_core::contract::selection::{validate_tag, CredentialFilter, Selection, Strategy};
 use janus_core::contract::upstream::UpstreamKind;
 use janus_core::proxy::token_url_refusal;
 use serde::Deserialize;
@@ -226,6 +234,9 @@ pub struct CredentialConfig {
     pub credential_ref: String,
     pub upstream: UpstreamKind,
     pub label: Option<String>,
+    /// Selection tags an `[upstream.credentials]` filter can match.
+    #[serde(default)]
+    pub tags: Vec<String>,
     /// Exactly one of `env` / `file`.
     pub env: Option<String>,
     pub file: Option<PathBuf>,
@@ -243,12 +254,16 @@ impl CredentialConfig {
     }
 }
 
-/// `[[upstream]]`.
+/// `[[upstream]]`: one upstream instance.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawUpstreamConfig")]
 pub struct UpstreamConfig {
-    /// Which upstream implementation; also the contract's `upstream` value.
-    pub name: UpstreamKind,
+    /// The instance name: the request log's and the contract's `upstream`
+    /// value, and the `?upstream=` of the admin surface.
+    pub name: String,
+    /// Which upstream implementation the instance is of; its credentials
+    /// are that implementation's.
+    pub implementation: UpstreamKind,
     /// Data-plane path prefix routed to this upstream, e.g. `/anthropic`.
     pub path_prefix: String,
     pub base_url: Url,
@@ -259,8 +274,84 @@ pub struct UpstreamConfig {
     /// `[upstream.identity]`: merged over `[identity]` field by field.
     pub identity: Option<IdentityBindingConfig>,
     /// `[[upstream.route]]`: path-specific bindings.
-    #[serde(default, rename = "route")]
     pub routes: Vec<RouteConfig>,
+    /// How the instance picks among its credentials.
+    pub strategy: Strategy,
+    /// Whether a default-chain request moves on to the next credential
+    /// when the upstream rejects the one it used.
+    pub failover: bool,
+    /// `[upstream.credentials]`: which of the implementation's credentials
+    /// the instance may use; `None` admits all of them.
+    pub credentials: Option<CredentialFilter>,
+}
+
+impl UpstreamConfig {
+    /// The instance's selection rules, with a fresh round-robin cursor.
+    pub fn selection(&self) -> Selection {
+        Selection::new(
+            self.name.clone(),
+            self.implementation,
+            self.credentials.clone().unwrap_or_default(),
+            self.strategy,
+            self.failover,
+        )
+    }
+}
+
+/// `[[upstream]]` as written, before `implementation` is settled.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawUpstreamConfig {
+    name: String,
+    implementation: Option<UpstreamKind>,
+    path_prefix: String,
+    base_url: Url,
+    token_url: Option<Url>,
+    identity: Option<IdentityBindingConfig>,
+    #[serde(default, rename = "route")]
+    routes: Vec<RouteConfig>,
+    #[serde(default)]
+    strategy: Strategy,
+    #[serde(default)]
+    failover: bool,
+    credentials: Option<CredentialFilter>,
+}
+
+impl TryFrom<RawUpstreamConfig> for UpstreamConfig {
+    type Error = String;
+
+    fn try_from(raw: RawUpstreamConfig) -> Result<Self, String> {
+        let named = raw.name.parse::<UpstreamKind>().ok();
+        let implementation = match (named, raw.implementation) {
+            (Some(named), Some(set)) if named != set => {
+                return Err(format!(
+                    "upstream {:?}: a name that is an implementation name must be an instance of that implementation; `implementation` is {set:?}",
+                    raw.name
+                ))
+            }
+            (_, Some(set)) => set,
+            (Some(named), None) => named,
+            (None, None) => {
+                return Err(format!(
+                    "upstream {:?}: `name` is not an implementation name ({}); set `implementation`",
+                    raw.name,
+                    UpstreamKind::ALL.map(UpstreamKind::as_str).join(", ")
+                ))
+            }
+        };
+        Ok(UpstreamConfig {
+            name: raw.name,
+            implementation,
+            path_prefix: raw.path_prefix,
+            base_url: raw.base_url,
+            token_url: raw.token_url,
+            identity: raw.identity,
+            routes: raw.routes,
+            strategy: raw.strategy,
+            failover: raw.failover,
+            credentials: raw.credentials,
+        })
+    }
 }
 
 /// `[[upstream.route]]`.
@@ -480,7 +571,8 @@ impl PluginConfig {
 /// The resolved identity bindings of one upstream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpstreamBindings {
-    pub upstream: UpstreamKind,
+    /// The instance name.
+    pub upstream: String,
     /// The upstream-level binding (upstream block merged over the default,
     /// or the default alone). `None`: no binding resolves, so every request
     /// not matched by a route is rejected.
@@ -629,7 +721,7 @@ impl DaemonConfig {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(UpstreamBindings {
-                    upstream: up.name,
+                    upstream: up.name.clone(),
                     binding,
                     routes,
                 })
@@ -766,7 +858,23 @@ impl DaemonConfig {
         let mut prefixes = BTreeSet::new();
         for up in &self.upstreams {
             let at = format!("upstream[{}]", up.name);
-            if !names.insert(up.name) {
+            if up.name.is_empty() {
+                return Err(invalid(
+                    "upstream[].name",
+                    "an upstream name must not be empty",
+                ));
+            }
+            if let Some(c) = up
+                .name
+                .chars()
+                .find(|c| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '_')))
+            {
+                return Err(invalid(
+                    format!("{at}.name"),
+                    format!("an upstream name uses only [A-Za-z0-9_-]; found {c:?}"),
+                ));
+            }
+            if !names.insert(up.name.as_str()) {
                 return Err(invalid(at, "upstream configured more than once"));
             }
             let p = up.path_prefix.as_str();
@@ -799,7 +907,7 @@ impl DaemonConfig {
             }
             if let Some(token_url) = &up.token_url {
                 let at = format!("{at}.token_url");
-                if up.name == UpstreamKind::OpenRouter {
+                if up.implementation == UpstreamKind::OpenRouter {
                     return Err(invalid(
                         at,
                         "openrouter has no OAuth refresh; remove `token_url`",
@@ -835,6 +943,10 @@ impl DaemonConfig {
                 }
             }
         }
+        self.validate_token_urls()?;
+        for up in &self.upstreams {
+            self.validate_selection(up)?;
+        }
         for up in self.resolve_bindings()? {
             for (at, spec) in up.located() {
                 if let BindingSpec::Hmac(h) = spec {
@@ -846,6 +958,80 @@ impl DaemonConfig {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Credentials and their refresh belong to an implementation, not to an
+    /// instance: every instance of one implementation names the same token
+    /// endpoint, or none does.
+    fn validate_token_urls(&self) -> Result<(), ConfigError> {
+        for (i, up) in self.upstreams.iter().enumerate() {
+            let first = self.upstreams[..i]
+                .iter()
+                .find(|o| o.implementation == up.implementation);
+            if let Some(first) = first {
+                if first.token_url != up.token_url {
+                    return Err(invalid(
+                        format!("upstream[{}].token_url", up.name),
+                        format!(
+                            "differs from upstream[{}].token_url; every {} instance refreshes the same credentials, so they must name the same token_url",
+                            first.name, up.implementation
+                        ),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_selection(&self, up: &UpstreamConfig) -> Result<(), ConfigError> {
+        let Some(filter) = &up.credentials else {
+            return Ok(());
+        };
+        let at = format!("upstream[{}].credentials", up.name);
+        if filter.is_empty() {
+            return Err(invalid(
+                at,
+                "an empty filter admits every credential; remove the table or set `kind`, `refs` or `tags`",
+            ));
+        }
+        if filter.kind == Some(CredentialKind::Oauth)
+            && up.implementation == UpstreamKind::OpenRouter
+        {
+            return Err(invalid(
+                format!("{at}.kind"),
+                "openrouter has no OAuth credentials; this filter would admit none",
+            ));
+        }
+        if let Some(refs) = &filter.refs {
+            let at = format!("{at}.refs");
+            if refs.is_empty() {
+                return Err(invalid(at, "an empty list admits no credential"));
+            }
+            let mut seen = BTreeSet::new();
+            for r in refs {
+                validate_credential_ref(r).map_err(|e| invalid(&at, format!("{r:?}: {e}")))?;
+                if !seen.insert(r.as_str()) {
+                    return Err(invalid(&at, format!("{r:?} is listed more than once")));
+                }
+                let other = self
+                    .credentials
+                    .iter()
+                    .find(|c| &c.credential_ref == r && c.upstream != up.implementation);
+                if let Some(other) = other {
+                    return Err(invalid(
+                        &at,
+                        format!(
+                            "credential {r:?} is for {}, not {}",
+                            other.upstream, up.implementation
+                        ),
+                    ));
+                }
+            }
+        }
+        if let Some(tags) = &filter.tags {
+            validate_tag_list(&format!("{at}.tags"), tags)?;
         }
         Ok(())
     }
@@ -864,9 +1050,27 @@ impl DaemonConfig {
                 (None, Some(path)) if !path.as_os_str().is_empty() => {}
                 _ => return Err(invalid(at, "set exactly one non-empty `env` or `file`")),
             }
+            if !cred.tags.is_empty() {
+                validate_tag_list(&format!("{at}.tags"), &cred.tags)?;
+            }
         }
         Ok(())
     }
+}
+
+/// A non-empty list of distinct, well-formed tags.
+fn validate_tag_list(at: &str, tags: &[String]) -> Result<(), ConfigError> {
+    if tags.is_empty() {
+        return Err(invalid(at, "an empty list matches no credential"));
+    }
+    let mut seen = BTreeSet::new();
+    for tag in tags {
+        validate_tag(tag).map_err(|e| invalid(at, format!("{tag:?}: {e}")))?;
+        if !seen.insert(tag.as_str()) {
+            return Err(invalid(at, format!("{tag:?} is listed more than once")));
+        }
+    }
+    Ok(())
 }
 
 /// Whether two path prefixes could both match one request: equal, or one is
@@ -971,7 +1175,8 @@ linked = true
     fn documented_binding_example_parses_and_resolves_per_docs() {
         let cfg = with_base(DOC_BINDING_EXAMPLE).expect("documented example is valid");
         assert_eq!(cfg.upstreams.len(), 2);
-        assert_eq!(cfg.upstreams[0].name, UpstreamKind::Anthropic);
+        assert_eq!(cfg.upstreams[0].name, "anthropic");
+        assert_eq!(cfg.upstreams[0].implementation, UpstreamKind::Anthropic);
         assert_eq!(
             cfg.upstreams[0].base_url.host_str(),
             Some("api.anthropic.com")
@@ -1351,6 +1556,213 @@ linked = true
             ok.credentials[0].source(),
             Some(MaterialSource::Env("OPENROUTER_API_KEY".into()))
         );
+    }
+
+    /// docs/configuration#upstream-instances: two instances of one
+    /// implementation, each with its own prefix, filter and strategy.
+    const INSTANCES_EXAMPLE: &str = r#"
+[[upstream]]
+name        = "anthropic"
+path_prefix = "/anthropic"
+base_url    = "https://api.anthropic.com"
+strategy    = "round_robin"
+failover    = true
+  [upstream.credentials]
+  kind = "api_key"
+
+[[upstream]]
+name           = "claude"
+implementation = "anthropic"
+path_prefix    = "/claude"
+base_url       = "https://api.anthropic.com"
+strategy       = "sticky"
+  [upstream.credentials]
+  kind = "oauth"
+  tags = ["max", "team"]
+
+[[credential]]
+ref      = "claude-max"
+upstream = "anthropic"
+file     = "/k/claude.json"
+tags     = ["max"]
+"#;
+
+    #[test]
+    fn upstream_instances_parse_with_their_selection() {
+        let cfg = with_base(INSTANCES_EXAMPLE).expect("valid");
+        let [api, claude] = &cfg.upstreams[..] else {
+            panic!("two upstreams")
+        };
+        assert_eq!(api.name, "anthropic");
+        assert_eq!(api.implementation, UpstreamKind::Anthropic);
+        assert_eq!(api.strategy, Strategy::RoundRobin);
+        assert!(api.failover);
+        assert_eq!(
+            api.credentials,
+            Some(CredentialFilter {
+                kind: Some(CredentialKind::ApiKey),
+                ..CredentialFilter::default()
+            })
+        );
+        assert_eq!(claude.name, "claude");
+        assert_eq!(claude.implementation, UpstreamKind::Anthropic);
+        assert_eq!(claude.strategy, Strategy::Sticky);
+        assert!(!claude.failover);
+        let sel = claude.selection();
+        assert_eq!(sel.instance(), "claude");
+        assert_eq!(
+            sel.filter().tags.as_deref(),
+            Some(&["max".to_owned(), "team".to_owned()][..])
+        );
+        assert_eq!(cfg.credentials[0].tags, vec!["max".to_owned()]);
+    }
+
+    #[test]
+    fn a_legacy_upstream_is_an_unfiltered_ordered_instance_of_its_name() {
+        let cfg = with_base(
+            "[[upstream]]\nname = \"openai\"\npath_prefix = \"/openai\"\nbase_url = \"https://api.openai.com\"\n",
+        )
+        .expect("valid");
+        let up = &cfg.upstreams[0];
+        assert_eq!(up.implementation, UpstreamKind::OpenAi);
+        assert_eq!(up.strategy, Strategy::Ordered);
+        assert!(!up.failover);
+        assert_eq!(up.credentials, None);
+        assert!(up.selection().filter().is_empty());
+        // Naming the implementation explicitly is the same thing.
+        let explicit = with_base(
+            "[[upstream]]\nname = \"openai\"\nimplementation = \"openai\"\npath_prefix = \"/openai\"\nbase_url = \"https://api.openai.com\"\n",
+        )
+        .expect("valid");
+        assert_eq!(explicit.upstreams, cfg.upstreams);
+    }
+
+    #[test]
+    fn upstream_instance_and_selection_errors_are_refused() {
+        let up = |name: &str, prefix: &str, extra: &str| {
+            format!("[[upstream]]\nname = \"{name}\"\npath_prefix = \"{prefix}\"\nbase_url = \"https://api.anthropic.com\"\n{extra}\n")
+        };
+        let claude = |extra: &str| {
+            up(
+                "claude",
+                "/claude",
+                &format!("implementation = \"anthropic\"\n{extra}"),
+            )
+        };
+        // A name that is not an implementation needs `implementation`.
+        let missing = with_base(&up("claude", "/claude", "")).expect_err("refused");
+        assert!(
+            missing.to_string().contains("set `implementation`"),
+            "{missing}"
+        );
+        // A name that is an implementation cannot be an instance of another.
+        let mismatch =
+            with_base(&up("openai", "/o", "implementation = \"anthropic\"")).expect_err("refused");
+        assert!(
+            mismatch
+                .to_string()
+                .contains("must be an instance of that implementation"),
+            "{mismatch}"
+        );
+        // Unknown strategy, unknown filter key, unknown implementation.
+        assert_eq!(err_at(&claude("strategy = \"random\"")), "<parse>");
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\nlabel = \"x\"")),
+            "<parse>"
+        );
+        assert_eq!(
+            err_at(&up("g", "/g", "implementation = \"gemini\"")),
+            "<parse>"
+        );
+        // Name grammar and uniqueness.
+        assert_eq!(
+            err_at(&up("", "/x", "implementation = \"anthropic\"")),
+            "upstream[].name"
+        );
+        assert_eq!(
+            err_at(&up("my claude", "/x", "implementation = \"anthropic\"")),
+            "upstream[my claude].name"
+        );
+        assert_eq!(
+            err_at(&format!(
+                "{}{}",
+                claude(""),
+                up("claude", "/other", "implementation = \"openai\"")
+            )),
+            "upstream[claude]"
+        );
+        // Filters.
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]")),
+            "upstream[claude].credentials"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\nrefs = []")),
+            "upstream[claude].credentials.refs"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\nrefs = [\"a\", \"a\"]")),
+            "upstream[claude].credentials.refs"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\nrefs = [\"../x\"]")),
+            "upstream[claude].credentials.refs"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\ntags = []")),
+            "upstream[claude].credentials.tags"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\ntags = [\"a b\"]")),
+            "upstream[claude].credentials.tags"
+        );
+        assert_eq!(
+            err_at(&claude("[upstream.credentials]\ntags = [\"t\", \"t\"]")),
+            "upstream[claude].credentials.tags"
+        );
+        assert_eq!(
+            err_at("[[upstream]]\nname = \"openrouter\"\npath_prefix = \"/openrouter\"\nbase_url = \"https://openrouter.ai/api\"\n[upstream.credentials]\nkind = \"oauth\"\n"),
+            "upstream[openrouter].credentials.kind"
+        );
+        // A ref that names another implementation's configured credential.
+        assert_eq!(
+            err_at(&format!(
+                "{}[[credential]]\nref = \"or\"\nupstream = \"openrouter\"\nenv = \"K\"\n",
+                claude("[upstream.credentials]\nrefs = [\"or\"]")
+            )),
+            "upstream[claude].credentials.refs"
+        );
+        // Every instance of one implementation names the same token_url.
+        assert_eq!(
+            err_at(&format!(
+                "{}{}",
+                up(
+                    "anthropic",
+                    "/anthropic",
+                    "token_url = \"http://127.0.0.1:9/t\""
+                ),
+                claude("")
+            )),
+            "upstream[claude].token_url"
+        );
+        let shared = with_base(&format!(
+            "{}{}",
+            up(
+                "anthropic",
+                "/anthropic",
+                "token_url = \"http://127.0.0.1:9/t\""
+            ),
+            claude("token_url = \"http://127.0.0.1:9/t\"")
+        ))
+        .expect("the same token_url on both instances");
+        assert_eq!(shared.upstreams.len(), 2);
+        // Credential tags.
+        let cred = |tags: &str| {
+            format!("[[credential]]\nref = \"k\"\nupstream = \"anthropic\"\nenv = \"K\"\ntags = {tags}\n")
+        };
+        assert_eq!(err_at(&cred("[\"a/b\"]")), "credential[k].tags");
+        assert_eq!(err_at(&cred("[\"a\", \"a\"]")), "credential[k].tags");
+        assert!(with_base(&cred("[]")).is_ok(), "no tags is no tags");
     }
 
     #[test]

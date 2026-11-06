@@ -93,6 +93,8 @@ impl From<PoolError> for ApiError {
             PoolError::RefreshFailed { .. } => (StatusCode::BAD_GATEWAY, "refresh_failed"),
             PoolError::InvalidMaterial { .. } => (StatusCode::BAD_REQUEST, "invalid_material"),
             PoolError::NotPoolManaged { .. } => (StatusCode::CONFLICT, "not_pool_managed"),
+            PoolError::NotEligible { .. } => (StatusCode::CONFLICT, "not_eligible"),
+            PoolError::InvalidTag(_) => (StatusCode::BAD_REQUEST, "invalid_tag"),
             PoolError::Io(_) => {
                 tracing::error!(error = %e, "credential pool I/O failed");
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal")

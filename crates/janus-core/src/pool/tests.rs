@@ -17,6 +17,7 @@ use url::Url;
 
 use super::*;
 use crate::contract::credential::{CredentialKind, Secret};
+use crate::contract::selection::{CredentialFilter, Pick, Selection, Strategy};
 use crate::contract::upstream::UsageObserver;
 
 // ---------------------------------------------------------------- fakes
@@ -268,6 +269,7 @@ fn new_cred(upstream: UpstreamKind, r: Option<&str>, doc: MaterialDocument) -> N
         upstream,
         credential_ref: r.map(str::to_owned),
         label: None,
+        tags: Vec::new(),
         material: doc,
     }
 }
@@ -295,6 +297,7 @@ fn env_cred(r: &str, upstream: UpstreamKind, var: &str, value: &str) -> Configur
         credential_ref: r.into(),
         upstream,
         label: None,
+        tags: Vec::new(),
         source: ConfiguredSource::Env(var.into()),
     }
 }
@@ -315,8 +318,12 @@ async fn resolve_all_at_once(
             let barrier = barrier.clone();
             tokio::spawn(async move {
                 barrier.wait().await;
-                pool.resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
-                    .await
+                pool.resolve(
+                    &Selection::implementation_wide(UpstreamKind::Anthropic),
+                    &CredentialChoice::Default,
+                    Pick::default(),
+                )
+                .await
             })
         })
         .collect();
@@ -389,7 +396,11 @@ async fn detects_kind_from_auth_json_as_openai_oauth_with_account() {
     assert_eq!(meta.upstream, UpstreamKind::OpenAi);
     assert_eq!(meta.kind, CredentialKind::Oauth);
     let m = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Ref("codex".into()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Ref("codex".into()),
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-codex");
@@ -406,7 +417,11 @@ async fn detects_kind_from_plain_api_key_as_openrouter() {
     assert_eq!(meta.kind, CredentialKind::ApiKey);
     assert_eq!(meta.expires_at, None);
     let m = pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "sk-or-v1-abc", "trailing newline trimmed");
@@ -419,6 +434,7 @@ async fn recorded_upstream_wins_over_file_name_detection() {
     let state = SlotState {
         upstream: UpstreamKind::OpenAi,
         label: Some("OpenAI key".into()),
+        tags: Vec::new(),
         created_at: Utc::now(),
         disabled: false,
         invalid: None,
@@ -450,7 +466,11 @@ async fn expired_credential_refreshed_before_use_and_written_back() {
     assert!(before.expires_at.is_some_and(|t| t < Utc::now()));
 
     let m = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-old+r1");
@@ -472,14 +492,22 @@ async fn expired_credential_refreshed_before_use_and_written_back() {
     assert_eq!(names(&dir), vec!["auth.json", "slot.json"]);
 
     // A fresh token is not refreshed again, here or after a restart.
-    pool.resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
-        .await
-        .expect("again");
+    pool.resolve(
+        &Selection::implementation_wide(UpstreamKind::OpenAi),
+        &CredentialChoice::Default,
+        Pick::default(),
+    )
+    .await
+    .expect("again");
     assert_eq!(fx.openai.refreshes(), 1);
     drop(pool);
     let reopened = fx.open();
     let m = reopened
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("after restart");
     assert_eq!(secret_of(&m), "at-old+r1");
@@ -507,8 +535,9 @@ async fn refresh_failure_is_request_failure_not_fallback() {
     let pool = fx.open();
     let named = pool
         .resolve(
-            UpstreamKind::Anthropic,
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
             &CredentialChoice::Ref("a-expired".into()),
+            Pick::default(),
         )
         .await;
     assert!(
@@ -516,7 +545,11 @@ async fn refresh_failure_is_request_failure_not_fallback() {
         "{named:?}"
     );
     let default = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await;
     assert!(
         matches!(&default, Err(PoolError::RefreshFailed { credential_ref, .. }) if credential_ref == "a-expired"),
@@ -539,7 +572,11 @@ async fn refresh_failure_is_request_failure_not_fallback() {
     fx.anthropic.fail_refresh.store(false, Ordering::SeqCst);
     end_refresh_backoff(&pool, "a-expired");
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(m.credential_ref, "a-expired");
@@ -575,7 +612,11 @@ async fn forced_refresh_renews_oauth_and_refuses_api_keys_without_blame() {
     assert_eq!(fx.anthropic.refreshes(), 1);
     assert_ne!(meta.expires_at, before);
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-fresh+r1");
@@ -602,6 +643,7 @@ async fn default_chain_order() {
         let state = SlotState {
             upstream: UpstreamKind::OpenRouter,
             label: None,
+            tags: Vec::new(),
             created_at: created,
             disabled: false,
             invalid: None,
@@ -639,10 +681,13 @@ async fn default_chain_order() {
     );
 
     let pick = || async {
-        pool.peek_default(UpstreamKind::OpenRouter)
-            .await
-            .expect("peek")
-            .credential_ref
+        pool.peek_default(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            None,
+        )
+        .await
+        .expect("peek")
+        .credential_ref
     };
     assert_eq!(pick().await, "cfg-b");
     pool.disable("cfg-b").await.expect("disable");
@@ -658,7 +703,11 @@ async fn default_chain_order() {
     pool.report("slot-m", &limited).await.expect("report");
     assert_eq!(pick().await, "slot-z");
     let m = pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(m.credential_ref, "slot-z");
@@ -672,13 +721,19 @@ async fn default_chain_order() {
     assert_eq!(pick().await, "slot-m");
 
     // Nothing for an upstream with no credentials.
-    let none = pool.peek_default(UpstreamKind::OpenAi).await;
+    let none = pool
+        .peek_default(&Selection::implementation_wide(UpstreamKind::OpenAi), None)
+        .await;
     assert!(
-        matches!(none, Err(PoolError::NoDefault(UpstreamKind::OpenAi))),
+        matches!(none, Err(PoolError::NoDefault(ref n)) if n == "openai"),
         "{none:?}"
     );
     let none = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await;
     assert!(matches!(none, Err(PoolError::NoDefault(_))), "{none:?}");
 }
@@ -694,7 +749,7 @@ async fn disabled_credential_not_selected() {
         .await
         .expect("add a2");
     assert_eq!(
-        pool.peek_default(UpstreamKind::OpenAi)
+        pool.peek_default(&Selection::implementation_wide(UpstreamKind::OpenAi), None)
             .await
             .expect("peek")
             .credential_ref,
@@ -704,13 +759,21 @@ async fn disabled_credential_not_selected() {
     assert_eq!(meta.status, CredentialStatus::Disabled);
     for _ in 0..3 {
         let m = pool
-            .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+            .resolve(
+                &Selection::implementation_wide(UpstreamKind::OpenAi),
+                &CredentialChoice::Default,
+                Pick::default(),
+            )
             .await
             .expect("resolve");
         assert_eq!(m.credential_ref, "a2");
     }
     let named = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Ref("a1".into()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Ref("a1".into()),
+            Pick::default(),
+        )
         .await;
     assert!(
         matches!(
@@ -725,7 +788,7 @@ async fn disabled_credential_not_selected() {
     assert_eq!(pool.show("a1").await.expect("show").request_count, 0);
     assert_eq!(pool.show("a2").await.expect("show").request_count, 3);
     assert_eq!(
-        pool.peek_default(UpstreamKind::OpenAi)
+        pool.peek_default(&Selection::implementation_wide(UpstreamKind::OpenAi), None)
             .await
             .expect("peek")
             .credential_ref,
@@ -741,7 +804,7 @@ async fn disabled_credential_not_selected() {
     );
     pool.enable("a1").await.expect("enable");
     assert_eq!(
-        pool.peek_default(UpstreamKind::OpenAi)
+        pool.peek_default(&Selection::implementation_wide(UpstreamKind::OpenAi), None)
             .await
             .expect("peek")
             .credential_ref,
@@ -755,18 +818,29 @@ async fn resolve_counts_a_use_and_peek_does_not() {
     fx.hand_slot("k", "api_key", b"sk-or-k");
     let pool = fx.open();
     let peeked = pool
-        .peek_default(UpstreamKind::OpenRouter)
+        .peek_default(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            None,
+        )
         .await
         .expect("peek");
     assert_eq!(peeked.request_count, 0);
     assert_eq!(peeked.last_used_at, None);
     let t0 = Utc::now();
-    pool.resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
-        .await
-        .expect("resolve");
-    pool.resolve(UpstreamKind::OpenRouter, &CredentialChoice::Ref("k".into()))
-        .await
-        .expect("resolve");
+    pool.resolve(
+        &Selection::implementation_wide(UpstreamKind::OpenRouter),
+        &CredentialChoice::Default,
+        Pick::default(),
+    )
+    .await
+    .expect("resolve");
+    pool.resolve(
+        &Selection::implementation_wide(UpstreamKind::OpenRouter),
+        &CredentialChoice::Ref("k".into()),
+        Pick::default(),
+    )
+    .await
+    .expect("resolve");
     let meta = pool.show("k").await.expect("show");
     assert_eq!(meta.request_count, 2);
     assert!(meta.last_used_at.is_some_and(|t| t >= t0));
@@ -779,8 +853,9 @@ async fn named_ref_errors_never_fall_through() {
     let pool = fx.open();
     let missing = pool
         .resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("nope".into()),
+            Pick::default(),
         )
         .await;
     assert!(
@@ -788,7 +863,11 @@ async fn named_ref_errors_never_fall_through() {
         "{missing:?}"
     );
     let wrong = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Ref("or".into()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Ref("or".into()),
+            Pick::default(),
+        )
         .await;
     assert!(
         matches!(
@@ -832,8 +911,9 @@ async fn upstream_rejection_marks_invalid_until_rotation_clears_it() {
         .is_some_and(|e| e.contains("401")));
     let named = pool
         .resolve(
-            UpstreamKind::Anthropic,
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
             &CredentialChoice::Ref("ant".into()),
+            Pick::default(),
         )
         .await;
     assert!(
@@ -855,7 +935,11 @@ async fn upstream_rejection_marks_invalid_until_rotation_clears_it() {
         CredentialStatus::Invalid
     );
     let none = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await;
     assert!(matches!(none, Err(PoolError::NoDefault(_))), "{none:?}");
 
@@ -867,7 +951,11 @@ async fn upstream_rejection_marks_invalid_until_rotation_clears_it() {
     assert_eq!(names(&slot_dir), vec![".credentials.json", "slot.json"]);
     assert_eq!(mode(&slot_dir.join(".credentials.json")), 0o600);
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-new");
@@ -897,8 +985,9 @@ async fn rate_limit_backs_off_and_account_errors_are_recorded() {
     );
     let named = pool
         .resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("or".into()),
+            Pick::default(),
         )
         .await;
     assert!(
@@ -950,6 +1039,7 @@ async fn add_writes_a_private_slot_that_is_live_at_once() {
             upstream: UpstreamKind::Anthropic,
             credential_ref: Some("team-a".into()),
             label: Some("Team A".into()),
+            tags: Vec::new(),
             material: MaterialDocument::new(claude_json("at-team", hours(8))),
         })
         .await
@@ -967,8 +1057,9 @@ async fn add_writes_a_private_slot_that_is_live_at_once() {
     assert_eq!(names(&fx.pool_dir()), vec!["team-a"], "no scratch left");
     let m = pool
         .resolve(
-            UpstreamKind::Anthropic,
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
             &CredentialChoice::Ref("team-a".into()),
+            Pick::default(),
         )
         .await
         .expect("live without reopening");
@@ -1069,7 +1160,11 @@ async fn add_refuses_taken_refs_bad_material_and_unknown_upstreams() {
     );
     // The existing slot is untouched by the refused duplicate.
     let m = pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Ref("k".into()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Ref("k".into()),
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "sk-k");
@@ -1104,8 +1199,9 @@ async fn delete_removes_the_slot_and_config_credentials_are_not_pool_managed() {
     ));
     let r = pool
         .resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("gone".into()),
+            Pick::default(),
         )
         .await;
     assert!(matches!(r, Err(PoolError::NotFound(_))), "{r:?}");
@@ -1160,12 +1256,14 @@ async fn env_and_file_sources_are_reported_and_file_refresh_writes_back() {
             credential_ref: "file-oauth".into(),
             upstream: UpstreamKind::OpenAi,
             label: Some("codex".into()),
+            tags: Vec::new(),
             source: ConfiguredSource::File(auth.clone()),
         },
         ConfiguredCredential {
             credential_ref: "file-key".into(),
             upstream: UpstreamKind::OpenRouter,
             label: None,
+            tags: Vec::new(),
             source: ConfiguredSource::File(keyfile),
         },
     ];
@@ -1188,8 +1286,9 @@ async fn env_and_file_sources_are_reported_and_file_refresh_writes_back() {
 
     let m = pool
         .resolve(
-            UpstreamKind::OpenAi,
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
             &CredentialChoice::Ref("file-oauth".into()),
+            Pick::default(),
         )
         .await
         .expect("resolve");
@@ -1198,7 +1297,11 @@ async fn env_and_file_sources_are_reported_and_file_refresh_writes_back() {
     assert_eq!(on_disk["tokens"]["access_token"], "at-file+r1");
     assert_eq!(mode(&auth), 0o640, "the file's own mode is kept");
     let m = pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(
@@ -1220,6 +1323,7 @@ async fn material_changed_on_disk_is_reloaded() {
         credential_ref: "codex".into(),
         upstream: UpstreamKind::OpenAi,
         label: None,
+        tags: Vec::new(),
         source: ConfiguredSource::File(auth.clone()),
     }];
     let slot_dir = fx.hand_slot("or", "api_key", b"sk-or-old");
@@ -1232,12 +1336,20 @@ async fn material_changed_on_disk_is_reloaded() {
     .expect("rewrite");
     fs::write(slot_dir.join("api_key"), b"sk-or-new-and-longer").expect("rewrite");
     let m = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-2-from-cli");
     let m = pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "sk-or-new-and-longer");
@@ -1251,6 +1363,7 @@ async fn open_refuses_bad_config_credentials() {
         credential_ref: "x".into(),
         upstream: UpstreamKind::OpenRouter,
         label: None,
+        tags: Vec::new(),
         source: ConfiguredSource::Env("JANUS_POOL_T_DEFINITELY_UNSET".into()),
     };
     assert!(matches!(
@@ -1306,7 +1419,11 @@ async fn path_traversal_refs_are_refused_everywhere() {
             "enable {bad:?}"
         );
         let r = pool
-            .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Ref(bad.into()))
+            .resolve(
+                &Selection::implementation_wide(UpstreamKind::OpenRouter),
+                &CredentialChoice::Ref(bad.into()),
+                Pick::default(),
+            )
             .await;
         assert!(
             matches!(r, Err(PoolError::InvalidRef(_))),
@@ -1443,7 +1560,11 @@ async fn concurrent_refresh_failure_is_single_flight_and_backs_off() {
 
     // Within the back-off, a new request does not call the endpoint either.
     let again = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await;
     assert!(
         matches!(&again, Err(PoolError::RefreshFailed { reason, .. }) if reason.contains("not retried before")),
@@ -1454,7 +1575,11 @@ async fn concurrent_refresh_failure_is_single_flight_and_backs_off() {
     // After it, one request tries again.
     end_refresh_backoff(&pool, "spent");
     let retried = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await;
     assert!(matches!(retried, Err(PoolError::RefreshFailed { .. })));
     assert_eq!(fx.anthropic.refreshes(), 2);
@@ -1473,7 +1598,11 @@ async fn concurrent_refresh_failure_is_single_flight_and_backs_off() {
     .await
     .expect("rotate");
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("new material refreshes at once");
     assert_eq!(secret_of(&m), "at-new+r4");
@@ -1487,7 +1616,11 @@ async fn refreshed_token_that_is_already_expiring_is_refused() {
     let dir = fx.hand_slot("claude", ".credentials.json", &body);
     let pool = fx.open();
     let err = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect_err("stale refresh");
     assert!(
@@ -1510,7 +1643,14 @@ async fn status_is_checked_again_after_waiting_on_a_refresh() {
     let step = || tokio::time::sleep(Duration::from_millis(60));
     let resolve = |choice: CredentialChoice| {
         let pool = pool.clone();
-        tokio::spawn(async move { pool.resolve(UpstreamKind::Anthropic, &choice).await })
+        tokio::spawn(async move {
+            pool.resolve(
+                &Selection::implementation_wide(UpstreamKind::Anthropic),
+                &choice,
+                Pick::default(),
+            )
+            .await
+        })
     };
 
     // The first request refreshes `a` (holding it for 300ms); the operator
@@ -1554,7 +1694,14 @@ async fn default_pick_removed_while_waiting_moves_to_the_next() {
     let (_fx, pool) = slow_refresh_pool_a_expired_b_healthy().await;
     let resolve = |choice: CredentialChoice| {
         let pool = pool.clone();
-        tokio::spawn(async move { pool.resolve(UpstreamKind::Anthropic, &choice).await })
+        tokio::spawn(async move {
+            pool.resolve(
+                &Selection::implementation_wide(UpstreamKind::Anthropic),
+                &choice,
+                Pick::default(),
+            )
+            .await
+        })
     };
     let first = resolve(CredentialChoice::Default);
     tokio::time::sleep(Duration::from_millis(60)).await;
@@ -1632,7 +1779,11 @@ async fn bare_string_keys_are_stored_canonically_and_survive_a_restart() {
         ("oai", UpstreamKind::OpenAi, "sk-proj-z"),
     ] {
         let m = pool
-            .resolve(upstream, &CredentialChoice::Ref(r.into()))
+            .resolve(
+                &Selection::implementation_wide(upstream),
+                &CredentialChoice::Ref(r.into()),
+                Pick::default(),
+            )
             .await
             .expect("resolve");
         assert_eq!(secret_of(&m), key, "{r}");
@@ -1647,6 +1798,7 @@ async fn slots_holding_a_key_as_a_json_string_open() {
     let state = SlotState {
         upstream: UpstreamKind::OpenRouter,
         label: None,
+        tags: Vec::new(),
         created_at: Utc::now(),
         disabled: false,
         invalid: None,
@@ -1659,16 +1811,18 @@ async fn slots_holding_a_key_as_a_json_string_open() {
     let pool = fx.try_open(Vec::new()).expect("open");
     let m = pool
         .resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("legacy".into()),
+            Pick::default(),
         )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "sk-legacy");
     let m = pool
         .resolve(
-            UpstreamKind::Anthropic,
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
             &CredentialChoice::Ref("legacy-ant".into()),
+            Pick::default(),
         )
         .await
         .expect("resolve");
@@ -1685,6 +1839,7 @@ async fn half_written_config_file_is_an_error_not_a_key() {
         credential_ref: "codex".into(),
         upstream: UpstreamKind::OpenAi,
         label: None,
+        tags: Vec::new(),
         source: ConfiguredSource::File(auth.clone()),
     }];
     let pool = fx.try_open(configured.clone()).expect("open");
@@ -1695,7 +1850,11 @@ async fn half_written_config_file_is_an_error_not_a_key() {
     )
     .expect("truncate");
     let err = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect_err("half-written file");
     assert!(matches!(err, PoolError::InvalidMaterial { .. }), "{err:?}");
@@ -1706,7 +1865,11 @@ async fn half_written_config_file_is_an_error_not_a_key() {
     let done = serde_json::to_vec(&codex_json("at-2", hours(2))).expect("json");
     fs::write(&auth, &done).expect("finish");
     let m = pool
-        .resolve(UpstreamKind::OpenAi, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenAi),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-2");
@@ -1743,7 +1906,11 @@ async fn interrupted_rotation_opens_with_the_recorded_material() {
     fs::write(dir.join(".credentials.json"), &oauth).expect("write");
     let pool = fx.try_open(Vec::new()).expect("open");
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "sk-ant-old");
@@ -1757,7 +1924,11 @@ async fn interrupted_rotation_opens_with_the_recorded_material() {
     slot::write_state(&dir, &state).expect("slot.json");
     let pool = fx.try_open(Vec::new()).expect("open");
     let m = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("resolve");
     assert_eq!(secret_of(&m), "at-new");
@@ -1860,14 +2031,22 @@ async fn material_never_in_debug_output() {
     seen.push(format!("{refused} {refused:?}"));
     fx.anthropic.fail_refresh.store(true, Ordering::SeqCst);
     let failed = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect_err("refresh fails");
     seen.push(format!("{failed} {failed:?}"));
     fx.anthropic.fail_refresh.store(false, Ordering::SeqCst);
     end_refresh_backoff(&pool, "claude");
     let material = pool
-        .resolve(UpstreamKind::Anthropic, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("refreshed");
     assert!(
@@ -1877,14 +2056,16 @@ async fn material_never_in_debug_output() {
     seen.push(format!("{material:?}"));
     for m in [
         pool.resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("env-key".into()),
+            Pick::default(),
         )
         .await
         .expect("env"),
         pool.resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("added".into()),
+            Pick::default(),
         )
         .await
         .expect("added"),
@@ -1929,4 +2110,278 @@ async fn material_never_in_debug_output() {
         "{log_text}"
     );
     assert!(!all.contains("SECRET"), "material leaked:\n{all}");
+}
+
+/// Three Anthropic API keys `k1`..`k3` added in that order, and one OAuth
+/// credential `sub` added last.
+async fn selection_pool(fx: &Fixture) -> FilePool {
+    let pool = fx.open();
+    for (r, tags) in [("k1", vec!["team"]), ("k2", vec![]), ("k3", vec!["team"])] {
+        let mut new = new_cred(
+            UpstreamKind::Anthropic,
+            Some(r),
+            key_doc(&format!("sk-{r}")),
+        );
+        new.tags = tags.into_iter().map(str::to_owned).collect();
+        pool.add(new).await.expect("add key");
+    }
+    pool.add(new_cred(
+        UpstreamKind::Anthropic,
+        Some("sub"),
+        MaterialDocument::new(claude_json("tok-sub", hours(5))),
+    ))
+    .await
+    .expect("add oauth");
+    pool
+}
+
+fn instance(filter: CredentialFilter, strategy: Strategy) -> Selection {
+    Selection::new("inst", UpstreamKind::Anthropic, filter, strategy, false)
+}
+
+async fn picks(
+    pool: &FilePool,
+    selection: &Selection,
+    identity: Option<&str>,
+    n: usize,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    for _ in 0..n {
+        let pick = Pick {
+            identity,
+            exclude: &[],
+        };
+        let m = pool
+            .resolve(selection, &CredentialChoice::Default, pick)
+            .await
+            .expect("resolve");
+        out.push(m.credential_ref);
+    }
+    out
+}
+
+#[tokio::test]
+async fn ordered_strategy_takes_the_first_admitted_credential() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    let all = instance(CredentialFilter::default(), Strategy::Ordered);
+    assert_eq!(picks(&pool, &all, None, 3).await, ["k1", "k1", "k1"]);
+    let oauth = instance(
+        CredentialFilter {
+            kind: Some(CredentialKind::Oauth),
+            ..CredentialFilter::default()
+        },
+        Strategy::Ordered,
+    );
+    assert_eq!(picks(&pool, &oauth, None, 2).await, ["sub", "sub"]);
+    pool.disable("k1").await.expect("disable");
+    assert_eq!(picks(&pool, &all, None, 1).await, ["k2"]);
+}
+
+#[tokio::test]
+async fn round_robin_spreads_over_admitted_credentials_and_skips_unusable_ones() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    let keys = instance(
+        CredentialFilter {
+            kind: Some(CredentialKind::ApiKey),
+            ..CredentialFilter::default()
+        },
+        Strategy::RoundRobin,
+    );
+    assert_eq!(
+        pool.peek_default(&keys, None)
+            .await
+            .expect("peek")
+            .credential_ref,
+        "k1"
+    );
+    assert_eq!(
+        picks(&pool, &keys, None, 6).await,
+        ["k1", "k2", "k3", "k1", "k2", "k3"]
+    );
+    // A peek does not advance the cursor.
+    let peeked = pool.peek_default(&keys, None).await.expect("peek");
+    assert_eq!(picks(&pool, &keys, None, 1).await, [peeked.credential_ref]);
+    pool.report(
+        "k2",
+        &UpstreamFeedback::RateLimited {
+            until: Some(hours(1)),
+        },
+    )
+    .await
+    .expect("report");
+    let spread = picks(&pool, &keys, None, 4).await;
+    assert!(!spread.contains(&"k2".to_owned()), "{spread:?}");
+    assert!(spread.contains(&"k1".to_owned()) && spread.contains(&"k3".to_owned()));
+}
+
+#[tokio::test]
+async fn least_recently_used_takes_the_credential_picked_longest_ago() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    let keys = instance(
+        CredentialFilter {
+            refs: Some(vec!["k1".into(), "k2".into(), "k3".into()]),
+            ..CredentialFilter::default()
+        },
+        Strategy::LeastRecentlyUsed,
+    );
+    assert_eq!(picks(&pool, &keys, None, 3).await, ["k1", "k2", "k3"]);
+    // A pick through another instance counts: k1 is now the most recent.
+    let ordered = instance(CredentialFilter::default(), Strategy::Ordered);
+    assert_eq!(picks(&pool, &ordered, None, 1).await, ["k1"]);
+    assert_eq!(picks(&pool, &keys, None, 3).await, ["k2", "k3", "k1"]);
+    // A named credential is not a default-chain pick.
+    pool.resolve(&keys, &CredentialChoice::Ref("k2".into()), Pick::default())
+        .await
+        .expect("named");
+    assert_eq!(picks(&pool, &keys, None, 1).await, ["k2"]);
+}
+
+#[tokio::test]
+async fn sticky_keeps_an_identity_on_one_credential_and_moves_only_its_holders() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    let keys = instance(
+        CredentialFilter {
+            kind: Some(CredentialKind::ApiKey),
+            ..CredentialFilter::default()
+        },
+        Strategy::Sticky,
+    );
+    let callers: Vec<String> = (0..24).map(|i| format!("caller-{i}")).collect();
+    let mut before = BTreeMap::new();
+    for c in &callers {
+        let got = picks(&pool, &keys, Some(c), 3).await;
+        assert!(got.iter().all(|r| r == &got[0]), "{c}: {got:?}");
+        assert_eq!(
+            pool.peek_default(&keys, Some(c))
+                .await
+                .expect("peek")
+                .credential_ref,
+            got[0]
+        );
+        before.insert(c.clone(), got[0].clone());
+    }
+    let used: std::collections::BTreeSet<_> = before.values().collect();
+    assert!(used.len() > 1, "24 identities over 3 keys spread: {used:?}");
+    // No identity: ordered.
+    assert_eq!(picks(&pool, &keys, None, 2).await, ["k1", "k1"]);
+    pool.disable("k2").await.expect("disable");
+    for c in &callers {
+        let now = &picks(&pool, &keys, Some(c), 1).await[0];
+        if before[c] != "k2" {
+            assert_eq!(now, &before[c], "{c} stays put");
+        } else {
+            assert_ne!(now, "k2");
+        }
+    }
+}
+
+#[tokio::test]
+async fn filters_restrict_by_kind_refs_and_tags_and_exclusions_are_honoured() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    let team = instance(
+        CredentialFilter {
+            tags: Some(vec!["team".into()]),
+            ..CredentialFilter::default()
+        },
+        Strategy::Ordered,
+    );
+    assert_eq!(picks(&pool, &team, None, 1).await, ["k1"]);
+    let exclude = vec!["k1".to_owned()];
+    let next = pool
+        .resolve(
+            &team,
+            &CredentialChoice::Default,
+            Pick {
+                identity: None,
+                exclude: &exclude,
+            },
+        )
+        .await
+        .expect("next");
+    assert_eq!(next.credential_ref, "k3");
+    let exclude = vec!["k1".to_owned(), "k3".to_owned()];
+    let none = pool
+        .resolve(
+            &team,
+            &CredentialChoice::Default,
+            Pick {
+                identity: None,
+                exclude: &exclude,
+            },
+        )
+        .await;
+    assert!(
+        matches!(&none, Err(PoolError::NoDefault(n)) if n == "inst"),
+        "{none:?}"
+    );
+    // A named credential outside the filter is refused, not substituted.
+    let named = pool
+        .resolve(&team, &CredentialChoice::Ref("k2".into()), Pick::default())
+        .await;
+    assert!(
+        matches!(&named, Err(PoolError::NotEligible { credential_ref, instance })
+            if credential_ref == "k2" && instance == "inst"),
+        "{named:?}"
+    );
+    let openrouter = Selection::implementation_wide(UpstreamKind::OpenRouter);
+    let wrong = pool
+        .resolve(
+            &openrouter,
+            &CredentialChoice::Ref("k1".into()),
+            Pick::default(),
+        )
+        .await;
+    assert!(
+        matches!(wrong, Err(PoolError::WrongUpstream { .. })),
+        "{wrong:?}"
+    );
+}
+
+#[tokio::test]
+async fn tags_are_validated_persisted_and_settable_on_pool_slots_only() {
+    let fx = Fixture::new();
+    let pool = selection_pool(&fx).await;
+    assert_eq!(pool.show("k1").await.expect("show").tags, ["team"]);
+    let meta = pool
+        .set_tags("k2", vec!["b".into(), "a".into(), "b".into()])
+        .await
+        .expect("tag");
+    assert_eq!(meta.tags, ["a", "b"]);
+    let bad = pool.set_tags("k2", vec!["no spaces".into()]).await;
+    assert!(matches!(bad, Err(PoolError::InvalidTag(_))), "{bad:?}");
+    let mut bad_add = new_cred(UpstreamKind::Anthropic, Some("k9"), key_doc("sk-k9"));
+    bad_add.tags = vec![String::new()];
+    assert!(matches!(
+        pool.add(bad_add).await,
+        Err(PoolError::InvalidTag(_))
+    ));
+    drop(pool);
+
+    let pool = fx.open();
+    assert_eq!(pool.show("k2").await.expect("show").tags, ["a", "b"]);
+    drop(pool);
+
+    let configured = env_cred(
+        "cfg",
+        UpstreamKind::Anthropic,
+        "JANUS_POOL_TEST_TAG_KEY",
+        "sk-cfg",
+    );
+    let pool = fx
+        .try_open(vec![ConfiguredCredential {
+            tags: vec!["cfg-tag".into()],
+            ..configured
+        }])
+        .expect("open");
+    assert_eq!(pool.show("cfg").await.expect("show").tags, ["cfg-tag"]);
+    let refused = pool.set_tags("cfg", vec!["x".into()]).await;
+    assert!(
+        matches!(refused, Err(PoolError::NotPoolManaged { .. })),
+        "{refused:?}"
+    );
 }

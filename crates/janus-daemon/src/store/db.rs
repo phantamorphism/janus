@@ -62,6 +62,13 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX requests_received_at ON requests (received_at);
     CREATE INDEX requests_identity_received_at ON requests (caller_identity, received_at);
     CREATE INDEX requests_request_id ON requests (request_id);",
+    // 2: upstream instances (docs/configuration#upstream-instances).
+    // `upstream` now holds the instance name; `implementation` its
+    // implementation, which is what `upstream` held in every older row;
+    // `attempts` the credentials failed over from, as a JSON array.
+    "ALTER TABLE requests ADD COLUMN implementation TEXT;
+    ALTER TABLE requests ADD COLUMN attempts TEXT;
+    UPDATE requests SET implementation = upstream WHERE upstream IS NOT NULL;",
 ];
 
 /// The schema version this build writes.
@@ -230,6 +237,52 @@ mod tests {
             assert_eq!(mode & 0o777, 0o600, "{}", file.display());
         }
         drop(conn);
+    }
+
+    #[test]
+    fn migration_2_backfills_the_implementation_of_every_older_row() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("janus.db");
+        // A version-1 file, as a release before upstream instances left it.
+        let conn = Connection::open(&path).expect("raw open");
+        conn.execute_batch(MIGRATIONS[0]).expect("migration 1");
+        conn.pragma_update(None, "user_version", 1)
+            .expect("version");
+        conn.execute_batch(
+            "INSERT INTO requests (request_id, received_at, duration_ms, upstream, method, path, caller_identity, outcome)
+             VALUES ('old-1', '2026-01-01T00:00:00.000000000Z', 1, 'anthropic', 'POST', '/anthropic/v1/messages', 'a', 'forwarded'),
+                    ('old-2', '2026-01-01T00:00:01.000000000Z', 1, NULL, 'GET', '/nowhere', '', 'rejected_identity');",
+        )
+        .expect("old rows");
+        drop(conn);
+
+        let conn = open(&path).expect("migrates");
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .expect("user_version");
+        assert_eq!(version, schema_version());
+        type Row = (String, Option<String>, Option<String>, Option<String>);
+        let rows: Vec<Row> = conn
+            .prepare(
+                "SELECT request_id, upstream, implementation, attempts FROM requests ORDER BY seq",
+            )
+            .expect("prepare")
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .expect("query")
+            .collect::<Result<_, _>>()
+            .expect("rows");
+        assert_eq!(
+            rows,
+            [
+                (
+                    "old-1".into(),
+                    Some("anthropic".into()),
+                    Some("anthropic".into()),
+                    None
+                ),
+                ("old-2".into(), None, None, None),
+            ]
+        );
     }
 
     #[test]

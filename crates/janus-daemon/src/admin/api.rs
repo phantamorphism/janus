@@ -150,6 +150,7 @@ fn v1(state: AdminState) -> Router {
         .route("/credentials/{ref}/enable", post(credentials::enable))
         .route("/credentials/{ref}/disable", post(credentials::disable))
         .route("/credentials/{ref}/refresh", post(credentials::refresh))
+        .route("/credentials/{ref}/tags", put(credentials::set_tags))
         .route(
             "/identities",
             get(identities::list).post(identities::create),
