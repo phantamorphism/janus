@@ -8,8 +8,10 @@
 //!   ChatGPT backend, whose Codex API is the platform API's `/v1` surface
 //!   unversioned (`/v1/responses` -> `<codex base>/responses`), so an OAuth
 //!   request is targeted there ([`CODEX_BASE_URL`] unless configured with
-//!   [`OpenAiUpstream::with_codex_base_url`]); a path outside that surface
-//!   is refused.
+//!   [`OpenAiUpstream::with_codex_base_url`]). The Codex CLI addresses that
+//!   API without `/v1` (it appends `/responses` to its base URL), so a path
+//!   without the `/v1` segment is taken as the Codex API's own and joined
+//!   to the Codex base as is; nothing can leave that base.
 //! - Material: a plain API key, or `auth.json` (`{"auth_mode",
 //!   "OPENAI_API_KEY", "tokens": {"id_token", "access_token",
 //!   "refresh_token", "account_id"}, "last_refresh"}`): `auth_mode =
@@ -66,6 +68,7 @@ const CHATGPT_ACCOUNT_ID: HeaderName = HeaderName::from_static("chatgpt-account-
 
 forwarding_allowlist! {
     static FORWARDED = [
+    "content-encoding",
     "openai-beta",
     "originator",
     "x-codex-installation-id",
@@ -110,11 +113,14 @@ impl OpenAiUpstream {
         self
     }
 
-    /// The Codex-backend equivalent of a platform-API target: the part of
-    /// the path after the `/v1` segment, on the Codex base. That segment is
-    /// either the last of `base_url`'s path (`https://proxy.corp/openai/v1`)
-    /// or the first of `rest`; a `/v1` anywhere else (`/dashboard/v1/x`,
-    /// `/v1x/v1/...`) is not the platform surface, and is refused.
+    /// The Codex-backend equivalent of a target: on the Codex base, either
+    /// the platform API's `/v1` surface unversioned, or a Codex-native path
+    /// as is. The `/v1` segment is either the last of `base_url`'s path
+    /// (`https://proxy.corp/openai/v1`) or the first of `rest`
+    /// (`/v1/responses`). Without one, `rest` is already the Codex API's own
+    /// path (`/responses`, `/models`), which is what the Codex CLI appends to
+    /// its base URL. Either way the result lies below the Codex base:
+    /// [`join_base`] refuses a path that escapes it.
     fn codex_target(&self, base_url: &Url, rest: &str) -> Result<Url, UpstreamError> {
         let (path, query) = match rest.split_once('?') {
             Some((path, query)) => (path, Some(query)),
@@ -128,7 +134,7 @@ impl OpenAiUpstream {
         } else if path.starts_with("/v1/") {
             &path["/v1".len()..]
         } else {
-            return Err(UpstreamError::BadPath(rest.to_owned()));
+            path
         };
         let rest = match query {
             Some(query) => format!("{after}?{query}"),
@@ -366,6 +372,10 @@ mod tests {
                     HeaderName::from_static("originator"),
                     "codex_cli_rs".parse().unwrap(),
                 ),
+                // A zstd-compressed request body: dropping the header would
+                // hand the backend bytes it cannot read.
+                (header::CONTENT_ENCODING, "zstd".parse().unwrap()),
+                (header::COOKIE, "caller=secret".parse().unwrap()),
             ]
             .into_iter()
             .collect(),
@@ -399,6 +409,8 @@ mod tests {
         assert_eq!(got.headers["authorization"], "Bearer eyJ-access");
         assert_eq!(got.headers["chatgpt-account-id"], "acct-123");
         assert_eq!(got.headers["originator"], "codex_cli_rs");
+        assert_eq!(got.headers["content-encoding"], "zstd");
+        assert!(got.headers.get("cookie").is_none());
     }
 
     #[test]
@@ -432,32 +444,60 @@ mod tests {
             target(platform, "/v1", CredentialKind::Oauth).unwrap(),
             "https://chatgpt.com/backend-api/codex"
         );
-        // `/v1` must be the surface's own segment, not one found anywhere.
-        for outside in [
-            "/dashboard/x",
-            "/dashboard/v1/x",
-            "/v1x/v1/responses",
-            "/v1x",
-            "/x/v1",
+        // The Codex CLI's own form: no `/v1`, the path as is on the Codex
+        // base (what it sends when its base URL is `<janus>/openai`).
+        for (rest, want) in [
+            ("/responses", "/responses"),
+            (
+                "/models?client_version=0.133.0",
+                "/models?client_version=0.133.0",
+            ),
+            ("/responses/compact", "/responses/compact"),
+            ("/", "/"),
+            ("", ""),
         ] {
-            assert!(
-                matches!(
-                    target(platform, outside, CredentialKind::Oauth),
-                    Err(UpstreamError::BadPath(_))
-                ),
-                "{outside}"
+            assert_eq!(
+                target(platform, rest, CredentialKind::Oauth).unwrap(),
+                format!("https://chatgpt.com/backend-api/codex{want}"),
+                "{rest}"
+            );
+        }
+        // `/v1` is only the platform surface's own leading segment: found
+        // anywhere else it is an ordinary Codex path segment, and the
+        // result still lies below the Codex base.
+        for (rest, want) in [
+            ("/v1x", "/v1x"),
+            ("/x/v1", "/x/v1"),
+            ("/v1x/v1/responses", "/v1x/v1/responses"),
+        ] {
+            assert_eq!(
+                target(platform, rest, CredentialKind::Oauth).unwrap(),
+                format!("https://chatgpt.com/backend-api/codex{want}"),
+                "{rest}"
             );
         }
         // A base whose path merely ends in the letters `v1` is not `/v1`.
-        assert!(matches!(
-            target("https://proxy.corp/apiv1", "/models", CredentialKind::Oauth),
-            Err(UpstreamError::BadPath(_))
-        ));
+        assert_eq!(
+            target("https://proxy.corp/apiv1", "/models", CredentialKind::Oauth).unwrap(),
+            "https://chatgpt.com/backend-api/codex/models"
+        );
         // The Codex target gets the same traversal checks as any other.
-        assert!(matches!(
-            target(platform, "/v1/../../x", CredentialKind::Oauth),
-            Err(UpstreamError::BadPath(_))
-        ));
+        for escape in [
+            "/v1/../../x",
+            "/../../x",
+            "/%2e%2e/x",
+            "/responses/../../x",
+            "responses",
+            "/responses#frag",
+        ] {
+            assert!(
+                matches!(
+                    target(platform, escape, CredentialKind::Oauth),
+                    Err(UpstreamError::BadPath(_))
+                ),
+                "{escape}"
+            );
+        }
         assert!(target(platform, "/dashboard/x", CredentialKind::ApiKey).is_ok());
 
         // Auth applies material only; the target is outbound_url's alone.
