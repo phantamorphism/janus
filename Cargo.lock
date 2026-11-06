@@ -2579,6 +2579,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tenant-pinning-plugin"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hyper-util",
+ "janus-core",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "toml",
+ "tonic",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"

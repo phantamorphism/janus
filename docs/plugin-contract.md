@@ -15,6 +15,9 @@ delegated to a plugin over a contract defined in `proto/janus.proto`.
 implements the server side — see
 <ref target="docs/architecture#janus-daemon">janus-daemon</ref>.
 
+A practical guide to building one, with a complete example plugin, is
+<ref target="docs/writing-a-plugin">writing a plugin</ref>.
+
 The contract defines exactly two operations, `ResolveRoute` and `Notify`, and
 they are shaped very differently from each other. That's deliberate: one is on
 the critical path of every proxied request and its answer changes what Janus
