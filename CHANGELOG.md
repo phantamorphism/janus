@@ -57,6 +57,11 @@ will ship in it. What is built is described in `docs/status.md`.
   records the instance, its implementation and the failed-over `attempts`;
   `ResolveRoute` gains `implementation`. A config with one upstream per
   implementation works unchanged.
+- **Example plugin** (`examples/tenant-pinning-plugin`): a unix-socket policy
+  plugin that pins credentials by `tenant` claim, denies `tier=blocked` and
+  unlisted tenants, and meters a per-identity request budget in two phases, with
+  tests and a recorded end-to-end verification; and a guide,
+  `docs/writing-a-plugin.md`.
 - **Documentation**: the design corpus in `docs/` (checked with Schematic), the
   acceptance deliverables in `evidence/DELIVERABLES.md` with a blind-QA harness
   and recorded results, and independent review reports in `reviews/`.

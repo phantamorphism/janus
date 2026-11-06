@@ -7,10 +7,10 @@ tags: [janus, architecture]
 
 # Architecture
 
-Janus is a Cargo workspace of three crates plus a standalone web UI. This
-document describes what each piece is responsible for and the path a single
-request takes through them. For what the system is *for* — callers, identities,
-and why the substitution exists at all — see
+Janus is a Cargo workspace of three crates and an example plugin, plus a
+standalone web UI. This document describes what each piece is responsible for
+and the path a single request takes through them. For what the system is *for* —
+callers, identities, and why the substitution exists at all — see
 <ref target="docs/credential-substitution">credential substitution and policy
 enforcement</ref>. See <ref target="docs/status#build-status">status</ref> for
 which parts are built.
@@ -25,6 +25,8 @@ janus/
 │   ├── janus-daemon/    # library + binary; data plane, admin surface,
 │   │                    # plugin client. Linked into custom builds.
 │   └── janus-cli/       # admin client binary ("janus")
+├── examples/
+│   └── tenant-pinning-plugin/  # example policy plugin (unix socket)
 ├── proto/
 │   └── janus.proto      # the plugin contract
 └── ui/                  # standalone web UI

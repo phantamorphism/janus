@@ -1,0 +1,22 @@
+# Policy for tenant-pinning-plugin. Read once at startup; restart to reload.
+
+# A caller whose `tenant` claim is missing or not listed below: `false` sends it
+# to the upstream instance's default credential chain, `true` denies it.
+deny_unlisted = false
+
+# Every admitted request is charged one unit against its caller identity. The
+# window is fixed: counts reset on each `window_secs` boundary. A request the
+# daemon then abandons (it never reached the upstream) is refunded.
+[budget]
+requests    = 5
+window_secs = 60
+
+# `pin` maps an upstream instance name (`[[upstream]].name` in the daemon's
+# config) to the credential ref this tenant uses there. An instance not listed
+# gets the default chain. A caller with claim `tier = "blocked"` is always
+# denied.
+[tenants.acme]
+pin = { claude = "claude-acme" }
+
+[tenants.globex]
+pin = { claude = "claude-globex" }

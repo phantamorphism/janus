@@ -1,0 +1,29 @@
+[package]
+name = "tenant-pinning-plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Example Janus policy plugin: pins credentials by tenant claim, denies blocked callers, meters a per-identity request budget."
+
+[dependencies]
+janus-core.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+hyper-util.workspace = true
+tower.workspace = true
+libc.workspace = true

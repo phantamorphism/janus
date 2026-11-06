@@ -236,7 +236,8 @@ client.
 
 With no plugin configured Janus makes no plugin calls and is a plain
 credential-substituting proxy. See <ref target="docs/plugin-contract">the plugin
-contract</ref>.
+contract</ref>, and <ref target="docs/writing-a-plugin">writing a plugin</ref>
+for a guide and a complete example plugin in `examples/tenant-pinning-plugin/`.
 
 ## Configuration, admin and CLI
 
@@ -296,8 +297,8 @@ Design docs live in `docs/`, start at
 (`schematic.yaml` at the root), kept consistent by the `sch` CLI; edit docs with
 the `sch branch` / `sch check` / `sch fix` / `sch commit` / `sch merge` loop
 rather than plain git. The workspace is `crates/janus-core`,
-`crates/janus-daemon` and `crates/janus-cli`, plus `proto/` and the web UI in
-`ui/`.
+`crates/janus-daemon`, `crates/janus-cli` and the example plugin
+`examples/tenant-pinning-plugin`, plus `proto/` and the web UI in `ui/`.
 
 ## Contributing
 

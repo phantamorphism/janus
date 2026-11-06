@@ -20,6 +20,7 @@ reference it points at. For what the system is, start with
 | `crates/janus-core` | The plugin contract (generated from `proto/janus.proto`), identity extractors, credential pool, the per-upstream proxy implementations, forwarding, and metering primitives with their `UsageStore`s. |
 | `crates/janus-daemon` | The long-running process: data plane, admin API, UI listener, request log and opaque-identity registry in SQLite, plugin client. A library plus a thin binary, so a custom build can call `janus_daemon::run`. |
 | `crates/janus-cli` | The `janus` admin CLI, a thin client of the admin API. |
+| `examples/tenant-pinning-plugin` | An example policy plugin served on a unix socket; a workspace member, so the workspace gates cover it. See <ref target="docs/writing-a-plugin">writing a plugin</ref>. |
 | `proto/janus.proto` | The plugin contract. |
 | `ui/` | The operator UI (React, TypeScript, Vite, Vitest). |
 | `docs/` | The design corpus, kept consistent by Schematic. See <ref target="docs/development#docs-workflow">the docs workflow</ref>. |
