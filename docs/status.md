@@ -29,8 +29,10 @@ Built and running:
   ChatGPT-account OAuth credentials, served at the Codex backend) and OpenRouter
   upstreams, through the full
   <ref target="docs/architecture#request-lifecycle">request lifecycle</ref>; the
-  credential pool with config credentials, pool slots and refresh; the plugin
-  client over a unix socket, mutual TLS or opt-in plaintext, or linked; the
+  credential pool with config credentials, pool slots and refresh;
+  <ref target="docs/configuration#upstream-instances">upstream instances</ref>
+  with credential filters, selection strategies and failover; the plugin client
+  over a unix socket, mutual TLS or opt-in plaintext, or linked; the
   opaque-identity registry and request log in SQLite; the admin API on the unix
   socket, the TCP admin listener and the UI listener; and
   `janus-daemon check-config`. See <ref target="docs/configuration">daemon

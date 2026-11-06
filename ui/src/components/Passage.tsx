@@ -1,5 +1,6 @@
 import type { RequestRecord } from '@/api/types'
 import { outcomeTone, type Tone } from '@/lib/tone'
+import { recordUpstream } from '@/lib/upstream'
 
 const stroke: Record<Tone, string> = {
   ok: 'text-ok',
@@ -42,7 +43,7 @@ export function Passage({ record }: { record: RequestRecord }) {
         <path d="M5 21V10a7 7 0 0 1 14 0v11" />
         {open ? <path d="M3 21h18" /> : <path d="M7.5 21V10.5h9V21M3 21h18" />}
       </svg>
-      <span className="min-w-0 truncate">{record.upstream ?? <span className="text-muted">no upstream</span>}</span>
+      <span className="min-w-0 truncate">{recordUpstream(record) ?? <span className="text-muted">no upstream</span>}</span>
     </span>
   )
 }

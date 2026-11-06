@@ -107,7 +107,10 @@ pub use anthropic::{AnthropicUpstream, ANTHROPIC_TOKEN_URL};
 pub use openai::{OpenAiUpstream, CODEX_BASE_URL, OPENAI_TOKEN_URL};
 pub use openrouter::OpenRouterUpstream;
 pub use outbound::{build_outbound, Substitution, SubstitutionError};
-pub use relay::{BoxError, ForwardError, Forwarder, RelayBody, RelayEnd, RelayOutcome, Relayed};
+pub use relay::{
+    BoxError, ForwardError, Forwarder, OutboundBody, RelayBody, RelayEnd, RelayOutcome, Relayed,
+    Sent,
+};
 
 /// How long establishing a connection to an upstream (or a token endpoint)
 /// may take.

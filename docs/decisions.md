@@ -230,3 +230,56 @@ inspection, which Janus does not do. Recorded in
 
 **Clear-cut.** These are consumers of endpoints the surface needs for its own
 users anyway; the admin surface provides them.
+
+## Upstream instances and built-in selection {#upstream-instances}
+
+**Decision.** An `[[upstream]]` is an instance of an implementation, with its
+own name, prefix, credential filter (kind, refs, tags), strategy (`ordered`,
+`round_robin`, `least_recently_used`, `sticky`) and an opt-in `failover`.
+Credentials stay owned by the implementation. Built-in selection is limited to
+strategies that are deterministic and need only the pool's state and the
+verified identity; anything that depends on who the caller is beyond that stays
+with the plugin. `sticky` is built in. Design:
+<ref target="docs/credential-substitution#credential-selection">credential
+selection</ref> and <ref target="docs/configuration#upstream-instances">upstream
+instances</ref>.
+
+**Contested**, on three points.
+
+- *Where an account split lives.* The alternatives were a plugin that refuses
+  OAuth credentials on one path, or credentials owned by an instance rather than
+  an implementation. A plugin-only split fails goal 4's spirit for the end user:
+  the most common deployment ("API keys here, subscriptions there") would need
+  code, and with no plugin the split would not exist at all. Instance-owned
+  credentials would make one vendor account appear twice (once per instance)
+  with separate health, refresh and rate-limit state, which is wrong: the vendor
+  limits the account, not the path. A filter over implementation-owned
+  credentials gives the split in config while keeping one health record per
+  account, and it binds the plugin too — a plugin answer outside the filter is
+  refused — so the boundary is a property of the deployment, not of policy code.
+- *Which strategies are built in.* Every strategy beyond `ordered` could be
+  written in a plugin. `round_robin` and `least_recently_used` are built in
+  because spreading load over identical API keys is mechanical, needs the pool's
+  own state, and every operator with more than one key wants it; making it
+  policy would force a plugin onto deployments that have no policy. Budgets,
+  usage-weighted balancing and per-team pinning are not built in: they need
+  state and judgement the plugin already owns, and metering primitives exist for
+  it.
+- *Whether `sticky` by identity is built in.* For: subscription credentials are
+  limited per account and their vendors favour one caller staying on one
+  account, so a plugin-less deployment of several subscriptions needs it; it is
+  a stateless rendezvous hash of the verified identity and the admitted refs, so
+  it adds no store, survives restarts, and moves only the identities of a
+  credential that leaves the chain. Against: it is caller-aware, which is the
+  plugin's domain. It was kept because it reads only what Janus has already
+  verified (never the unverified correlation id), grants nothing the filter does
+  not, and a plugin that wants different stickiness answers with a
+  `credential_ref`, which overrides it.
+
+`failover` is opt-in, not the default, because it changes what a caller sees (a
+success instead of the upstream's 429) and spends a second credential on one
+request; an operator chooses that per instance. It is limited to the default
+chain and to bodies that can be replayed whole within the existing 1 MiB replay
+buffer, so it never overrides policy and never sends a truncated request.
+Backward compatibility is exact: an instance named after its implementation with
+none of the new keys is the old `[[upstream]]`.

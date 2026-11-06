@@ -10,6 +10,7 @@ import { Time } from '@/components/Time'
 import { credentialErrorText, formatCount, formatRetain, words } from '@/lib/format'
 import { loadTraffic, MAX_PAGES, type Traffic } from '@/lib/traffic'
 import { credentialTone, outcomeTone } from '@/lib/tone'
+import { filterText, selectionText } from '@/lib/upstream'
 import { useResource } from '@/lib/useResource'
 
 const WINDOWS = [
@@ -271,6 +272,8 @@ export function Overview() {
                     <tr>
                       <th scope="col">Upstream</th>
                       <th scope="col">Path prefix</th>
+                      <th scope="col">Selection</th>
+                      <th scope="col">Credentials</th>
                       <th scope="col">Base URL</th>
                       <th scope="col">Identity binding</th>
                       <th scope="col">Routes</th>
@@ -279,8 +282,22 @@ export function Overview() {
                   <tbody>
                     {s.upstreams.map((u) => (
                       <tr key={u.name}>
-                        <td className="whitespace-nowrap">{u.name}</td>
+                        <td className="whitespace-nowrap">
+                          {u.name}
+                          {u.implementation !== u.name && (
+                            <div className="text-xs text-muted">{u.implementation}</div>
+                          )}
+                        </td>
                         <td className="mono whitespace-nowrap">{u.path_prefix}</td>
+                        <td className="whitespace-nowrap">{selectionText(u.strategy, u.failover)}</td>
+                        <td>
+                          {u.eligible.length === 0 ? (
+                            <span className="text-bad">none admitted</span>
+                          ) : (
+                            <span className="mono">{u.eligible.join(', ')}</span>
+                          )}
+                          <div className="text-xs text-muted">{filterText(u.credentials) ?? `every ${u.implementation} credential`}</div>
+                        </td>
                         <td className="mono whitespace-nowrap">{u.base_url}</td>
                         <td className="mono">{u.binding ?? <span className="text-muted">none</span>}</td>
                         <td className="mono">

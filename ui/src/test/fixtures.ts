@@ -19,6 +19,7 @@ export function credential(over: Partial<CredentialMetadata> = {}): CredentialMe
     request_count: 1234,
     error_count: 2,
     last_error: null,
+    tags: [],
     ...over,
   }
 }
@@ -43,6 +44,7 @@ export function record(over: Partial<RequestRecord> = {}): RequestRecord {
     received_at: '2026-11-03T10:00:00Z',
     duration_ms: 412,
     upstream: 'openai',
+    implementation: 'openai',
     route: null,
     method: 'POST',
     path: '/openai/v1/chat/completions',
@@ -55,6 +57,7 @@ export function record(over: Partial<RequestRecord> = {}): RequestRecord {
     status: 200,
     usage: { input_tokens: 12, output_tokens: 40 },
     error: null,
+    attempts: [],
     ...over,
   } as RequestRecord
 }
@@ -103,6 +106,11 @@ export function status(over: Record<string, unknown> = {}) {
     upstreams: [
       {
         name: 'openai',
+        implementation: 'openai',
+        strategy: 'ordered',
+        failover: false,
+        credentials: null,
+        eligible: ['oa-main'],
         path_prefix: '/openai',
         base_url: 'https://api.openai.com/',
         binding: 'hmac',
@@ -110,6 +118,11 @@ export function status(over: Record<string, unknown> = {}) {
       },
       {
         name: 'anthropic',
+        implementation: 'anthropic',
+        strategy: 'ordered',
+        failover: false,
+        credentials: null,
+        eligible: ['team-a'],
         path_prefix: '/anthropic',
         base_url: 'https://api.anthropic.com/',
         binding: 'opaque',

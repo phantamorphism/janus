@@ -10,6 +10,7 @@
 //
 // Timestamps are RFC 3339 strings (chrono's serde form).
 
+/** An upstream implementation. An `[[upstream]]` instance has a name of its own. */
 export type UpstreamKind = 'anthropic' | 'openai' | 'openrouter'
 export const UPSTREAMS: readonly UpstreamKind[] = ['anthropic', 'openai', 'openrouter']
 
@@ -35,9 +36,12 @@ export const CREDENTIAL_STATUSES: readonly CredentialStatus[] = [
 
 export interface CredentialMetadata {
   ref: string
+  /** The implementation the credential belongs to. */
   upstream: UpstreamKind
   kind: CredentialKind
   label: string | null
+  /** Selection tags an instance's credential filter can match. */
+  tags: string[]
   source: CredentialSource
   status: CredentialStatus
   rate_limited_until: Timestamp | null
@@ -108,11 +112,23 @@ export type Outcome =
   | { outcome: 'upstream_error' }
   | { outcome: 'abandoned'; stage: AbandonStage }
 
+export type Verdict = 'credential_invalid' | 'rate_limited' | 'account_error'
+
+/** A credential the upstream rejected before the request failed over to the next. */
+export interface FailedAttempt {
+  credential_ref: string
+  status: number
+  verdict: Verdict
+}
+
 export type RequestRecord = Outcome & {
   request_id: string
   received_at: Timestamp
   duration_ms: number
-  upstream: UpstreamKind | null
+  /** The `[[upstream]]` instance name; null when no `path_prefix` matched. */
+  upstream: string | null
+  /** The instance's implementation; null exactly when `upstream` is. */
+  implementation: UpstreamKind | null
   route: string | null
   method: string
   path: string
@@ -125,11 +141,14 @@ export type RequestRecord = Outcome & {
   status: number | null
   usage: unknown
   error: string | null
+  /** Credentials failed over from before `credential_ref`, in order. */
+  attempts: FailedAttempt[]
 }
 
 export interface RequestFilter {
   identity?: string
-  upstream?: UpstreamKind
+  /** An instance name. */
+  upstream?: string
   outcome?: OutcomeName
   credential?: string
   /** RFC 3339. */
@@ -242,8 +261,25 @@ export interface RouteSummary {
   binding: string
 }
 
+export type Strategy = 'ordered' | 'round_robin' | 'least_recently_used' | 'sticky'
+
+/** `[upstream.credentials]`: every set field must hold; `tags` holds on any one. */
+export interface CredentialFilter {
+  kind?: CredentialKind
+  refs?: string[]
+  tags?: string[]
+}
+
 export interface UpstreamSummary {
-  name: UpstreamKind
+  /** The instance name. */
+  name: string
+  implementation: UpstreamKind
+  strategy: Strategy
+  failover: boolean
+  /** Null: the instance admits every credential of its implementation. */
+  credentials: CredentialFilter | null
+  /** Refs the filter admits now, in chain order, whatever their status. */
+  eligible: string[]
   path_prefix: string
   base_url: string
   /** The upstream-wide binding method; null when none resolves. */

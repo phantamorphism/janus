@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
 use super::plugin::event_type;
+use super::selection::{InvalidTag, Pick, Selection};
 use super::upstream::UpstreamKind;
 
 /// How auth is carried for the credential's upstream.
@@ -79,6 +80,10 @@ pub struct CredentialMetadata {
     pub request_count: u64,
     pub error_count: u64,
     pub last_error: Option<String>,
+    /// Selection tags (`docs/credential-substitution#credential-selection`);
+    /// empty when the credential has none.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// The `ref` that may never name a credential: `GET /v1/credentials/default`
@@ -240,6 +245,9 @@ pub struct NewCredential {
     pub credential_ref: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Selection tags; see [`super::selection::validate_tag`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     pub material: MaterialDocument,
 }
 
@@ -308,7 +316,15 @@ pub enum PoolError {
     },
     /// The default chain has no usable credential for this upstream.
     #[error("no usable default credential for {0}")]
-    NoDefault(UpstreamKind),
+    NoDefault(String),
+    /// A named credential the instance's credential filter does not admit.
+    #[error("credential {credential_ref:?} is not eligible for upstream {instance:?}")]
+    NotEligible {
+        credential_ref: String,
+        instance: String,
+    },
+    #[error(transparent)]
+    InvalidTag(#[from] InvalidTag),
     #[error("refreshing credential {credential_ref:?} failed: {reason}")]
     RefreshFailed {
         credential_ref: String,
@@ -336,15 +352,19 @@ pub enum PoolError {
 /// mutation is live without a restart.
 #[async_trait]
 pub trait CredentialPool: Send + Sync {
-    /// Step 4 of the request lifecycle: resolve `choice` for `upstream` to
-    /// live material, refreshing it first if it has expired. A `Ref` that is
-    /// disabled, invalid, rate-limited, unknown or for another upstream is
-    /// an error, never a fall-through to the default chain. Counts as a use
+    /// Step 4 of the request lifecycle: resolve `choice` for the instance
+    /// `selection` describes to live material, refreshing it first if it has
+    /// expired. A `Ref` that is disabled, invalid, rate-limited, unknown, for
+    /// another implementation or not admitted by the instance's filter is an
+    /// error, never a fall-through to the default chain. `Default` picks
+    /// among the usable credentials the filter admits, minus
+    /// `pick.exclude`, by the selection's strategy. Counts as a use
     /// (`last_used_at`, `request_count`).
     async fn resolve(
         &self,
-        upstream: UpstreamKind,
+        selection: &Selection,
         choice: &CredentialChoice,
+        pick: Pick<'_>,
     ) -> Result<CredentialMaterial, PoolError>;
 
     /// Record what the upstream's response said about `credential_ref`.
@@ -363,9 +383,22 @@ pub trait CredentialPool: Send + Sync {
     /// `GET /v1/credentials/{ref}`.
     async fn show(&self, credential_ref: &str) -> Result<CredentialMetadata, PoolError>;
 
-    /// `GET /v1/credentials/default?upstream=`: what the default chain would
-    /// pick right now. Never touches the material and is not a use.
-    async fn peek_default(&self, upstream: UpstreamKind) -> Result<CredentialMetadata, PoolError>;
+    /// `GET /v1/credentials/default?upstream=`: what the default chain of
+    /// `selection` would pick right now for a request from `identity`.
+    /// Never touches the material, is not a use and does not advance a
+    /// round-robin cursor.
+    async fn peek_default(
+        &self,
+        selection: &Selection,
+        identity: Option<&str>,
+    ) -> Result<CredentialMetadata, PoolError>;
+
+    /// `PUT /v1/credentials/{ref}/tags`: replace a pool slot's tags.
+    async fn set_tags(
+        &self,
+        credential_ref: &str,
+        tags: Vec<String>,
+    ) -> Result<CredentialMetadata, PoolError>;
 
     /// `POST /v1/credentials`: write a new pool slot.
     async fn add(&self, new: NewCredential) -> Result<CredentialMetadata, PoolError>;
@@ -412,8 +445,10 @@ mod tests {
             request_count: 3,
             error_count: 1,
             last_error: Some("429".into()),
+            tags: vec!["team".into()],
         };
         let json = serde_json::to_value(&meta).expect("ser");
+        assert_eq!(json["tags"], serde_json::json!(["team"]));
         assert_eq!(json["ref"], "team-a");
         assert_eq!(json["upstream"], "anthropic");
         assert_eq!(json["kind"], "oauth");
@@ -442,6 +477,7 @@ mod tests {
             upstream: UpstreamKind::OpenRouter,
             credential_ref: None,
             label: None,
+            tags: Vec::new(),
             material: doc,
         };
         assert!(!format!("{body:?}").contains("sk-live"));

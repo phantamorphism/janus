@@ -43,10 +43,12 @@ use janus_core::contract::binding::Method;
 use janus_core::contract::credential::{CredentialPool, PoolError, Secret};
 use janus_core::contract::plugin::PluginMode;
 use janus_core::contract::registry::OpaqueRegistry;
+use janus_core::contract::selection::Strategy;
 use janus_core::contract::upstream::UpstreamKind;
 use janus_core::identity::{BindingTable, IdentityFactory, MaterialResolver, StartupError};
 use janus_core::pool::{
-    pool_dir, ConfiguredCredential, ConfiguredSource, FilePool, OpenError, PoolOptions,
+    normalize_tags, pool_dir, ConfiguredCredential, ConfiguredSource, FilePool, OpenError,
+    PoolOptions,
 };
 use janus_core::proxy::{ClientInitError, Forwarder, UpstreamSet};
 use tokio::net::TcpListener;
@@ -185,6 +187,7 @@ fn configured_credentials(config: &DaemonConfig) -> Result<Vec<ConfiguredCredent
                 credential_ref: c.credential_ref.clone(),
                 upstream: c.upstream,
                 label: c.label.clone(),
+                tags: normalize_tags(c.tags.clone()),
                 source,
             })
         })
@@ -197,7 +200,54 @@ async fn prepare(config: &DaemonConfig, embedded: &Embedded) -> Result<Prepared,
     embedded.check_against(config)?;
     let data_dir = config.data_dir().ok_or(RunError::NoDataDir)?;
     ensure_data_dir(&data_dir)?;
-    build(config, embedded, data_dir).await
+    let prepared = build(config, embedded, data_dir).await?;
+    check_selections(config, prepared.pool.as_ref()).await?;
+    Ok(prepared)
+}
+
+/// The selection rules only the pool can decide: a filter `ref` naming a
+/// pool slot of another implementation is a refusal; a `ref` naming no
+/// credential, and an instance that admits no credential, are warnings
+/// (credentials can be added at runtime).
+async fn check_selections(config: &DaemonConfig, pool: &FilePool) -> Result<(), RunError> {
+    let all = pool.list(None).await?;
+    for up in &config.upstreams {
+        let filter = up.credentials.clone().unwrap_or_default();
+        for r in filter.refs.iter().flatten() {
+            match all.iter().find(|m| &m.credential_ref == r) {
+                Some(m) if m.upstream != up.implementation => {
+                    return Err(invalid(
+                        format!("upstream[{}].credentials.refs", up.name),
+                        format!(
+                            "credential {r:?} is for {}, not {}",
+                            m.upstream, up.implementation
+                        ),
+                    )
+                    .into())
+                }
+                Some(_) => {}
+                None => tracing::warn!(
+                    upstream = %up.name,
+                    credential = %r,
+                    "upstream credential filter names a credential that does not exist (yet)"
+                ),
+            }
+        }
+        let admitted = all
+            .iter()
+            .filter(|m| {
+                m.upstream == up.implementation && filter.admits(&m.credential_ref, m.kind, &m.tags)
+            })
+            .count();
+        if admitted == 0 {
+            tracing::warn!(
+                upstream = %up.name,
+                implementation = %up.implementation,
+                "upstream admits no credential; its requests fail as credential_unavailable until one is added"
+            );
+        }
+    }
+    Ok(())
 }
 
 /// The validation and construction of [`prepare`] against `data_dir`, which
@@ -213,7 +263,7 @@ async fn build(
         config
             .upstreams
             .iter()
-            .find(|up| up.name == kind)
+            .find(|up| up.implementation == kind)
             .and_then(|up| up.token_url.clone())
     };
     let upstreams = UpstreamSet::with_token_urls(
@@ -230,10 +280,10 @@ async fn build(
     };
     let mut builder = BindingTable::builder(&factory, &materials, &embedded.extractors)?;
     for up in config.resolve_bindings()? {
-        builder.upstream(up.upstream, up.binding.as_ref()).await?;
+        builder.upstream(&up.upstream, up.binding.as_ref()).await?;
         for route in &up.routes {
             builder
-                .route(up.upstream, &route.path, &route.binding)
+                .route(&up.upstream, &route.path, &route.binding)
                 .await?;
         }
     }
@@ -311,12 +361,14 @@ impl Daemon {
             .map_err(|source| RunError::Bind { addr, source })?;
 
         let refused = Arc::new(AtomicU64::new(0));
+        let routes: Vec<UpstreamRoute> = config.upstreams.iter().map(UpstreamRoute::from).collect();
         let admin = admin::start(
             AdminDeps {
                 data_plane_refused: Arc::clone(&refused),
                 config: Arc::clone(&config),
                 data_dir: prepared.data_dir.clone(),
                 pool: Arc::clone(&pool),
+                selections: routes.iter().map(|r| Arc::clone(&r.selection)).collect(),
                 registry: Arc::clone(prepared.store.registry()),
                 requests: Arc::clone(&requests),
                 plugin: prepared.plugin.clone(),
@@ -334,7 +386,7 @@ impl Daemon {
         );
         let tracker = Tracker::default();
         let dp = Arc::new(DataPlane {
-            routes: config.upstreams.iter().map(UpstreamRoute::from).collect(),
+            routes,
             bindings: prepared.bindings,
             upstreams: prepared.upstreams,
             forwarder: prepared.forwarder,
@@ -458,7 +510,11 @@ pub struct CheckReport {
 /// One upstream's resolved bindings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedUpstream {
-    pub upstream: UpstreamKind,
+    /// The instance name.
+    pub upstream: String,
+    pub implementation: UpstreamKind,
+    pub strategy: Strategy,
+    pub failover: bool,
     pub path_prefix: String,
     /// `None`: requests matched by no route are rejected.
     pub binding: Option<Method>,
@@ -479,8 +535,8 @@ impl fmt::Display for CheckReport {
                 .map_or_else(|| "unbound".to_owned(), ToString::to_string);
             writeln!(
                 f,
-                "upstream    {} {} identity={binding}",
-                up.upstream, up.path_prefix
+                "upstream    {} ({}) {} identity={binding} strategy={} failover={}",
+                up.upstream, up.implementation, up.path_prefix, up.strategy, up.failover
             )?;
             for (path, method) in &up.routes {
                 writeln!(f, "  route     {}{path} identity={method}", up.path_prefix)?;
@@ -509,14 +565,13 @@ pub async fn check_config(path: &Path, embedded: Embedded) -> Result<CheckReport
     let upstreams = config
         .resolve_bindings()?
         .into_iter()
-        .map(|up| CheckedUpstream {
+        .zip(&config.upstreams)
+        .map(|(up, c)| CheckedUpstream {
             upstream: up.upstream,
-            path_prefix: config
-                .upstreams
-                .iter()
-                .find(|c| c.name == up.upstream)
-                .map(|c| c.path_prefix.clone())
-                .unwrap_or_default(),
+            implementation: c.implementation,
+            strategy: c.strategy,
+            failover: c.failover,
+            path_prefix: c.path_prefix.clone(),
             binding: up.binding.as_ref().map(|b| b.method()),
             routes: up
                 .routes

@@ -133,6 +133,76 @@ The symmetric point: with no plugin configured there is no policy, and Janus is
 a pass-through credential-substituting proxy and nothing more. Policy is
 additive.
 
+## Credential selection {#credential-selection}
+
+"Which real credential applies" is answered in two layers. Credentials belong to
+an upstream implementation; each `[[upstream]]` is an **instance** of one
+implementation, mounted at its own path prefix with its own **credential
+filter** (by kind, ref or tag) and **strategy** — see
+<ref target="docs/configuration#upstream-instances">upstream instances</ref>.
+One vendor can so be split by account type: `/anthropic` for API keys only,
+`/claude` for subscriptions only, with no credential reachable through the other
+prefix.
+
+- **The plugin chooses**, when one is configured and answers with a
+  `credential_ref` (see <ref target="docs/plugin-contract#resolve-route">
+  ResolveRoute</ref>). The ref must be one the instance's filter admits; a ref
+  outside it fails the request as `credential_unavailable`, exactly like a ref
+  that does not exist. The filter is a hard boundary that policy cannot widen.
+- **The default chain chooses** otherwise (no plugin, `use_default`, or a `none`
+  route): among the admitted credentials that are usable now (active, not
+  rate-limited, not disabled or invalid), in the implementation's chain order,
+  the instance's strategy picks one: `ordered`, `round_robin`,
+  `least_recently_used`, or `sticky` by verified caller identity.
+
+Built in are the deterministic strategies that need nothing but the pool's own
+state and the verified identity. Selection that depends on who the caller is
+beyond that — pinning a team to an account, spending a budget per account,
+balancing by observed usage — is policy, and belongs to the plugin, which
+already receives the verified identity, its claims and the instance and
+implementation names. `sticky` is the one caller-aware built-in, because it
+costs nothing a plugin would do better: it is a pure function of the verified
+identity and the admitted refs, keeps no state, never reads the caller's
+unverified correlation id, and cannot reach a credential the filter does not
+admit. It exists for subscription credentials, whose vendors limit per account
+and favour one caller staying on one account, so a deployment without a plugin
+gets that behaviour without writing one. The reasoning is recorded in
+<ref target="docs/decisions#upstream-instances">upstream instances and built-in
+selection</ref>.
+
+### Failover {#failover}
+
+An instance with `failover = true` lets a default-chain request survive a
+rejected credential. When the upstream answers a `4xx` that the implementation
+classifies as a rate limit, an invalid credential or an account error, Janus:
+
+1. reports the verdict to the pool (a rate limit benches the credential until
+   its reset, an invalid credential leaves the chain) and to the plugin
+   (`credential_invalid` / `account_error`), as for any relayed rejection;
+2. picks again with the strategy, excluding every credential this request has
+   tried;
+3. sends the same request, with the new credential substituted, and records the
+   rejected attempt in the request's `attempts`.
+
+When no admitted credential is left, the last rejection is relayed to the caller
+as it came. The rules that keep this safe:
+
+- **Only the default chain fails over.** A credential the plugin named is
+  policy's choice; its rejection is relayed and reported, never replaced by
+  another.
+- **Only a body that can be sent again whole.** The caller's body is buffered
+  for replay up to the same 1 MiB limit as the retry on a dead pooled upstream
+  connection, and is sent again only when Janus has read it to its end within
+  that limit. A larger or still-streaming body is never failed over; its
+  rejection is relayed.
+- **Nothing reaches the caller before the decision.** Only the response head and
+  at most the first 16 KiB of a `4xx` body are read to classify it; if the
+  request does not fail over, they are relayed first and the rest follows
+  unchanged. A `2xx`, `3xx` or `5xx` is never held back.
+
+Failover never widens access: each attempt uses a credential the instance's
+filter admits, and the caller sees only the response of the last attempt.
+
 ## Not specific to LLM providers {#general-purpose}
 
 The first upstreams Janus implements are Anthropic, OpenAI, and OpenRouter,

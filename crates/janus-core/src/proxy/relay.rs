@@ -108,6 +108,13 @@ struct ReplayState {
     /// More than [`REPLAY_LIMIT`] bytes were read, or the caller's body
     /// failed: this body can no longer be sent again.
     spent: bool,
+    /// The caller's body ended, and all of it is in `captured` unless
+    /// `spent`: no attempt reads `inner` again.
+    complete: bool,
+    /// The body's exact length, when the caller declared one. An attempt
+    /// framed by `content-length` stops reading at that length, so reaching
+    /// it is how the end is seen.
+    exact_len: Option<u64>,
 }
 
 /// One attempt's view of a [`ReplayState`]: the captured chunks first, then
@@ -128,6 +135,9 @@ impl Stream for ReplayAttempt {
             this.next += 1;
             return Poll::Ready(Some(Ok(chunk)));
         }
+        if state.complete {
+            return Poll::Ready(None);
+        }
         let polled = state.inner.as_mut().poll_next(cx);
         match &polled {
             Poll::Ready(Some(Ok(chunk))) if !state.spent => {
@@ -141,9 +151,13 @@ impl Stream for ReplayAttempt {
                     // what is retained.
                     state.captured.push(Bytes::copy_from_slice(chunk));
                     this.next += 1;
+                    if state.exact_len == Some(state.captured_len as u64) {
+                        state.complete = true;
+                    }
                 }
             }
             Poll::Ready(Some(Err(_))) => state.spent = true,
+            Poll::Ready(None) => state.complete = true,
             _ => {}
         }
         polled
@@ -269,43 +283,37 @@ impl Forwarder {
         B: Body<Data = Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
     {
+        let body = OutboundBody::new(body);
+        Ok(self.send(&outbound, &body).await?.relay(upstream))
+    }
+
+    /// Send one attempt of `outbound` with `body`, retrying once on a dead
+    /// pooled connection, and return the response head with its body still
+    /// unread. The same `body` may be sent again with another head (a
+    /// credential failover) while [`OutboundBody::replayable`] holds.
+    pub async fn send(
+        &self,
+        outbound: &http::request::Parts,
+        body: &OutboundBody,
+    ) -> Result<Sent, ForwardError> {
         let target = outbound.uri.to_string();
         let url = Url::parse(&target).map_err(|_| ForwardError::BadTarget(target.clone()))?;
-        let method = outbound.method;
-        // A request that has no body keeps having none (no chunked framing
-        // on a GET); any other body is streamed through without buffering.
-        let replay = if body.is_end_stream() || body.size_hint().exact() == Some(0) {
-            None
-        } else {
-            let inner: ChunkStream = Box::pin(BodyDataStream::new(body).map_err(Into::into));
-            Some(Arc::new(Mutex::new(ReplayState {
-                inner,
-                captured: Vec::new(),
-                captured_len: 0,
-                spent: false,
-            })))
-        };
+        let method = outbound.method.clone();
         let mut retried = false;
         let response = loop {
             let mut request = self
                 .client
                 .request(method.clone(), url.clone())
                 .headers(outbound.headers.clone());
-            if let Some(state) = &replay {
-                request = request.body(reqwest::Body::wrap_stream(ReplayAttempt {
-                    state: Arc::clone(state),
-                    next: 0,
-                }));
+            if let Some(attempt) = body.attempt() {
+                request = request.body(attempt);
             }
             let connects_before = self.connects.load(Ordering::SeqCst);
             match request.send().await {
                 Ok(response) => break response,
                 Err(e) => {
                     let reused = self.connects.load(Ordering::SeqCst) == connects_before;
-                    let replayable = replay
-                        .as_ref()
-                        .is_none_or(|s| !s.lock().unwrap_or_else(|e| e.into_inner()).spent);
-                    if !retried && reused && replayable && is_dead_connection(&e) {
+                    if !retried && reused && body.replayable() && is_dead_connection(&e) {
                         tracing::debug!(
                             error = %transport_error(e),
                             "pooled upstream connection was closed; retrying once on a new one"
@@ -329,22 +337,175 @@ impl Forwarder {
         let chunks = response
             .bytes_stream()
             .map_err(|e| BoxError::from(e.without_url()));
+        Ok(Sent {
+            status,
+            headers,
+            expected_len,
+            read: Vec::new(),
+            read_len: 0,
+            done: false,
+            chunks: Box::pin(chunks),
+        })
+    }
+}
+
+/// A caller's request body on its way upstream, kept (up to
+/// [`REPLAY_LIMIT`] bytes) so it can be sent again: on a fresh connection
+/// after a dead pooled one, or with another credential after a rejection.
+pub struct OutboundBody {
+    /// `None` when the request has no body: it keeps having none (no
+    /// chunked framing on a GET).
+    replay: Option<Arc<Mutex<ReplayState>>>,
+}
+
+impl std::fmt::Debug for OutboundBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OutboundBody")
+            .field("replayable", &self.replayable())
+            .finish()
+    }
+}
+
+impl OutboundBody {
+    pub fn new<B>(body: B) -> Self
+    where
+        B: Body<Data = Bytes> + Send + 'static,
+        B::Error: Into<BoxError>,
+    {
+        let exact_len = body.size_hint().exact();
+        let replay = if body.is_end_stream() || exact_len == Some(0) {
+            None
+        } else {
+            let inner: ChunkStream = Box::pin(BodyDataStream::new(body).map_err(Into::into));
+            Some(Arc::new(Mutex::new(ReplayState {
+                inner,
+                captured: Vec::new(),
+                captured_len: 0,
+                spent: false,
+                complete: false,
+                exact_len,
+            })))
+        };
+        OutboundBody { replay }
+    }
+
+    /// Whether another attempt can send the body from its first byte: there
+    /// is none, or no more than [`REPLAY_LIMIT`] bytes of it have been read
+    /// and reading it has not failed.
+    pub fn replayable(&self) -> bool {
+        self.replay
+            .as_ref()
+            .is_none_or(|s| !s.lock().unwrap_or_else(|e| e.into_inner()).spent)
+    }
+
+    /// Whether the body can be sent again while an earlier attempt may still
+    /// be reading it (a credential failover: the first upstream may answer
+    /// before it has read the whole body, and its connection keeps
+    /// reading). That needs the caller's whole body read and within
+    /// [`REPLAY_LIMIT`], so no attempt reads the caller's body any more;
+    /// a dead connection's retry needs only [`OutboundBody::replayable`],
+    /// since the dead attempt reads nothing further.
+    pub fn resendable(&self) -> bool {
+        self.replay.as_ref().is_none_or(|s| {
+            let s = s.lock().unwrap_or_else(|e| e.into_inner());
+            s.complete && !s.spent
+        })
+    }
+
+    /// One attempt's body: what was captured, then the rest of the caller's.
+    fn attempt(&self) -> Option<reqwest::Body> {
+        self.replay.as_ref().map(|state| {
+            reqwest::Body::wrap_stream(ReplayAttempt {
+                state: Arc::clone(state),
+                next: 0,
+            })
+        })
+    }
+}
+
+/// An upstream response whose head has arrived and whose body has not been
+/// relayed yet.
+pub struct Sent {
+    status: StatusCode,
+    headers: HeaderMap,
+    expected_len: Option<u64>,
+    /// Body items already read by [`Sent::verdict`], relayed first.
+    read: Vec<Result<Bytes, BoxError>>,
+    read_len: usize,
+    /// The body ended or failed while being read: nothing follows `read`.
+    done: bool,
+    chunks: ChunkStream,
+}
+
+impl std::fmt::Debug for Sent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sent")
+            .field("status", &self.status)
+            .finish()
+    }
+}
+
+impl Sent {
+    pub fn status(&self) -> StatusCode {
+        self.status
+    }
+
+    /// For a `4xx` response, [`UpstreamImpl::classify`]'s verdict, read
+    /// from the first [`CLASSIFY_PREFIX_LIMIT`] bytes of the body (or all of
+    /// it, if shorter); `None` for any other status. What is read stays
+    /// here and is relayed first if the response is relayed after all.
+    pub async fn verdict(&mut self, upstream: &dyn UpstreamImpl) -> Option<UpstreamFeedback> {
+        use futures::StreamExt as _;
+        if !self.status.is_client_error() {
+            return None;
+        }
+        while !self.done && self.read_len < CLASSIFY_PREFIX_LIMIT {
+            match self.chunks.next().await {
+                Some(Ok(chunk)) => {
+                    self.read_len += chunk.len();
+                    self.read.push(Ok(chunk));
+                }
+                Some(Err(e)) => {
+                    self.read.push(Err(e));
+                    self.done = true;
+                }
+                None => self.done = true,
+            }
+        }
+        let mut prefix = Vec::with_capacity(self.read_len.min(CLASSIFY_PREFIX_LIMIT));
+        for chunk in self.read.iter().flatten() {
+            let room = CLASSIFY_PREFIX_LIMIT - prefix.len();
+            prefix.extend_from_slice(&chunk[..room.min(chunk.len())]);
+        }
+        upstream.classify(self.status, &self.headers, &prefix)
+    }
+
+    /// Relay the response to the caller; `upstream` observes and classifies
+    /// it on the way.
+    pub fn relay(self, upstream: Arc<dyn UpstreamImpl>) -> Relayed {
+        use futures::StreamExt as _;
+        let read = futures::stream::iter(self.read);
+        let chunks: ChunkStream = if self.done {
+            Box::pin(read)
+        } else {
+            Box::pin(read.chain(self.chunks))
+        };
         let (tx, rx) = oneshot::channel();
         let body = RelayBody::new(
-            Box::pin(chunks),
+            chunks,
             upstream,
-            status,
-            &headers,
-            expected_len,
+            self.status,
+            &self.headers,
+            self.expected_len,
             tx,
         );
         let mut relayed = http::Response::new(body);
-        *relayed.status_mut() = status;
-        *relayed.headers_mut() = headers;
-        Ok(Relayed {
+        *relayed.status_mut() = self.status;
+        *relayed.headers_mut() = self.headers;
+        Relayed {
             response: relayed,
             outcome: rx,
-        })
+        }
     }
 }
 
@@ -1240,5 +1401,138 @@ mod tests {
             matches!(&outcome.feedback, Some(UpstreamFeedback::CredentialInvalid { reason }) if reason.contains("401")),
             "{outcome:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn a_verdict_is_read_from_a_4xx_and_the_buffered_body_still_relays_intact() {
+        // Longer than the classify prefix, so the relay must join what the
+        // verdict read with what it did not.
+        let mut long = br#"{"error":{"message":"rate limited","code":429},"pad":""#.to_vec();
+        long.extend(std::iter::repeat_n(b'p', CLASSIFY_PREFIX_LIMIT * 2));
+        long.extend_from_slice(b"\"}");
+        let expected = long.clone();
+        let upstream =
+            testkit::spawn(move |_req| Reply::bytes(429, &[("retry-after", "30")], long.clone()))
+                .await;
+        let forwarder = Forwarder::new().unwrap();
+        let parts = outbound(&upstream.url, Method::POST, "/v1/chat/completions", &[]);
+        let body = OutboundBody::new(Full::new(Bytes::from_static(b"{}")));
+        let mut sent = forwarder.send(&parts, &body).await.unwrap();
+        assert_eq!(sent.status(), 429);
+        let verdict = sent.verdict(openrouter().as_ref()).await;
+        assert!(
+            matches!(
+                verdict,
+                Some(UpstreamFeedback::RateLimited { until: Some(_) })
+            ),
+            "{verdict:?}"
+        );
+        let relayed = sent.relay(openrouter());
+        assert_eq!(relayed.response.status(), 429);
+        let got = relayed
+            .response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        assert_eq!(got.len(), expected.len());
+        assert_eq!(&got[..], &expected[..]);
+    }
+
+    #[tokio::test]
+    async fn no_verdict_is_read_from_a_success_or_a_server_error() {
+        for status in [200u16, 500] {
+            let upstream = testkit::spawn(move |_req| {
+                Reply::bytes(status, &[], br#"{"error":{"code":401}}"#.to_vec())
+            })
+            .await;
+            let parts = outbound(&upstream.url, Method::POST, "/v1/x", &[]);
+            let body = OutboundBody::new(Full::new(Bytes::from_static(b"{}")));
+            let mut sent = Forwarder::new().unwrap().send(&parts, &body).await.unwrap();
+            assert_eq!(sent.verdict(openrouter().as_ref()).await, None, "{status}");
+            let got = sent
+                .relay(openrouter())
+                .response
+                .into_body()
+                .collect()
+                .await;
+            assert_eq!(got.unwrap().to_bytes(), &br#"{"error":{"code":401}}"#[..]);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_body_read_to_its_end_is_resent_whole_to_another_upstream() {
+        let first = testkit::spawn(|_req| Reply::bytes(401, &[], b"{}".to_vec())).await;
+        let second = testkit::spawn(|_req| Reply::bytes(200, &[], b"ok".to_vec())).await;
+        let forwarder = Forwarder::new().unwrap();
+        let payload = Bytes::from(vec![b'b'; 64 * 1024]);
+        let len = payload.len().to_string();
+        // The caller declared its length: the attempt is framed by it, and
+        // the body still counts as read to its end.
+        let headers = [("content-length", len.as_str())];
+        let body = OutboundBody::new(Full::new(payload.clone()));
+        assert!(body.replayable());
+        assert!(!body.resendable(), "nothing read yet");
+        let sent = forwarder
+            .send(
+                &outbound(&first.url, Method::POST, "/v1/x", &headers),
+                &body,
+            )
+            .await
+            .unwrap();
+        assert_eq!(sent.status(), 401);
+        assert!(body.resendable());
+        let sent = forwarder
+            .send(
+                &outbound(&second.url, Method::POST, "/v1/x", &headers),
+                &body,
+            )
+            .await
+            .unwrap();
+        assert_eq!(sent.status(), 200);
+        for server in [&first, &second] {
+            let received = server.received();
+            assert_eq!(received.len(), 1);
+            assert_eq!(received[0].body, payload);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_chunked_body_of_unknown_length_is_resendable_once_it_ended() {
+        let first = testkit::spawn(|_req| Reply::bytes(429, &[], b"{}".to_vec())).await;
+        let second = testkit::spawn(|_req| Reply::bytes(200, &[], b"ok".to_vec())).await;
+        let forwarder = Forwarder::new().unwrap();
+        let chunks =
+            futures::stream::iter([Bytes::from_static(b"{\"a\":"), Bytes::from_static(b"1}")])
+                .map(|b| Ok::<_, std::convert::Infallible>(http_body::Frame::data(b)));
+        let body = OutboundBody::new(http_body_util::StreamBody::new(chunks));
+        forwarder
+            .send(&outbound(&first.url, Method::POST, "/v1/x", &[]), &body)
+            .await
+            .unwrap();
+        assert!(body.resendable());
+        forwarder
+            .send(&outbound(&second.url, Method::POST, "/v1/x", &[]), &body)
+            .await
+            .unwrap();
+        assert_eq!(second.received()[0].body, &b"{\"a\":1}"[..]);
+        assert_eq!(first.received()[0].body, second.received()[0].body);
+    }
+
+    #[tokio::test]
+    async fn a_body_over_the_replay_limit_or_without_one_is_judged_correctly() {
+        let upstream = testkit::spawn(|_req| Reply::bytes(429, &[], b"{}".to_vec())).await;
+        let forwarder = Forwarder::new().unwrap();
+        let big = OutboundBody::new(Full::new(Bytes::from(vec![b'x'; REPLAY_LIMIT + 1])));
+        forwarder
+            .send(&outbound(&upstream.url, Method::POST, "/v1/x", &[]), &big)
+            .await
+            .unwrap();
+        assert!(!big.replayable());
+        assert!(!big.resendable());
+        // No body: always sendable again.
+        let none = OutboundBody::new(Full::new(Bytes::new()));
+        assert!(none.replayable() && none.resendable());
     }
 }

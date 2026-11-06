@@ -16,7 +16,7 @@ use janus_core::contract::request_log::{Outcome, RequestRecord};
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{upstream_parser, Ctx};
+use super::Ctx;
 use crate::client::{api_path, decode, Admin};
 use crate::error::CliError;
 use crate::render::{self, fields, Table};
@@ -61,7 +61,8 @@ pub struct StreamFilter {
     /// Only records whose verified caller identity is this.
     #[arg(long, value_name = "STRING")]
     identity: Option<String>,
-    #[arg(long, value_name = "NAME", value_parser = upstream_parser())]
+    /// Only records of this upstream instance (`[[upstream]] name`).
+    #[arg(long, value_name = "NAME")]
     upstream: Option<String>,
     #[arg(long, value_name = "OUTCOME", value_parser = clap::builder::PossibleValuesParser::new(janus_daemon::store::OUTCOMES))]
     outcome: Option<String>,
@@ -181,7 +182,7 @@ fn row(r: &RequestRecord) -> Vec<String> {
     vec![
         render::time(Some(r.received_at)),
         r.request_id.clone(),
-        r.upstream.map_or("-".to_owned(), |u| u.to_string()),
+        upstream_text(r),
         r.method.clone(),
         r.path.clone(),
         render::text(Some(&r.caller_identity)),
@@ -189,6 +190,28 @@ fn row(r: &RequestRecord) -> Vec<String> {
         r.status.map_or("-".to_owned(), |s| s.to_string()),
         r.duration_ms.to_string(),
     ]
+}
+
+/// The instance name, with its implementation when the two differ:
+/// `claude (anthropic)`.
+fn upstream_text(r: &RequestRecord) -> String {
+    match (&r.upstream, r.implementation) {
+        (None, _) => "-".to_owned(),
+        (Some(name), Some(imp)) if name != imp.as_str() => format!("{name} ({imp})"),
+        (Some(name), _) => name.clone(),
+    }
+}
+
+/// The credentials tried and rejected before the one recorded.
+fn attempts_text(r: &RequestRecord) -> String {
+    if r.attempts.is_empty() {
+        return "-".to_owned();
+    }
+    r.attempts
+        .iter()
+        .map(|a| format!("{} {} {}", a.credential_ref, a.status, a.verdict.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn table(records: &[RequestRecord]) -> String {
@@ -207,10 +230,7 @@ fn detail(r: &RequestRecord) -> String {
         ("request id", r.request_id.clone()),
         ("received", render::time(Some(r.received_at))),
         ("duration", format!("{} ms", r.duration_ms)),
-        (
-            "upstream",
-            r.upstream.map_or("-".to_owned(), |u| u.to_string()),
-        ),
+        ("upstream", upstream_text(r)),
         ("route", render::text(r.route.as_deref())),
         ("request", format!("{} {}", r.method, r.path)),
         (
@@ -228,6 +248,7 @@ fn detail(r: &RequestRecord) -> String {
         ("outcome", outcome_text(&r.outcome)),
         ("credential", render::text(r.credential_ref.as_deref())),
         ("status", r.status.map_or("-".to_owned(), |s| s.to_string())),
+        ("failed over", attempts_text(r)),
         (
             "usage",
             r.usage.as_ref().map_or("-".to_owned(), Value::to_string),
@@ -473,6 +494,25 @@ impl Tail {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn records_show_the_instance_its_implementation_and_failed_over_credentials() {
+        let rec = |json: &str| serde_json::from_str::<RequestRecord>(json).unwrap();
+        let base = r#""request_id":"r","received_at":"2026-11-03T12:00:00Z","duration_ms":1,"method":"POST","path":"/p","binding":null,"caller_identity":"a","outcome":"forwarded""#;
+        let claude = rec(&format!(
+            r#"{{{base},"upstream":"claude","implementation":"anthropic","attempts":[{{"credential_ref":"max-1","status":429,"verdict":"rate_limited"}}]}}"#
+        ));
+        assert_eq!(upstream_text(&claude), "claude (anthropic)");
+        assert_eq!(attempts_text(&claude), "max-1 429 rate_limited");
+        assert!(detail(&claude).contains("claude (anthropic)"));
+        assert!(table(std::slice::from_ref(&claude)).contains("claude (anthropic)"));
+        // A legacy record: the instance is its implementation.
+        let legacy = rec(&format!(r#"{{{base},"upstream":"anthropic"}}"#));
+        assert_eq!(upstream_text(&legacy), "anthropic");
+        assert_eq!(attempts_text(&legacy), "-");
+        let none = rec(&format!("{{{base}}}"));
+        assert_eq!(upstream_text(&none), "-");
+    }
 
     #[test]
     fn times_are_rfc3339_or_a_duration_ago() {

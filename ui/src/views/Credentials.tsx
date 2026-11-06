@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useApi } from '@/api/context'
-import { UPSTREAMS, type CredentialMetadata, type UpstreamKind } from '@/api/types'
+import type { CredentialMetadata } from '@/api/types'
 import { Badge } from '@/components/Badge'
 import { ConfirmAction } from '@/components/ConfirmAction'
 import { PageHeader } from '@/components/PageHeader'
@@ -10,6 +10,7 @@ import { ActionNotice, Empty, ErrorNotice, Loading } from '@/components/States'
 import { Time } from '@/components/Time'
 import { credentialErrorText, formatCount, words } from '@/lib/format'
 import { credentialTone } from '@/lib/tone'
+import { useUpstreamNames } from '@/lib/upstream'
 import { useResource } from '@/lib/useResource'
 
 type Action = 'enable' | 'disable' | 'refresh' | 'remove'
@@ -34,7 +35,8 @@ const sourceLabel: Record<CredentialMetadata['source'], string> = {
 
 export function Credentials() {
   const api = useApi()
-  const [upstream, setUpstream] = useState<UpstreamKind | ''>('')
+  const [upstream, setUpstream] = useState('')
+  const upstreams = useUpstreamNames(true)
   const list = useResource(
     (signal) => api.credentials(upstream || undefined, signal),
     `credentials:${upstream}`,
@@ -71,10 +73,10 @@ export function Credentials() {
               <select
                 className="field"
                 value={upstream}
-                onChange={(e) => setUpstream(e.target.value as UpstreamKind | '')}
+                onChange={(e) => setUpstream(e.target.value)}
               >
                 <option value="">All</option>
-                {UPSTREAMS.map((u) => (
+                {upstreams.map((u) => (
                   <option key={u} value={u}>
                     {u}
                   </option>
@@ -136,6 +138,15 @@ export function Credentials() {
                     <div className="text-xs text-muted">
                       {kindLabel[c.kind] ?? c.kind}, {sourceLabel[c.source] ?? c.source}
                     </div>
+                    {c.tags.length > 0 && (
+                      <ul className="mt-1 flex flex-wrap gap-1" aria-label={`Tags of ${c.ref}`}>
+                        {c.tags.map((t) => (
+                          <li key={t} className="mono rounded border border-line px-1.5 text-xs text-ink-soft">
+                            {t}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </td>
                   <td className="whitespace-nowrap">{c.upstream}</td>
                   <td>

@@ -86,6 +86,7 @@ use crate::contract::credential::{
     CredentialPool, CredentialSource, CredentialStatus, MaterialDocument, NewCredential, PoolError,
     UpstreamFeedback,
 };
+use crate::contract::selection::{sticky_score, validate_tag, Pick, Selection, Strategy};
 use crate::contract::upstream::{DecodedMaterial, UpstreamError, UpstreamImpl, UpstreamKind};
 
 pub use slot::{pool_dir, POOL_DIR_NAME};
@@ -109,6 +110,8 @@ pub struct ConfiguredCredential {
     pub credential_ref: String,
     pub upstream: UpstreamKind,
     pub label: Option<String>,
+    /// Selection tags, already validated.
+    pub tags: Vec<String>,
     pub source: ConfiguredSource,
 }
 
@@ -159,6 +162,10 @@ pub struct FilePool {
     entries: RwLock<BTreeMap<String, Arc<Entry>>>,
     /// Serialises adds and removals, which change the set of slots.
     membership: tokio::sync::Mutex<()>,
+    /// Serialises default-chain picks, and counts them: a pick reads every
+    /// candidate's `last_pick` and stamps the chosen one, so two concurrent
+    /// picks never both take the same least-recently-used credential.
+    picks: Mutex<u64>,
 }
 
 impl fmt::Debug for FilePool {
@@ -234,6 +241,11 @@ struct Material {
 
 struct EntryState {
     label: Option<String>,
+    tags: Vec<String>,
+    /// The pool-wide pick sequence number of the last time a default-chain
+    /// pick chose this credential; `0` for never. What
+    /// `least_recently_used` orders by.
+    last_pick: u64,
     material: Material,
     disabled: bool,
     invalid: Option<String>,
@@ -281,6 +293,13 @@ impl EntryState {
         self.error_count += 1;
         self.last_error = Some(message);
     }
+}
+
+/// Tags as stored: sorted, without duplicates.
+pub fn normalize_tags(mut tags: Vec<String>) -> Vec<String> {
+    tags.sort();
+    tags.dedup();
+    tags
 }
 
 fn read_lock<T>(lock: &RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
@@ -332,6 +351,7 @@ impl Entry {
             request_count: st.request_count,
             error_count: st.error_count,
             last_error: st.last_error.clone(),
+            tags: st.tags.clone(),
         }
     }
 
@@ -339,6 +359,7 @@ impl Entry {
         SlotState {
             upstream: self.kind(),
             label: st.label.clone(),
+            tags: st.tags.clone(),
             created_at: self.created_at,
             disabled: st.disabled,
             invalid: st.invalid.clone(),
@@ -654,6 +675,7 @@ impl FilePool {
             upstreams,
             entries: RwLock::new(entries),
             membership: tokio::sync::Mutex::new(()),
+            picks: Mutex::new(0),
         })
     }
 
@@ -701,7 +723,11 @@ impl FilePool {
             chain: ChainKey::Configured(index),
             created_at: DateTime::<Utc>::UNIX_EPOCH,
             io: tokio::sync::Mutex::new(()),
-            state: Mutex::new(EntryState::new(cfg.label.clone(), material)),
+            state: Mutex::new(EntryState::new(
+                cfg.label.clone(),
+                cfg.tags.clone(),
+                material,
+            )),
         })
     }
 
@@ -752,6 +778,7 @@ impl FilePool {
                 let state = SlotState {
                     upstream: upstream_kind,
                     label: None,
+                    tags: Vec::new(),
                     created_at: disk.dir_modified,
                     disabled: false,
                     invalid: None,
@@ -764,7 +791,10 @@ impl FilePool {
                 state
             }
         };
-        let mut entry_state = EntryState::new(state.label, material);
+        for tag in &state.tags {
+            validate_tag(tag).map_err(|e| err(format!("{}: {e}", slot::SLOT_STATE_FILE)))?;
+        }
+        let mut entry_state = EntryState::new(state.label, state.tags, material);
         entry_state.disabled = state.disabled;
         entry_state.invalid = state.invalid;
         entry_state.rate_limited_until = state.rate_limited_until;
@@ -821,13 +851,73 @@ impl FilePool {
         list
     }
 
-    /// The default chain's pick for `upstream` right now.
-    fn default_entry(&self, upstream: UpstreamKind) -> Result<Arc<Entry>, PoolError> {
+    /// The credentials `selection` may pick now: active, admitted by its
+    /// filter, not in `exclude`, in chain order.
+    fn candidates(&self, selection: &Selection, exclude: &[String]) -> Vec<Arc<Entry>> {
         let now = Utc::now();
-        self.ordered(Some(upstream))
+        self.ordered(Some(selection.implementation()))
             .into_iter()
-            .find(|e| e.lock().status(now) == CredentialStatus::Active)
-            .ok_or(PoolError::NoDefault(upstream))
+            .filter(|e| !exclude.contains(&e.credential_ref))
+            .filter(|e| {
+                let st = e.lock();
+                st.status(now) == CredentialStatus::Active
+                    && selection.filter().admits(
+                        &e.credential_ref,
+                        st.material.decoded.kind,
+                        &st.tags,
+                    )
+            })
+            .collect()
+    }
+
+    /// The default chain's pick for `selection` right now. `commit` makes
+    /// it a pick: the round-robin cursor advances and the chosen credential
+    /// is stamped for `least_recently_used`; a peek does neither.
+    fn default_entry(
+        &self,
+        selection: &Selection,
+        pick: Pick<'_>,
+        commit: bool,
+    ) -> Result<Arc<Entry>, PoolError> {
+        let mut picks = self.picks.lock().unwrap_or_else(|e| e.into_inner());
+        let mut candidates = self.candidates(selection, pick.exclude);
+        if candidates.is_empty() {
+            return Err(PoolError::NoDefault(selection.instance().to_owned()));
+        }
+        let index = match (selection.strategy(), pick.identity) {
+            (Strategy::Ordered, _) | (Strategy::Sticky, None) => 0,
+            (Strategy::RoundRobin, _) => {
+                let position = if commit {
+                    selection.advance()
+                } else {
+                    selection.position()
+                };
+                // `len` is at most the number of credentials: no overflow.
+                (position % candidates.len() as u64) as usize
+            }
+            (Strategy::LeastRecentlyUsed, _) => candidates
+                .iter()
+                .enumerate()
+                .min_by_key(|(i, e)| (e.lock().last_pick, *i))
+                .map_or(0, |(i, _)| i),
+            (Strategy::Sticky, Some(identity)) => candidates
+                .iter()
+                .enumerate()
+                .max_by(|(i, a), (j, b)| {
+                    sticky_score(identity, &a.credential_ref)
+                        .cmp(&sticky_score(identity, &b.credential_ref))
+                        // Equal scores cannot happen for distinct refs; if
+                        // they did, the earlier in chain order wins.
+                        .then(j.cmp(i))
+                })
+                .map_or(0, |(i, _)| i),
+        };
+        let chosen = candidates.swap_remove(index);
+        if commit {
+            *picks += 1;
+            chosen.lock().last_pick = *picks;
+        }
+        Ok(chosen)
     }
 
     /// Apply `change` to the state, persist it, and return the metadata.
@@ -861,9 +951,11 @@ impl FilePool {
 }
 
 impl EntryState {
-    fn new(label: Option<String>, material: Material) -> EntryState {
+    fn new(label: Option<String>, tags: Vec<String>, material: Material) -> EntryState {
         EntryState {
             label,
+            tags,
+            last_pick: 0,
             material,
             disabled: false,
             invalid: None,
@@ -882,9 +974,11 @@ impl EntryState {
 impl CredentialPool for FilePool {
     async fn resolve(
         &self,
-        upstream: UpstreamKind,
+        selection: &Selection,
         choice: &CredentialChoice,
+        pick: Pick<'_>,
     ) -> Result<CredentialMaterial, PoolError> {
+        let upstream = selection.implementation();
         let unavailable = |r: &str, status| PoolError::Unavailable {
             credential_ref: r.to_owned(),
             status,
@@ -900,13 +994,24 @@ impl CredentialPool for FilePool {
                             actual: entry.kind(),
                         });
                     }
-                    let status = entry.lock().status(Utc::now());
+                    let st = entry.lock();
+                    if !selection
+                        .filter()
+                        .admits(r, st.material.decoded.kind, &st.tags)
+                    {
+                        return Err(PoolError::NotEligible {
+                            credential_ref: r.clone(),
+                            instance: selection.instance().to_owned(),
+                        });
+                    }
+                    let status = st.status(Utc::now());
                     if status != CredentialStatus::Active {
                         return Err(unavailable(r, status));
                     }
+                    drop(st);
                     entry
                 }
-                CredentialChoice::Default => self.default_entry(upstream)?,
+                CredentialChoice::Default => self.default_entry(selection, pick, true)?,
             };
             let usable = entry.make_usable(false).await;
             let default = matches!(choice, CredentialChoice::Default);
@@ -983,8 +1088,31 @@ impl CredentialPool for FilePool {
         Ok(self.get(credential_ref)?.metadata())
     }
 
-    async fn peek_default(&self, upstream: UpstreamKind) -> Result<CredentialMetadata, PoolError> {
-        Ok(self.default_entry(upstream)?.metadata())
+    async fn peek_default(
+        &self,
+        selection: &Selection,
+        identity: Option<&str>,
+    ) -> Result<CredentialMetadata, PoolError> {
+        let pick = Pick {
+            identity,
+            exclude: &[],
+        };
+        Ok(self.default_entry(selection, pick, false)?.metadata())
+    }
+
+    async fn set_tags(
+        &self,
+        credential_ref: &str,
+        tags: Vec<String>,
+    ) -> Result<CredentialMetadata, PoolError> {
+        for tag in &tags {
+            validate_tag(tag)?;
+        }
+        let tags = normalize_tags(tags);
+        self.pool_slot(credential_ref)?;
+        let meta = self.mutate(credential_ref, |st| st.tags = tags).await?;
+        tracing::info!(credential = %credential_ref, tags = ?meta.tags, "credential tags set");
+        Ok(meta)
     }
 
     async fn add(&self, new: NewCredential) -> Result<CredentialMetadata, PoolError> {
@@ -992,12 +1120,17 @@ impl CredentialPool for FilePool {
             upstream: kind,
             credential_ref,
             label,
+            tags,
             material: doc,
         } = new;
         let doc = slot::canonical_document(doc);
         if let Some(r) = &credential_ref {
             validate_credential_ref(r)?;
         }
+        for tag in &tags {
+            validate_tag(tag)?;
+        }
+        let tags = normalize_tags(tags);
         let upstream = self.upstream(kind)?.clone();
         let decoded = upstream
             .decode_material(&doc)
@@ -1010,6 +1143,7 @@ impl CredentialPool for FilePool {
         let state = SlotState {
             upstream: kind,
             label: label.clone(),
+            tags: tags.clone(),
             created_at,
             disabled: false,
             invalid: None,
@@ -1054,7 +1188,7 @@ impl CredentialPool for FilePool {
             chain: ChainKey::Pool(created_at, credential_ref.clone()),
             created_at,
             io: tokio::sync::Mutex::new(()),
-            state: Mutex::new(EntryState::new(label, material)),
+            state: Mutex::new(EntryState::new(label, tags, material)),
         });
         write_lock(&self.entries).insert(credential_ref.clone(), entry.clone());
         tracing::info!(credential = %credential_ref, upstream = %kind, "credential added to the pool");

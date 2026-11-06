@@ -64,9 +64,14 @@ what `janus status` prints and what the UI overview renders. Its fields:
 - `listeners` — `admin_socket` (its path); `admin_tcp` and `ui`, each `null`
   when not configured, otherwise `{ address, tls, url }`; and `data_plane` (its
   address).
-- `upstreams` — one entry per `[[upstream]]`: `name`, `path_prefix`, `base_url`,
-  `binding` (the upstream-wide binding's method, or `null` when none resolves),
-  and `routes`, a list of `{ path, binding }`.
+- `upstreams` — one entry per `[[upstream]]` instance: `name` (the instance
+  name), `implementation`, `path_prefix`, `base_url`, `binding` (the
+  upstream-wide binding's method, or `null` when none resolves), `routes`, a
+  list of `{ path, binding }`, and the instance's selection — `strategy`,
+  `failover`, `credentials` (its credential filter, `null` when it admits every
+  credential of the implementation) and `eligible`, the refs the filter admits
+  now, in chain order and whatever their status (see
+  <ref target="docs/configuration#upstream-instances">upstream instances</ref>).
 - `data_plane` — `refused_connections`: the connections the data plane closed
   unanswered since start for being over `data_plane.max_connections`; `0` in
   normal operation. `janus status` prints it, flagged when non-zero.
@@ -101,27 +106,44 @@ what `janus status` prints and what the UI overview renders. Its fields:
 A credential is addressed by its `ref` — the same opaque reference a plugin
 returns in `credential_ref`, and the pool slot's name. Every list and show
 response carries metadata only: `ref`, `upstream`, `kind` (how auth is carried
-for that upstream), `label`, `source` (`pool` | `env` | `file`), `status`
-(`active` | `invalid` | `disabled` | `rate_limited`), `rate_limited_until`,
-`expires_at`, `last_used_at`, `request_count`, `error_count`, `last_error`.
+for that upstream), `label`, `tags`, `source` (`pool` | `env` | `file`),
+`status` (`active` | `invalid` | `disabled` | `rate_limited`),
+`rate_limited_until`, `expires_at`, `last_used_at`, `request_count`,
+`error_count`, `last_error`.
+
+`upstream` in a query names an `[[upstream]]` instance, and selects the
+credentials that instance's filter admits. A name no instance has but which is
+an implementation name (`anthropic`, `openai`, `openrouter`) selects every
+credential of that implementation, in chain order with `ordered` selection; any
+other name is `400 invalid_request`. A credential's own `upstream` field is
+always its implementation.
 
 - `GET /v1/credentials[?upstream=]` — list.
 - `GET /v1/credentials/{ref}` — one credential.
-- `GET /v1/credentials/default?upstream=` — the credential the default chain
-  would pick for that upstream *right now*, as metadata. This is the "peek" a
-  host needs to show which account its traffic is on; it never touches the
-  material.
-- `POST /v1/credentials` — add a credential to the pool. Body: `upstream`,
-  optional `ref` (generated if absent), optional `label`, and `material` — a
-  kind-specific object the upstream implementation knows how to store (an API
-  key; the contents of a vendor CLI's credential file). The daemon writes the
-  pool slot and the credential is live without a restart.
+- `GET /v1/credentials/default?upstream=[&identity=]` — the credential the
+  instance's default chain would pick *right now*, as metadata. This is the
+  "peek" a host needs to show which account its traffic is on; it never touches
+  the material and has no side effect — it does not advance a `round_robin`
+  cursor or count as a pick for `least_recently_used`, so it names the
+  credential the next request would get. For a `sticky` instance, `identity` is
+  the caller identity to peek for; without it the peek picks as `ordered` does.
+- `POST /v1/credentials` — add a credential to the pool. Body: `upstream` (an
+  implementation name), optional `ref` (generated if absent), optional `label`,
+  optional `tags` (a list), and `material` — a kind-specific object the upstream
+  implementation knows how to store (an API key; the contents of a vendor CLI's
+  credential file). The daemon writes the pool slot and the credential is live
+  without a restart.
 - `PUT /v1/credentials/{ref}/material` — body `{ "material": { ... } }`; replace
   the material and clear an `invalid` status. The rotation path.
+- `PUT /v1/credentials/{ref}/tags` — body `{ "tags": [ ... ] }`; replace a pool
+  slot's tags, which takes effect on the next request to every instance that
+  filters on them. A tag uses only `[A-Za-z0-9._-]` (`400 invalid_tag`
+  otherwise). A config credential's tags belong to the config, so this is
+  `409 not_pool_managed` for one. Audited as `credential.set_tags`.
 - `POST /v1/credentials/{ref}/disable`, `POST /v1/credentials/{ref}/enable` —
-  take a credential out of, or back into, the default chain and plugin
-  resolution. A plugin that names a disabled `ref` gets a failed request, not a
-  silent fall-through — the same posture as step 4 of
+  take a credential out of, or back into, the default chain of every instance
+  and plugin resolution. A plugin that names a disabled `ref` gets a failed
+  request, not a silent fall-through — the same posture as step 4 of
   <ref target="docs/architecture#request-lifecycle">the request lifecycle</ref>.
 - `POST /v1/credentials/{ref}/refresh` — force a refresh of an expiring
   credential now rather than on next use. A credential with nothing to refresh
@@ -172,7 +194,10 @@ record shape.
 - `GET /v1/requests?identity=&upstream=&outcome=&credential=&since=&until=&limit=&before=`
   — newest first, cursor-paginated (`before` is the cursor from the previous
   page's `next`). `limit` defaults to 100 and is capped at 1000; `limit=0` and
-  an unknown `outcome` are refused.
+  an unknown `outcome` are refused. `upstream` matches the record's instance
+  name exactly; any name is accepted, because a record keeps the name of an
+  instance that has since been renamed or removed, and a name no record carries
+  matches nothing.
 - `GET /v1/requests/{request_id}` — one record.
 - `GET /v1/requests/stream?identity=&upstream=&outcome=` — a live tail as
   `text/event-stream`. SSE rather than a WebSocket because `curl`, the CLI and a
@@ -222,6 +247,7 @@ stored is `404 request_log_disabled` rather than `request_not_found`.
 | `invalid_request` | 400 | malformed body, query or path parameter; unknown field |
 | `invalid_ref` | 400 | a `ref` that breaks the naming rule |
 | `invalid_material` | 400 | material the upstream implementation cannot store |
+| `invalid_tag` | 400 | a tag that breaks the tag grammar |
 | `unauthorized` | 401 | missing or wrong admin token |
 | `not_found` | 404 | unknown endpoint |
 | `credential_not_found`, `identity_not_found`, `request_not_found` | 404 | no such resource |
@@ -231,7 +257,8 @@ stored is `404 request_log_disabled` rather than `request_not_found`.
 | `credential_exists` | 409 | `POST /v1/credentials` with a `ref` already in use |
 | `wrong_upstream` | 409 | the `ref` belongs to a different upstream |
 | `credential_unavailable` | 409 | the credential cannot be used in its current state |
-| `not_pool_managed` | 409 | replacing or deleting a config credential |
+| `not_pool_managed` | 409 | replacing, retagging or deleting a config credential |
+| `not_eligible` | 409 | a `ref` the instance's credential filter does not admit |
 | `not_refreshable` | 409 | refreshing a credential that has nothing to refresh |
 | `no_plugin` | 409 | `POST /v1/plugin/check` with no `[plugin]` block |
 | `payload_too_large` | 413 | request body over the limit |
@@ -251,8 +278,8 @@ it is metadata only — Janus does not capture request or response bodies. Field
 - `request_id` — Janus-assigned; the same value a plugin sees in `ResolveRoute`
   and `Notify`.
 - `received_at`, `duration_ms`.
-- `upstream`, `route` (the matched route path, if a route binding applied),
-  `method`, `path`.
+- `upstream` (the `[[upstream]]` instance name), `implementation`, `route` (the
+  matched route path, if a route binding applied), `method`, `path`.
 - `binding` — the identity method that ran (`hmac`, `jwt`, `opaque`,
   `trusted_header`, `custom:<name>`, or `none`).
 - `caller_identity` — the verified identity; empty on a `none` route and on a
@@ -266,7 +293,13 @@ it is metadata only — Janus does not capture request or response bodies. Field
   `denied` (with the plugin's `reason`), `plugin_failed` (with the failure
   class), `credential_unavailable`, `upstream_error`, `abandoned` (with
   `stage`).
-- `credential_ref` — what was actually used, when one was.
+- `credential_ref` — what was actually used, when one was; after a failover, the
+  credential that gave the answer relayed.
+- `attempts` — the credentials tried and failed over before `credential_ref`, in
+  order, each `{ credential_ref, status, verdict }` with `verdict` one of
+  `credential_invalid`, `rate_limited`, `account_error`; empty when the first
+  credential's answer was relayed (see
+  <ref target="docs/credential-substitution#failover">failover</ref>).
 - `status` — the upstream's HTTP status, when the call was forwarded.
 - `usage` — the upstream-specific observation object, identical to what
   `call_completed` carries.
@@ -292,9 +325,10 @@ janus status
 
 janus credential list [--upstream <name>]
 janus credential show <ref>
-janus credential default --upstream <name>
-janus credential add --upstream <name> [--ref <ref>] [--label <text>]
-                     (--api-key-stdin | --from-file <path>)
+janus credential default --upstream <name> [--identity <string>]
+janus credential add --upstream <implementation> [--ref <ref>] [--label <text>]
+                     [--tag <tag>]... (--api-key-stdin | --from-file <path>)
+janus credential tag <ref> [--tag <tag>]...      # replaces; none clears
 janus credential rotate <ref> (--api-key-stdin | --from-file <path>)
 janus credential enable|disable|refresh|rm <ref>
 
@@ -313,6 +347,12 @@ janus plugin status
 janus plugin check
 janus plugin tls init --plugin-host <name> [--out <dir>] [--days N]
 ```
+
+`janus status` prints each instance with its implementation, strategy
+(`+failover` when set) and admitted credentials; `janus credential list` and
+`show` print tags; `janus log` prints the instance as `claude (anthropic)` when
+its name differs from its implementation, and a `failed over` line listing the
+`attempts`.
 
 `--from-file` reads credential material from a file on the operator's host — the
 vendor CLI's own credential file, typically — and sends its contents in
@@ -356,14 +396,17 @@ not pool slots already on disk.
 The UI makes the daemon's state legible; it is the admin surface rendered, and
 it is deliberately a subset of it. Five views:
 
-- **Overview** — `/v1/status`: listeners, upstreams and their bindings, plugin
-  mode and health with certificate expiry, credential health at a glance,
-  request and denial rates from the log.
-- **Credentials** — the list with status and counters; actions: enable, disable,
-  refresh, remove.
+- **Overview** — `/v1/status`: listeners, upstream instances with their
+  implementation, bindings, strategy and admitted credentials, plugin mode and
+  health with certificate expiry, credential health at a glance, request and
+  denial rates from the log.
+- **Credentials** — the list with status, tags and counters; actions: enable,
+  disable, refresh, remove.
 - **Identities** — the registry with filters; action: revoke.
 - **Requests** — a filterable table over `/v1/requests` with a live-tail toggle
-  on `/v1/requests/stream`, and a detail drawer for one record.
+  on `/v1/requests/stream`, showing each record's instance (and implementation
+  when they differ), and a detail drawer for one record that lists its failed
+  over `attempts`.
 - **Plugin** — the channel's health, and a button that runs `/v1/plugin/check`.
 
 Two operations present on the API are not in the UI: adding a credential and
@@ -405,7 +448,9 @@ The daemon owns one SQLite database, `<data_dir>/janus.db`, with two tables:
   `opaque` lookup on the hot path is a hash-map probe and never a disk read;
   `last_seen_at` is flushed periodically rather than written per lookup.
 - `requests` — the request log, as described above, indexed on `(received_at)`,
-  `(caller_identity, received_at)` and `(request_id)`.
+  `(caller_identity, received_at)` and `(request_id)`. Rows written before
+  upstream instances existed are given an `implementation` equal to their
+  `upstream`, which was then always an implementation name, and no `attempts`.
 
 SQLite because the daemon is standalone by default and must carry no external
 service; because both tables want indexed queries and the request log wants

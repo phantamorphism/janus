@@ -1,5 +1,6 @@
 import { ApiError } from './client'
 import type {
+  CredentialFilter,
   CredentialStatus,
   DaemonStatus,
   Listeners,
@@ -8,7 +9,9 @@ import type {
   TcpListenerInfo,
   UpstreamSummary,
 } from './types'
-import { CREDENTIAL_STATUSES } from './types'
+import { CREDENTIAL_STATUSES, UPSTREAMS } from './types'
+
+const STRATEGIES: readonly string[] = ['ordered', 'round_robin', 'least_recently_used', 'sticky']
 
 // Strict readers for `GET /v1/status` and `GET /v1/plugin`, whose shapes are
 // fixed by the daemon (`admin/status.rs`, janus-core `PluginStatus`). A
@@ -73,6 +76,29 @@ function listeners(v: unknown): Listeners {
   }
 }
 
+function strings(o: Json, k: string, at: string): string[] {
+  return list(o, k, at).map((v, i) => {
+    if (typeof v !== 'string') bad(`${at}.${k}[${i}] is not a string`)
+    return v
+  })
+}
+
+function oneOf<T extends string>(o: Json, k: string, at: string, allowed: readonly string[]): T {
+  const v = str(o, k, at)
+  if (!allowed.includes(v)) bad(`${at}.${k} is ${JSON.stringify(v)}`)
+  return v as T
+}
+
+function filter(v: unknown, at: string): CredentialFilter | null {
+  if (v === null) return null
+  const o = obj(v, at)
+  const f: CredentialFilter = {}
+  if (o.kind !== undefined) f.kind = oneOf(o, 'kind', at, ['api_key', 'oauth'])
+  if (o.refs !== undefined) f.refs = strings(o, 'refs', at)
+  if (o.tags !== undefined) f.tags = strings(o, 'tags', at)
+  return f
+}
+
 function upstream(v: unknown, i: number): UpstreamSummary {
   const at = `upstreams[${i}]`
   const o = obj(v, at)
@@ -81,7 +107,12 @@ function upstream(v: unknown, i: number): UpstreamSummary {
     return { path: str(ro, 'path', `${at}.routes[${j}]`), binding: str(ro, 'binding', `${at}.routes[${j}]`) }
   })
   return {
-    name: str(o, 'name', at) as UpstreamSummary['name'],
+    name: str(o, 'name', at),
+    implementation: oneOf(o, 'implementation', at, UPSTREAMS),
+    strategy: oneOf(o, 'strategy', at, STRATEGIES),
+    failover: bool(o, 'failover', at),
+    credentials: filter(o.credentials, `${at}.credentials`),
+    eligible: strings(o, 'eligible', at),
     path_prefix: str(o, 'path_prefix', at),
     base_url: str(o, 'base_url', at),
     binding: strOrNull(o, 'binding', at),

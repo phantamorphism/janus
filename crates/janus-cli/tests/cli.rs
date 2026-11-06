@@ -1057,3 +1057,108 @@ async fn check_config_runs_the_daemons_validation() {
     let missing = janus(&["check-config"]).run().await;
     assert_eq!(missing.code, 2);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn credential_tags_and_upstream_instances() {
+    let d = TestDaemon::start(
+        "[[upstream]]\nname = \"team\"\nimplementation = \"openrouter\"\npath_prefix = \"/team\"\nbase_url = \"http://127.0.0.1:9/api\"\nstrategy = \"round_robin\"\n[upstream.credentials]\ntags = [\"team\"]\n",
+    )
+    .await;
+    for (r, tags) in [("or-a", &[][..]), ("or-b", &["team", "spare"][..])] {
+        let mut args = vec![
+            "credential",
+            "add",
+            "--upstream",
+            "openrouter",
+            "--ref",
+            r,
+            "--api-key-stdin",
+            "--json",
+        ];
+        for t in tags {
+            args.extend(["--tag", t]);
+        }
+        let meta = d.cli(&args).stdin(b"sk-or-v1-tagged").run().await.ok_json();
+        let mut want: Vec<&str> = tags.to_vec();
+        want.sort();
+        assert_eq!(meta["tags"], serde_json::json!(want), "{r}");
+    }
+    let refs = |v: serde_json::Value| -> Vec<String> {
+        v["credentials"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["ref"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let team = d
+        .janus(&["credential", "list", "--upstream", "team", "--json"])
+        .await
+        .ok_json();
+    assert_eq!(refs(team), ["or-b"]);
+
+    // `credential tag` replaces the tags; the instance admits or-a at once.
+    let tagged = d
+        .janus(&["credential", "tag", "or-a", "--tag", "team"])
+        .await;
+    tagged.ok();
+    assert!(
+        tagged.stdout.contains("tagged credential or-a"),
+        "{}",
+        tagged.stdout
+    );
+    assert!(tagged.stdout.contains("team"), "{}", tagged.stdout);
+    let team = d
+        .janus(&["credential", "list", "--upstream", "team", "--json"])
+        .await
+        .ok_json();
+    assert_eq!(refs(team), ["or-a", "or-b"]);
+    let cleared = d
+        .janus(&["credential", "tag", "or-b", "--json"])
+        .await
+        .ok_json();
+    assert_eq!(cleared["tags"], serde_json::json!([]));
+    let bad = d
+        .janus(&["credential", "tag", "or-b", "--tag", "a b", "--json"])
+        .await;
+    assert_eq!(bad.code, 1);
+    assert_eq!(bad.error_json()["error"]["code"], "invalid_tag");
+
+    // The default peek for an instance, and an unknown instance.
+    let peek = d
+        .janus(&[
+            "credential",
+            "default",
+            "--upstream",
+            "team",
+            "--identity",
+            "alice",
+            "--json",
+        ])
+        .await
+        .ok_json();
+    assert_eq!(peek["ref"], "or-a");
+    let unknown = d
+        .janus(&["credential", "list", "--upstream", "nope", "--json"])
+        .await;
+    assert_eq!(unknown.code, 1);
+
+    // Status names the instance and its implementation and strategy.
+    let status = d.janus(&["status"]).await;
+    status.ok();
+    for text in ["team", "openrouter", "round_robin", "or-a"] {
+        assert!(status.stdout.contains(text), "{text}: {}", status.stdout);
+    }
+    let check = janus(&[
+        "--config",
+        d.config_path.to_str().unwrap(),
+        "check-config",
+        "--json",
+    ])
+    .run()
+    .await
+    .ok_json();
+    assert_eq!(check["upstreams"][0]["upstream"], "team");
+    assert_eq!(check["upstreams"][0]["implementation"], "openrouter");
+    assert_eq!(check["upstreams"][0]["strategy"], "round_robin");
+}

@@ -7,7 +7,11 @@
 //! plugin is configured (no plugin, or a `method = "none"` route, makes zero
 //! plugin calls); every plugin failure fails the request closed; a
 //! credential that cannot be had fails the request rather than falling
-//! through to another. The caller's body is handed to the forwarder unread.
+//! through to another, except that an instance with `failover = true` moves
+//! a default-chain request on to its next eligible credential when the
+//! upstream rejects the one it used and the body can be sent again
+//! (`docs/credential-substitution#failover`). The caller's body is handed to
+//! the forwarder unread.
 
 use std::sync::Arc;
 
@@ -18,8 +22,11 @@ use janus_core::contract::credential::CredentialChoice;
 use janus_core::contract::identity::{RejectionKind, RequestHead};
 use janus_core::contract::plugin::{ResolveRoute, RouteOutcome};
 use janus_core::contract::request_log::{AbandonStage, Outcome};
+use janus_core::contract::selection::Pick;
 use janus_core::contract::upstream::UpstreamError;
-use janus_core::proxy::{build_outbound, ForwardError, Substitution, SubstitutionError};
+use janus_core::proxy::{
+    build_outbound, ForwardError, OutboundBody, Substitution, SubstitutionError,
+};
 
 use super::settle::Settlement;
 use super::{reply, DataPlane};
@@ -41,10 +48,10 @@ pub(super) async fn proxy(State(dp): State<Arc<DataPlane>>, request: Request) ->
         );
         return reply::not_routed();
     };
-    settle.upstream(upstream.kind);
+    settle.upstream(upstream.name(), upstream.kind);
 
     // Step 2: identity, from the head only.
-    let selected = match dp.bindings.select(upstream.kind, stripped) {
+    let selected = match dp.bindings.select(upstream.name(), stripped) {
         Ok(selected) => selected,
         Err(_) => {
             settle.abandon(
@@ -88,7 +95,8 @@ pub(super) async fn proxy(State(dp): State<Arc<DataPlane>>, request: Request) ->
         (Some(identity), Some(plugin)) => {
             let request = ResolveRoute {
                 request_id: settle.request_id(),
-                upstream: upstream.kind.as_str().to_owned(),
+                upstream: upstream.name().to_owned(),
+                implementation: upstream.kind.as_str().to_owned(),
                 caller_identity: identity.caller_identity.clone(),
                 correlation_id: identity.correlation_id.clone(),
                 identity_claims: identity.claims.clone(),
@@ -120,70 +128,125 @@ pub(super) async fn proxy(State(dp): State<Arc<DataPlane>>, request: Request) ->
 
     // Step 4: the credential.
     settle.stage(AbandonStage::Credential);
-    let material = match dp.pool.resolve(upstream.kind, &choice).await {
+    let selection = &upstream.selection;
+    let caller = identity.as_ref().map(|i| i.caller_identity.as_str());
+    let mut tried: Vec<String> = Vec::new();
+    let mut material = match dp
+        .pool
+        .resolve(
+            selection,
+            &choice,
+            Pick {
+                identity: caller,
+                exclude: &tried,
+            },
+        )
+        .await
+    {
         Ok(material) => material,
         Err(e) => {
             settle.abandon(Outcome::CredentialUnavailable, e.to_string());
             return reply::credential_unavailable();
         }
     };
-    settle.credential(&material.credential_ref);
-
-    // Step 5: the outbound request.
-    settle.stage(AbandonStage::Rewrite);
     let implementation = Arc::clone(dp.upstreams.get(upstream.kind));
-    let outbound = build_outbound(
-        &head,
-        Substitution {
-            upstream: implementation.as_ref(),
-            base_url: &upstream.base_url,
-            rest: &rest,
-            material: &material,
-            presented_at: identity.as_ref().map(|i| &i.presented_at),
-        },
-    );
-    let outbound = match outbound {
-        Ok(outbound) => outbound,
-        Err(e) => {
-            let (reason, response) = rewrite_failure(&e);
-            settle.abandon(
-                Outcome::Abandoned {
-                    stage: AbandonStage::Rewrite,
-                },
-                reason,
-            );
-            return response;
-        }
-    };
-    let credential_ref = material.credential_ref.clone();
-    drop(material);
+    let body = OutboundBody::new(body);
+    let may_fail_over = selection.failover() && choice == CredentialChoice::Default;
+    loop {
+        settle.credential(&material.credential_ref);
 
-    // Step 6: forward, relay.
-    settle.stage(AbandonStage::Forward);
-    match dp.forwarder.forward(implementation, outbound, body).await {
-        Ok(relayed) => {
-            let status = relayed.response.status();
-            settle.relayed(upstream.kind, credential_ref, status, relayed.outcome);
-            relayed.response.map(Body::new)
+        // Step 5: the outbound request.
+        settle.stage(AbandonStage::Rewrite);
+        let outbound = build_outbound(
+            &head,
+            Substitution {
+                upstream: implementation.as_ref(),
+                base_url: &upstream.base_url,
+                rest: &rest,
+                material: &material,
+                presented_at: identity.as_ref().map(|i| &i.presented_at),
+            },
+        );
+        let outbound = match outbound {
+            Ok(outbound) => outbound,
+            Err(e) => {
+                let (reason, response) = rewrite_failure(&e);
+                settle.abandon(
+                    Outcome::Abandoned {
+                        stage: AbandonStage::Rewrite,
+                    },
+                    reason,
+                );
+                return response;
+            }
+        };
+        let credential_ref = material.credential_ref.clone();
+        drop(material);
+
+        // Step 6: forward, relay.
+        settle.stage(AbandonStage::Forward);
+        let mut sent = match dp.forwarder.send(&outbound, &body).await {
+            Ok(sent) => sent,
+            Err(ForwardError::Upstream(e)) => {
+                // The cause chain carries no URL, query or credential.
+                tracing::warn!(upstream = %upstream.name(), error = %e, "upstream request failed");
+                settle.abandon(
+                    Outcome::UpstreamError,
+                    format!("upstream request failed: {e}"),
+                );
+                return reply::upstream_error();
+            }
+            Err(e @ ForwardError::BadTarget(_)) => {
+                settle.abandon(
+                    Outcome::Abandoned {
+                        stage: AbandonStage::Forward,
+                    },
+                    e.to_string(),
+                );
+                return reply::rewrite_failed();
+            }
+        };
+        if may_fail_over && body.replayable() {
+            if let Some(feedback) = sent.verdict(implementation.as_ref()).await {
+                tried.push(credential_ref.clone());
+                // Only a body read to its end within the replay limit is
+                // sent to another credential; otherwise relay what came
+                // back.
+                let next = match body.resendable() {
+                    true => dp
+                        .pool
+                        .resolve(
+                            selection,
+                            &choice,
+                            Pick {
+                                identity: caller,
+                                exclude: &tried,
+                            },
+                        )
+                        .await
+                        .ok(),
+                    false => None,
+                };
+                if let Some(next) = next {
+                    tracing::info!(
+                        upstream = %upstream.name(),
+                        from = %credential_ref,
+                        to = %next.credential_ref,
+                        status = sent.status().as_u16(),
+                        "upstream rejected the credential; failing over"
+                    );
+                    settle
+                        .failed_over(credential_ref, sent.status(), &feedback)
+                        .await;
+                    material = next;
+                    continue;
+                }
+            }
         }
-        Err(ForwardError::Upstream(e)) => {
-            // The cause chain carries no URL, query or credential.
-            tracing::warn!(upstream = %upstream.path_prefix, error = %e, "upstream request failed");
-            settle.abandon(
-                Outcome::UpstreamError,
-                format!("upstream request failed: {e}"),
-            );
-            reply::upstream_error()
-        }
-        Err(e @ ForwardError::BadTarget(_)) => {
-            settle.abandon(
-                Outcome::Abandoned {
-                    stage: AbandonStage::Forward,
-                },
-                e.to_string(),
-            );
-            reply::rewrite_failed()
-        }
+        let status = sent.status();
+        let relayed = sent.relay(implementation);
+        settle.relayed(credential_ref, status, relayed.outcome);
+        return relayed.response.map(Body::new);
     }
 }
 

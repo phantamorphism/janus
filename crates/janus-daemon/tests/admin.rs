@@ -23,6 +23,7 @@ use janus_core::contract::plugin::{
 };
 use janus_core::contract::registry::{OpaqueRegistry, TokenHash};
 use janus_core::contract::request_log::Outcome;
+use janus_core::contract::selection::{Pick, Selection};
 use janus_core::contract::upstream::UpstreamKind;
 use janus_daemon::admin::{AdminError, PING_INTERVAL};
 use serde_json::{json, Value};
@@ -766,6 +767,7 @@ async fn credential_material_never_returned() {
         "request_count",
         "error_count",
         "last_error",
+        "tags",
     ] {
         assert!(meta.get(field).is_some(), "metadata lacks {field}: {meta}");
     }
@@ -774,7 +776,7 @@ async fn credential_material_never_returned() {
     assert_eq!(meta["source"], "pool");
     assert_eq!(
         meta.as_object().expect("object").len(),
-        12,
+        13,
         "only metadata: {meta}"
     );
     bodies.push(added.text());
@@ -783,8 +785,9 @@ async fn credential_material_never_returned() {
     let material = d
         .pool
         .resolve(
-            UpstreamKind::OpenRouter,
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
             &CredentialChoice::Ref("main".into()),
+            Pick::default(),
         )
         .await
         .expect("usable");
@@ -878,7 +881,11 @@ async fn credential_add_is_live_with_a_generated_ref_and_a_pool_slot() {
     // Usable at once, without a restart: the default chain picks it.
     let material = d
         .pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Default)
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Default,
+            Pick::default(),
+        )
         .await
         .expect("default resolves");
     assert_eq!(material.credential_ref, r);
@@ -924,7 +931,11 @@ async fn credential_disable_enable_rotate_and_delete() {
     assert_eq!(peek.error_code(), "no_default_credential");
     let named = d
         .pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Ref(r.clone()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Ref(r.clone()),
+            Pick::default(),
+        )
         .await;
     assert!(
         matches!(named, Err(PoolError::Unavailable { .. })),
@@ -963,7 +974,11 @@ async fn credential_disable_enable_rotate_and_delete() {
     );
     let material = d
         .pool
-        .resolve(UpstreamKind::OpenRouter, &CredentialChoice::Ref(r.clone()))
+        .resolve(
+            &Selection::implementation_wide(UpstreamKind::OpenRouter),
+            &CredentialChoice::Ref(r.clone()),
+            Pick::default(),
+        )
         .await
         .expect("usable");
     assert_eq!(material.secret.expose_str(), Some("sk-or-new-0123456789"));
@@ -1074,8 +1089,9 @@ async fn credential_refresh_updates_oauth_expiry_now() {
     let material = d
         .pool
         .resolve(
-            UpstreamKind::Anthropic,
+            &Selection::implementation_wide(UpstreamKind::Anthropic),
             &CredentialChoice::Ref("claude-max".into()),
+            Pick::default(),
         )
         .await
         .expect("usable");
@@ -1504,11 +1520,17 @@ async fn requests_query_filters_and_paginates_newest_first() {
     assert_eq!(one["upstream"], "openai");
     assert_eq!(one["binding"], "opaque");
 
+    // `upstream` is an instance name, and the log keeps the names of
+    // instances a past config had, so an unknown name matches nothing
+    // rather than being refused.
+    let gone = s.get("/v1/requests?upstream=retired-instance").await;
+    assert_eq!(gone.status, 200, "{}", gone.text());
+    assert_eq!(gone.json()["requests"], json!([]));
+
     for bad in [
         "/v1/requests?outcome=bogus",
         "/v1/requests?before=garbage",
         "/v1/requests?limit=0",
-        "/v1/requests?upstream=bogus",
         "/v1/requests?since=yesterday",
         "/v1/requests?unknown=1",
     ] {
@@ -2122,4 +2144,173 @@ async fn check_config_refuses_what_start_refuses_and_creates_nothing() {
     let file = tempfile::NamedTempFile::new().expect("file");
     let err = check_config(&Builder::new("").config(), file.path()).expect_err("not a dir");
     assert!(matches!(err, AdminError::DataDir { .. }), "{err}");
+}
+
+const INSTANCES: &str = r#"
+[identity]
+method = "opaque"
+source = { header = "authorization", scheme = "Bearer " }
+
+[[upstream]]
+name = "anthropic"
+path_prefix = "/anthropic"
+base_url = "https://api.anthropic.com"
+strategy = "round_robin"
+failover = true
+[upstream.credentials]
+kind = "api_key"
+
+[[upstream]]
+name = "claude"
+implementation = "anthropic"
+path_prefix = "/claude"
+base_url = "https://api.anthropic.com"
+strategy = "sticky"
+[upstream.credentials]
+kind = "oauth"
+tags = ["max"]
+"#;
+
+#[tokio::test]
+async fn instances_scope_credential_listing_default_and_status_and_tags_are_settable() {
+    let d = Builder::new(INSTANCES).start().await;
+    let s = d.socket();
+    let far = (Utc::now() + chrono::Duration::days(30)).timestamp_millis();
+    let oauth = |r: &str, tags: Value| {
+        json!({
+            "upstream": "anthropic",
+            "ref": r,
+            "tags": tags,
+            "material": { "claudeAiOauth": {
+                "accessToken": format!("at-{r}-SECRET"),
+                "refreshToken": format!("rt-{r}-SECRET"),
+                "expiresAt": far,
+            } },
+        })
+    };
+    for body in [
+        json!({ "upstream": "anthropic", "ref": "key-1", "material": { "api_key": "sk-ant-api03-KEYONE" } }),
+        json!({ "upstream": "anthropic", "ref": "key-2", "material": { "api_key": "sk-ant-api03-KEYTWO" } }),
+        oauth("max-1", json!(["max", "personal"])),
+        oauth("max-2", json!([])),
+    ] {
+        let added = s.post("/v1/credentials", Some(body)).await;
+        assert_eq!(added.status, 201, "{}", added.text());
+    }
+    let refs = |reply: support::Reply| -> Vec<String> {
+        assert_eq!(reply.status, 200, "{}", reply.text());
+        reply.json()["credentials"]
+            .as_array()
+            .expect("list")
+            .iter()
+            .map(|c| c["ref"].as_str().expect("ref").to_owned())
+            .collect()
+    };
+    // `?upstream=` names an instance; an implementation name no instance
+    // has would list everything of it, but here `anthropic` is an instance.
+    assert_eq!(
+        refs(s.get("/v1/credentials?upstream=anthropic").await),
+        ["key-1", "key-2"]
+    );
+    assert_eq!(
+        refs(s.get("/v1/credentials?upstream=claude").await),
+        ["max-1"]
+    );
+    assert_eq!(
+        refs(s.get("/v1/credentials?upstream=openai").await),
+        Vec::<String>::new()
+    );
+    let unknown = s.get("/v1/credentials?upstream=nope").await;
+    assert_eq!(unknown.status, 400);
+    assert_eq!(unknown.error_code(), "invalid_request");
+
+    // Tags: normalised, validated, only on pool slots; they change what an
+    // instance admits at once.
+    let tagged = s
+        .put(
+            "/v1/credentials/max-2/tags",
+            json!({ "tags": ["team", "max", "max"] }),
+        )
+        .await;
+    assert_eq!(tagged.status, 200, "{}", tagged.text());
+    assert_eq!(tagged.json()["tags"], json!(["max", "team"]));
+    assert_eq!(
+        refs(s.get("/v1/credentials?upstream=claude").await),
+        ["max-1", "max-2"]
+    );
+    let bad = s
+        .put("/v1/credentials/max-2/tags", json!({ "tags": ["a b"] }))
+        .await;
+    assert_eq!(bad.status, 400, "{}", bad.text());
+    assert_eq!(bad.error_code(), "invalid_tag");
+    let missing = s
+        .put("/v1/credentials/nope/tags", json!({ "tags": [] }))
+        .await;
+    assert_eq!(missing.status, 404, "{}", missing.text());
+
+    // The default peek honours the instance's filter and strategy, and
+    // never advances round-robin.
+    for _ in 0..3 {
+        let peek = s.get("/v1/credentials/default?upstream=anthropic").await;
+        assert_eq!(peek.status, 200, "{}", peek.text());
+        assert_eq!(peek.json()["ref"], "key-1");
+    }
+    let sticky = |who: &str| {
+        let s = &s;
+        let path = format!("/v1/credentials/default?upstream=claude&identity={who}");
+        async move {
+            s.get(&path).await.json()["ref"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        }
+    };
+    let alice = sticky("alice").await;
+    assert!(["max-1", "max-2"].contains(&alice.as_str()));
+    assert_eq!(
+        sticky("alice").await,
+        alice,
+        "the same identity, the same pick"
+    );
+    let no_identity = s.get("/v1/credentials/default?upstream=claude").await;
+    assert_eq!(
+        no_identity.json()["ref"],
+        "max-1",
+        "without an identity: ordered"
+    );
+
+    // Status: every instance with its implementation, strategy, filter and
+    // the credentials it admits right now.
+    let status = s.get("/v1/status").await.json();
+    let ups = status["upstreams"].as_array().expect("upstreams");
+    assert_eq!(ups[0]["name"], "anthropic");
+    assert_eq!(ups[0]["implementation"], "anthropic");
+    assert_eq!(ups[0]["strategy"], "round_robin");
+    assert_eq!(ups[0]["failover"], true);
+    assert_eq!(ups[0]["credentials"], json!({ "kind": "api_key" }));
+    assert_eq!(ups[0]["eligible"], json!(["key-1", "key-2"]));
+    assert_eq!(ups[1]["name"], "claude");
+    assert_eq!(ups[1]["implementation"], "anthropic");
+    assert_eq!(ups[1]["strategy"], "sticky");
+    assert_eq!(ups[1]["failover"], false);
+    assert_eq!(
+        ups[1]["credentials"],
+        json!({ "kind": "oauth", "tags": ["max"] })
+    );
+    assert_eq!(ups[1]["eligible"], json!(["max-1", "max-2"]));
+}
+
+#[tokio::test]
+async fn a_legacy_upstream_reports_ordered_with_no_filter_and_admits_everything() {
+    let d = Builder::new(UPSTREAMS).start().await;
+    let s = d.socket();
+    add_openrouter(&s, "sk-or-v1-LEGACYKEY000001").await;
+    let status = s.get("/v1/status").await.json();
+    let up = &status["upstreams"][0];
+    assert_eq!(up["name"], "openrouter");
+    assert_eq!(up["implementation"], "openrouter");
+    assert_eq!(up["strategy"], "ordered");
+    assert_eq!(up["failover"], false);
+    assert_eq!(up["credentials"], Value::Null);
+    assert_eq!(up["eligible"].as_array().map(Vec::len), Some(1));
 }

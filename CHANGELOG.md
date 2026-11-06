@@ -47,6 +47,16 @@ will ship in it. What is built is described in `docs/status.md`.
   the upstream's HTTP status as a badge coloured by class; the Overview counts
   forwarded requests whose upstream replied 4xx or 5xx separately from
   `upstream_error`, which means no reply was obtained.
+- **Upstream instances and credential selection**: several `[[upstream]]`
+  instances of one implementation, each with its own `path_prefix`, a credential
+  filter (`kind`, `refs`, `tags`), a selection `strategy` (`ordered`,
+  `round_robin`, `least_recently_used`, `sticky`) and opt-in `failover` to the
+  next credential on a rejection when the body can be sent again. Credential
+  `tags`, settable in config, on `POST /v1/credentials`, with
+  `PUT /v1/credentials/{ref}/tags` and `janus credential tag`. The request log
+  records the instance, its implementation and the failed-over `attempts`;
+  `ResolveRoute` gains `implementation`. A config with one upstream per
+  implementation works unchanged.
 - **Documentation**: the design corpus in `docs/` (checked with Schematic), the
   acceptance deliverables in `evidence/DELIVERABLES.md` with a blind-QA harness
   and recorded results, and independent review reports in `reviews/`.

@@ -27,7 +27,6 @@ use crate::contract::identity::{
     IdentityExtractor, JwtKeyInput, RequestHead,
 };
 use crate::contract::registry::OpaqueRegistry;
-use crate::contract::upstream::UpstreamKind;
 
 use super::custom::CustomBinding;
 
@@ -155,7 +154,8 @@ pub struct Selected<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("no identity binding applies to {upstream} path {path:?}")]
 pub struct Unbound {
-    pub upstream: UpstreamKind,
+    /// The upstream instance name.
+    pub upstream: String,
     pub path: String,
 }
 
@@ -168,7 +168,7 @@ struct UpstreamEntry {
 /// Every binding of a config, constructed.
 #[derive(Debug, Default)]
 pub struct BindingTable {
-    upstreams: BTreeMap<UpstreamKind, UpstreamEntry>,
+    upstreams: BTreeMap<String, UpstreamEntry>,
 }
 
 impl BindingTable {
@@ -200,12 +200,12 @@ impl BindingTable {
     /// `path_prefix` stripped): the route whose path equals `path` in
     /// canonical form (see the module docs), else the upstream's binding,
     /// else [`Unbound`].
-    pub fn select(&self, upstream: UpstreamKind, path: &str) -> Result<Selected<'_>, Unbound> {
+    pub fn select(&self, upstream: &str, path: &str) -> Result<Selected<'_>, Unbound> {
         let unbound = || Unbound {
-            upstream,
+            upstream: upstream.to_owned(),
             path: path.to_owned(),
         };
-        let entry = self.upstreams.get(&upstream).ok_or_else(unbound)?;
+        let entry = self.upstreams.get(upstream).ok_or_else(unbound)?;
         if let Some((route, binding)) = entry.routes.get_key_value(&canonical_path(path)) {
             return Ok(Selected {
                 route: Some(route),
@@ -304,11 +304,11 @@ impl BindingTableBuilder<'_> {
     /// routes are bound).
     pub async fn upstream(
         &mut self,
-        upstream: UpstreamKind,
+        upstream: &str,
         binding: Option<&BindingSpec>,
     ) -> Result<(), StartupError> {
         let at = format!("upstream[{upstream}].identity");
-        if self.table.upstreams.contains_key(&upstream) {
+        if self.table.upstreams.contains_key(upstream) {
             return Err(StartupError::Duplicate {
                 at: format!("upstream[{upstream}]"),
             });
@@ -318,7 +318,7 @@ impl BindingTableBuilder<'_> {
             None => None,
         };
         self.table.upstreams.insert(
-            upstream,
+            upstream.to_owned(),
             UpstreamEntry {
                 binding,
                 routes: BTreeMap::new(),
@@ -332,7 +332,7 @@ impl BindingTableBuilder<'_> {
     /// is refused.
     pub async fn route(
         &mut self,
-        upstream: UpstreamKind,
+        upstream: &str,
         path: &str,
         binding: &BindingSpec,
     ) -> Result<(), StartupError> {
@@ -343,7 +343,7 @@ impl BindingTableBuilder<'_> {
                 reason,
             });
         }
-        match self.table.upstreams.get(&upstream) {
+        match self.table.upstreams.get(upstream) {
             None => return Err(StartupError::UndeclaredUpstream { at }),
             Some(entry) if entry.routes.contains_key(path) => {
                 return Err(StartupError::Duplicate {
@@ -353,7 +353,7 @@ impl BindingTableBuilder<'_> {
             Some(_) => {}
         }
         let constructed = self.construct(&at, binding).await?;
-        if let Some(entry) = self.table.upstreams.get_mut(&upstream) {
+        if let Some(entry) = self.table.upstreams.get_mut(upstream) {
             entry.routes.insert(path.to_owned(), constructed);
         }
         Ok(())
@@ -474,6 +474,7 @@ mod tests {
         Correlation, CustomSpec, HmacSpec, JwtSpec, OpaqueSpec, Source, TrustedHeaderSpec,
     };
     use crate::contract::identity::PresentedAt;
+    use crate::contract::upstream::UpstreamKind;
     use crate::identity::testkit::{
         clock_at, closed_port_url, head, mint_hmac, record, FakeRegistry, JwksServer, ED_PUBLIC,
         ED_X,
@@ -608,7 +609,8 @@ mod tests {
     ) -> Result<BindingTable, StartupError> {
         let f = factory();
         let mut b = BindingTable::builder(&f, materials, custom_extractors)?;
-        b.upstream(UpstreamKind::Anthropic, Some(spec)).await?;
+        b.upstream(UpstreamKind::Anthropic.as_str(), Some(spec))
+            .await?;
         Ok(b.finish())
     }
 
@@ -617,25 +619,29 @@ mod tests {
         let f = factory();
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
-        b.upstream(UpstreamKind::OpenAi, Some(&hmac_spec("x-api-key")))
+        b.upstream(UpstreamKind::OpenAi.as_str(), Some(&hmac_spec("x-api-key")))
             .await
             .expect("upstream");
-        b.route(UpstreamKind::OpenAi, "/v1/models", &BindingSpec::None)
-            .await
-            .expect("open route");
-        b.route(UpstreamKind::OpenAi, "/v1/mesh", &trusted())
+        b.route(
+            UpstreamKind::OpenAi.as_str(),
+            "/v1/models",
+            &BindingSpec::None,
+        )
+        .await
+        .expect("open route");
+        b.route(UpstreamKind::OpenAi.as_str(), "/v1/mesh", &trusted())
             .await
             .expect("mesh route");
         let table = b.finish();
 
         let models = table
-            .select(UpstreamKind::OpenAi, "/v1/models")
+            .select(UpstreamKind::OpenAi.as_str(), "/v1/models")
             .expect("bound");
         assert_eq!(models.route, Some("/v1/models"));
         assert_eq!(models.binding.method(), &Method::None);
 
         let mesh = table
-            .select(UpstreamKind::OpenAi, "/v1/mesh")
+            .select(UpstreamKind::OpenAi.as_str(), "/v1/mesh")
             .expect("bound");
         assert_eq!(mesh.route, Some("/v1/mesh"));
         let id = mesh
@@ -661,7 +667,9 @@ mod tests {
             "/v1//models//",
             "/v1/%6dodels",
         ] {
-            let sel = table.select(UpstreamKind::OpenAi, path).expect("bound");
+            let sel = table
+                .select(UpstreamKind::OpenAi.as_str(), path)
+                .expect("bound");
             assert_eq!(sel.route, Some("/v1/models"), "{path}");
         }
         // Everything else under the upstream takes the upstream binding,
@@ -672,12 +680,14 @@ mod tests {
             "/v1/models/gpt",
             "/v1/models%2F",
         ] {
-            let sel = table.select(UpstreamKind::OpenAi, path).expect("bound");
+            let sel = table
+                .select(UpstreamKind::OpenAi.as_str(), path)
+                .expect("bound");
             assert_eq!(sel.route, None, "{path}");
             assert_eq!(sel.binding.method(), &Method::Hmac, "{path}");
         }
         let chat = table
-            .select(UpstreamKind::OpenAi, "/v1/chat/completions")
+            .select(UpstreamKind::OpenAi.as_str(), "/v1/chat/completions")
             .expect("bound");
         let id = chat
             .binding
@@ -700,11 +710,11 @@ mod tests {
         let f = factory();
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
-        b.upstream(UpstreamKind::Anthropic, Some(&BindingSpec::None))
+        b.upstream(UpstreamKind::Anthropic.as_str(), Some(&BindingSpec::None))
             .await
             .expect("open upstream");
         b.route(
-            UpstreamKind::Anthropic,
+            UpstreamKind::Anthropic.as_str(),
             "/v1/messages",
             &hmac_spec("x-api-key"),
         )
@@ -719,13 +729,15 @@ mod tests {
             "/v1/%6Dessages",
             "/%76%31/messages/",
         ] {
-            let sel = table.select(UpstreamKind::Anthropic, path).expect("bound");
+            let sel = table
+                .select(UpstreamKind::Anthropic.as_str(), path)
+                .expect("bound");
             assert_eq!(sel.binding.method(), &Method::Hmac, "{path}");
             assert_eq!(sel.route, Some("/v1/messages"), "{path}");
         }
         assert_eq!(
             table
-                .select(UpstreamKind::Anthropic, "/v1/models")
+                .select(UpstreamKind::Anthropic.as_str(), "/v1/models")
                 .expect("bound")
                 .binding
                 .method(),
@@ -738,7 +750,7 @@ mod tests {
         let f = factory();
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
-        b.upstream(UpstreamKind::OpenAi, None)
+        b.upstream(UpstreamKind::OpenAi.as_str(), None)
             .await
             .expect("upstream");
         for bad in [
@@ -754,7 +766,7 @@ mod tests {
             "/v1/%2e/models",
         ] {
             let err = b
-                .route(UpstreamKind::OpenAi, bad, &BindingSpec::None)
+                .route(UpstreamKind::OpenAi.as_str(), bad, &BindingSpec::None)
                 .await
                 .expect_err(bad);
             assert!(
@@ -764,21 +776,21 @@ mod tests {
             assert_eq!(err.at(), format!("upstream[openai].route[{bad}].path"));
         }
         for good in ["/", "/v1/models", "/v1/a%2Fb", "/v1/~x"] {
-            b.route(UpstreamKind::OpenAi, good, &BindingSpec::None)
+            b.route(UpstreamKind::OpenAi.as_str(), good, &BindingSpec::None)
                 .await
                 .expect(good);
         }
         let table = b.finish();
         assert_eq!(
             table
-                .select(UpstreamKind::OpenAi, "/v1/a%2fb")
+                .select(UpstreamKind::OpenAi.as_str(), "/v1/a%2fb")
                 .expect("bound")
                 .route,
             Some("/v1/a%2Fb")
         );
         assert_eq!(
             table
-                .select(UpstreamKind::OpenAi, "/v1/%7Ex")
+                .select(UpstreamKind::OpenAi.as_str(), "/v1/%7Ex")
                 .expect("bound")
                 .route,
             Some("/v1/~x")
@@ -809,27 +821,31 @@ mod tests {
         let f = factory();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
         b.upstream(
-            UpstreamKind::Anthropic,
+            UpstreamKind::Anthropic.as_str(),
             Some(&spec("janus-data-plane", "caller-identity")),
         )
         .await
         .expect("a");
         b.upstream(
-            UpstreamKind::OpenAi,
+            UpstreamKind::OpenAi.as_str(),
             Some(&spec("host-rpc", "caller-identity")),
         )
         .await
         .expect("b");
         b.upstream(
-            UpstreamKind::OpenRouter,
+            UpstreamKind::OpenRouter.as_str(),
             Some(&spec("janus-data-plane", "other")),
         )
         .await
         .expect("c");
         let table = b.finish();
         let req = head("/x", &[("x-api-key", &token("s-1"))]);
-        let id = |up| {
-            let binding = table.select(up, "/x").expect("bound").binding.clone();
+        let id = |up: UpstreamKind| {
+            let binding = table
+                .select(up.as_str(), "/x")
+                .expect("bound")
+                .binding
+                .clone();
             let req = req.clone();
             async move { binding.identify(&req).await }
         };
@@ -857,7 +873,7 @@ mod tests {
             .await
             .expect("builds");
         let sel = table
-            .select(UpstreamKind::Anthropic, "/v1/models")
+            .select(UpstreamKind::Anthropic.as_str(), "/v1/models")
             .expect("bound");
         assert_eq!(sel.binding.method().name(), "none");
         assert_eq!(sel.route, None);
@@ -878,28 +894,34 @@ mod tests {
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
         // Neither [upstream.identity] nor [identity]: only the route is bound.
-        b.upstream(UpstreamKind::Anthropic, None)
+        b.upstream(UpstreamKind::Anthropic.as_str(), None)
             .await
             .expect("upstream");
-        b.route(UpstreamKind::Anthropic, "/v1/models", &BindingSpec::None)
-            .await
-            .expect("route");
+        b.route(
+            UpstreamKind::Anthropic.as_str(),
+            "/v1/models",
+            &BindingSpec::None,
+        )
+        .await
+        .expect("route");
         let table = b.finish();
-        assert!(table.select(UpstreamKind::Anthropic, "/v1/models").is_ok());
+        assert!(table
+            .select(UpstreamKind::Anthropic.as_str(), "/v1/models")
+            .is_ok());
         assert_eq!(
             table
-                .select(UpstreamKind::Anthropic, "/v1/messages")
+                .select(UpstreamKind::Anthropic.as_str(), "/v1/messages")
                 .map(|s| s.route),
             Err(Unbound {
-                upstream: UpstreamKind::Anthropic,
+                upstream: "anthropic".into(),
                 path: "/v1/messages".into()
             })
         );
         assert!(table
-            .select(UpstreamKind::OpenRouter, "/v1/models")
+            .select(UpstreamKind::OpenRouter.as_str(), "/v1/models")
             .is_err());
         assert!(BindingTable::default()
-            .select(UpstreamKind::OpenAi, "/")
+            .select(UpstreamKind::OpenAi.as_str(), "/")
             .is_err());
     }
 
@@ -910,7 +932,7 @@ mod tests {
             .await
             .expect("builds");
         let sel = table
-            .select(UpstreamKind::Anthropic, "/v1/messages")
+            .select(UpstreamKind::Anthropic.as_str(), "/v1/messages")
             .expect("bound");
         let forged = mint_hmac(
             b"not-the-secret",
@@ -958,7 +980,7 @@ mod tests {
         });
         let table = build_one(&m, &[], &spec).await.expect("builds");
         let b = table
-            .select(UpstreamKind::Anthropic, "/x")
+            .select(UpstreamKind::Anthropic.as_str(), "/x")
             .expect("bound")
             .binding;
         let id = b
@@ -987,7 +1009,7 @@ mod tests {
             .await
             .expect("builds");
         let b = plain
-            .select(UpstreamKind::Anthropic, "/x")
+            .select(UpstreamKind::Anthropic.as_str(), "/x")
             .expect("bound")
             .binding;
         assert_eq!(b.method().name(), "custom:introspect");
@@ -1000,7 +1022,7 @@ mod tests {
             .await
             .expect("builds");
         let id = t
-            .select(UpstreamKind::Anthropic, "/x")
+            .select(UpstreamKind::Anthropic.as_str(), "/x")
             .expect("bound")
             .binding
             .identify(&req)
@@ -1013,7 +1035,9 @@ mod tests {
         let t = build_one(&m, &registered, &custom(Some(by_claim)))
             .await
             .expect("builds");
-        let sel = t.select(UpstreamKind::Anthropic, "/x").expect("bound");
+        let sel = t
+            .select(UpstreamKind::Anthropic.as_str(), "/x")
+            .expect("bound");
         let id = sel
             .binding
             .identify(&req)
@@ -1180,30 +1204,38 @@ mod tests {
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
         let err = b
-            .route(UpstreamKind::OpenAi, "/v1/models", &BindingSpec::None)
+            .route(
+                UpstreamKind::OpenAi.as_str(),
+                "/v1/models",
+                &BindingSpec::None,
+            )
             .await
             .expect_err("route before upstream");
         assert_eq!(err.at(), "upstream[openai].route[/v1/models].identity");
-        b.upstream(UpstreamKind::OpenAi, None)
+        b.upstream(UpstreamKind::OpenAi.as_str(), None)
             .await
             .expect("upstream");
         assert_eq!(
-            b.upstream(UpstreamKind::OpenAi, None).await,
+            b.upstream(UpstreamKind::OpenAi.as_str(), None).await,
             Err(StartupError::Duplicate {
                 at: "upstream[openai]".into()
             })
         );
-        b.route(UpstreamKind::OpenAi, "/v1/models", &BindingSpec::None)
-            .await
-            .expect("route");
+        b.route(
+            UpstreamKind::OpenAi.as_str(),
+            "/v1/models",
+            &BindingSpec::None,
+        )
+        .await
+        .expect("route");
         assert!(matches!(
-            b.route(UpstreamKind::OpenAi, "/v1/models", &trusted())
+            b.route(UpstreamKind::OpenAi.as_str(), "/v1/models", &trusted())
                 .await,
             Err(StartupError::Duplicate { .. })
         ));
         // Route-level failures point at the route.
         let err = b
-            .route(UpstreamKind::OpenAi, "/v1/x", &custom(None))
+            .route(UpstreamKind::OpenAi.as_str(), "/v1/x", &custom(None))
             .await
             .expect_err("unregistered");
         assert_eq!(err.at(), "upstream[openai].route[/v1/x].identity.method");
@@ -1230,19 +1262,21 @@ mod tests {
         let m = Materials::standard();
         let mut b = BindingTable::builder(&f, &m, &[]).expect("builder");
         for up in UpstreamKind::ALL {
-            b.upstream(up, Some(&spec)).await.expect("upstream");
+            b.upstream(up.as_str(), Some(&spec))
+                .await
+                .expect("upstream");
         }
-        b.route(UpstreamKind::OpenAi, "/v1/responses", &spec)
+        b.route(UpstreamKind::OpenAi.as_str(), "/v1/responses", &spec)
             .await
             .expect("route");
         let table = b.finish();
         assert_eq!(server.fetches(), 1);
         let a = table
-            .select(UpstreamKind::Anthropic, "/x")
+            .select(UpstreamKind::Anthropic.as_str(), "/x")
             .expect("bound")
             .binding;
         let r = table
-            .select(UpstreamKind::OpenAi, "/v1/responses")
+            .select(UpstreamKind::OpenAi.as_str(), "/v1/responses")
             .expect("bound")
             .binding;
         assert!(Arc::ptr_eq(

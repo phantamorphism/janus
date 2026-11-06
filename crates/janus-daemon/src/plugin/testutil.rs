@@ -701,6 +701,7 @@ pub(crate) fn request(caller: &str) -> ResolveRoute {
     ResolveRoute {
         request_id: format!("req-{caller}"),
         upstream: "anthropic".into(),
+        implementation: "anthropic".into(),
         caller_identity: caller.into(),
         correlation_id: Some("conv-1".into()),
         identity_claims: BTreeMap::from([("tenant".to_owned(), "acme".to_owned())]),

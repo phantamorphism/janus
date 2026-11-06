@@ -52,6 +52,9 @@ pub async fn check_config(ctx: &Ctx, path: &Path) -> Result<(), CliError> {
         .map(|up| {
             json!({
                 "upstream": up.upstream,
+                "implementation": up.implementation,
+                "strategy": up.strategy,
+                "failover": up.failover,
                 "path_prefix": up.path_prefix,
                 "binding": up.binding.as_ref().map(ToString::to_string),
                 "routes": up.routes.iter().map(|(path, method)| json!({

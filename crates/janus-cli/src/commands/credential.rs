@@ -22,15 +22,22 @@ use crate::render::{self, fields, Table};
 pub enum CredentialCommand {
     /// List the pool's credentials (metadata only).
     List {
-        #[arg(long, value_name = "NAME", value_parser = upstream_parser())]
+        /// Only the credentials this upstream instance may use; an
+        /// implementation name lists all of that implementation's.
+        #[arg(long, value_name = "NAME")]
         upstream: Option<String>,
     },
     /// One credential's metadata.
     Show { r#ref: String },
-    /// The credential the default chain would pick for an upstream right now.
+    /// The credential the default chain would pick for an upstream
+    /// instance right now. The pick has no side effects.
     Default {
-        #[arg(long, value_name = "NAME", value_parser = upstream_parser())]
+        /// An upstream instance name, or an implementation name.
+        #[arg(long, value_name = "NAME")]
         upstream: String,
+        /// The verified caller identity a `sticky` instance would key on.
+        #[arg(long, value_name = "IDENTITY")]
+        identity: Option<String>,
     },
     /// Add a credential to the pool; live without a restart.
     Add {
@@ -41,8 +48,18 @@ pub enum CredentialCommand {
         credential_ref: Option<String>,
         #[arg(long, value_name = "TEXT")]
         label: Option<String>,
+        /// A tag an `[upstream.credentials] tags` filter can select on;
+        /// repeat for several.
+        #[arg(long = "tag", value_name = "TAG")]
+        tags: Vec<String>,
         #[command(flatten)]
         material: MaterialArgs,
+    },
+    /// Replace a pool slot's tags; no `--tag` clears them.
+    Tag {
+        r#ref: String,
+        #[arg(long = "tag", value_name = "TAG")]
+        tags: Vec<String>,
     },
     /// Replace a credential's material and clear an `invalid` status.
     Rotate {
@@ -188,11 +205,14 @@ pub async fn run(ctx: &Ctx, command: &CredentialCommand) -> Result<(), CliError>
             return render::out(&table(&list.credentials));
         }
         CredentialCommand::Show { r#ref } => (Method::GET, one(r#ref, None)?, None),
-        CredentialCommand::Default { upstream } => (
+        CredentialCommand::Default { upstream, identity } => (
             Method::GET,
             api_path(
                 &["v1", "credentials", "default"],
-                &[("upstream", Some(upstream.clone()))],
+                &[
+                    ("upstream", Some(upstream.clone())),
+                    ("identity", identity.clone()),
+                ],
             )?,
             None,
         ),
@@ -200,6 +220,7 @@ pub async fn run(ctx: &Ctx, command: &CredentialCommand) -> Result<(), CliError>
             upstream,
             credential_ref,
             label,
+            tags,
             material,
         } => {
             let mut body = json!({ "upstream": upstream, "material": material.read()? });
@@ -208,6 +229,9 @@ pub async fn run(ctx: &Ctx, command: &CredentialCommand) -> Result<(), CliError>
             }
             if let Some(l) = label {
                 body["label"] = l.clone().into();
+            }
+            if !tags.is_empty() {
+                body["tags"] = json!(tags);
             }
             (
                 Method::POST,
@@ -219,6 +243,11 @@ pub async fn run(ctx: &Ctx, command: &CredentialCommand) -> Result<(), CliError>
             Method::PUT,
             one(r#ref, Some("material"))?,
             Some(json!({ "material": material.read()? })),
+        ),
+        CredentialCommand::Tag { r#ref, tags } => (
+            Method::PUT,
+            one(r#ref, Some("tags"))?,
+            Some(json!({ "tags": tags })),
         ),
         CredentialCommand::Enable { r#ref } => (Method::POST, one(r#ref, Some("enable"))?, None),
         CredentialCommand::Disable { r#ref } => (Method::POST, one(r#ref, Some("disable"))?, None),
@@ -246,6 +275,7 @@ pub async fn run(ctx: &Ctx, command: &CredentialCommand) -> Result<(), CliError>
         CredentialCommand::Enable { .. } => Some("enabled"),
         CredentialCommand::Disable { .. } => Some("disabled"),
         CredentialCommand::Refresh { .. } => Some("refreshed"),
+        CredentialCommand::Tag { .. } => Some("tagged"),
         _ => None,
     };
     let mut text = verb.map_or_else(String::new, |v| {
@@ -269,6 +299,7 @@ fn table(credentials: &[CredentialMetadata]) -> String {
         "ERRORS",
         "LAST USED",
         "LABEL",
+        "TAGS",
     ]);
     for c in credentials {
         t.row(vec![
@@ -281,6 +312,7 @@ fn table(credentials: &[CredentialMetadata]) -> String {
             c.error_count.to_string(),
             render::time(c.last_used_at),
             render::text(c.label.as_deref()),
+            tags_text(&c.tags),
         ]);
     }
     t.render()
@@ -292,6 +324,7 @@ fn detail(c: &CredentialMetadata) -> String {
         ("upstream", c.upstream.to_string()),
         ("kind", render::name(&c.kind)),
         ("label", render::text(c.label.as_deref())),
+        ("tags", tags_text(&c.tags)),
         ("source", render::name(&c.source)),
         ("status", render::name(&c.status)),
         ("rate limited until", render::time(c.rate_limited_until)),
@@ -301,6 +334,14 @@ fn detail(c: &CredentialMetadata) -> String {
         ("errors", c.error_count.to_string()),
         ("last error", render::text(c.last_error.as_deref())),
     ])
+}
+
+fn tags_text(tags: &[String]) -> String {
+    if tags.is_empty() {
+        "-".to_owned()
+    } else {
+        tags.join(",")
+    }
 }
 
 #[cfg(test)]

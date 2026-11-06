@@ -152,6 +152,7 @@ mod tests {
         ResolveRoute {
             request_id: "req-1".into(),
             upstream: "anthropic".into(),
+            implementation: "anthropic".into(),
             caller_identity: "session-1".into(),
             correlation_id: None,
             identity_claims: BTreeMap::new(),

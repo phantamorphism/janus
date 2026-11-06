@@ -34,6 +34,7 @@ pub enum Reply {
 pub struct Resolved {
     pub request_id: String,
     pub upstream: String,
+    pub implementation: String,
     pub caller_identity: String,
     pub correlation_id: Option<String>,
     pub claims: BTreeMap<String, String>,
@@ -149,6 +150,7 @@ impl janus_plugin_server::JanusPlugin for Grpc {
             .answer(Resolved {
                 request_id: r.request_id,
                 upstream: r.upstream,
+                implementation: r.implementation,
                 caller_identity: r.caller_identity,
                 correlation_id: non_empty(r.correlation_id),
                 claims: r.identity_claims.into_iter().collect(),
@@ -225,6 +227,7 @@ impl JanusPlugin for Linked {
             .answer(Resolved {
                 request_id: req.request_id,
                 upstream: req.upstream,
+                implementation: req.implementation,
                 caller_identity: req.caller_identity,
                 correlation_id: req.correlation_id,
                 claims: req.identity_claims,

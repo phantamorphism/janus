@@ -8,6 +8,8 @@ mod harness;
 mod plugin;
 #[path = "dataplane/refresh.rs"]
 mod refresh;
+#[path = "dataplane/selection.rs"]
+mod selection;
 #[path = "dataplane/upstream.rs"]
 mod upstream;
 
@@ -233,7 +235,8 @@ async fn unbound_upstream_is_rejected_never_open() {
         }
     );
     assert_eq!(record.binding, None);
-    assert_eq!(record.upstream, Some(UpstreamKind::OpenRouter));
+    assert_eq!(record.upstream.as_deref(), Some("openrouter"));
+    assert_eq!(record.implementation, Some(UpstreamKind::OpenRouter));
     assert!(up.seen().is_empty());
     rt.stop().await;
 }
@@ -616,7 +619,8 @@ async fn forwarded_response_is_relayed_unmodified_and_settled() {
     assert_eq!(record.credential_ref.as_deref(), Some("or-main"));
     assert_eq!(record.caller_identity, "alice");
     assert_eq!(record.correlation_id.as_deref(), Some("sess-1"));
-    assert_eq!(record.upstream, Some(UpstreamKind::OpenRouter));
+    assert_eq!(record.upstream.as_deref(), Some("openrouter"));
+    assert_eq!(record.implementation, Some(UpstreamKind::OpenRouter));
     assert_eq!(record.path, "/openrouter/v1/chat/completions");
 
     let resolved = recorder.resolved();
@@ -1005,9 +1009,12 @@ async fn credential_invalid_reaches_pool_and_plugin() {
     let first = rt.record().await;
     assert_eq!(first.outcome, Outcome::Forwarded);
     assert_eq!(first.status, Some(401));
-    recorder
+    let invalid = recorder
         .wait_for("credential_invalid", &first.request_id)
         .await;
+    assert_eq!(invalid.payload["credential_ref"], "or-spare");
+    assert_eq!(invalid.payload["upstream"], "openrouter");
+    assert_eq!(invalid.payload["implementation"], "openrouter");
     recorder.wait_for("call_completed", &first.request_id).await;
 
     // The pool now holds or-spare invalid: naming it again fails at the

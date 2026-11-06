@@ -45,8 +45,12 @@ message ResolveRouteRequest {
   // never happened, in a NotifyEvent carrying this same request_id. See
   // docs/plugin-contract metering primitives.
   string request_id = 1;
-  // "anthropic" | "openai" | "openrouter" — which upstream this request is
-  // destined for. Additive: new upstreams are new values, not a proto change.
+  // The name of the upstream instance this request is destined for: the
+  // `name` of the `[[upstream]]` whose path_prefix it arrived under (see
+  // docs/configuration). An instance named after its implementation is
+  // "anthropic" | "openai" | "openrouter"; any other name is the operator's
+  // own, such as "claude". Additive: new instances are new values, not a
+  // proto change.
   string upstream = 2;
   // WHICH CALLER IS ASKING. The identity janus-daemon has already verified for
   // this request, and the primary input to the decision: the plugin's job is
@@ -78,6 +82,12 @@ message ResolveRouteRequest {
   // bare id does not have to parse caller_identity as a structure. Empty when
   // the configured extraction method yields only an identity.
   map<string, string> identity_claims = 5;
+  // "anthropic" | "openai" | "openrouter" — the implementation the instance
+  // named by upstream is of, and so which credentials a credential_ref
+  // answer may name. Additive: new implementations are new values. Empty
+  // from a daemon that predates this field; it then equals upstream, which
+  // was always an implementation name there.
+  string implementation = 6;
 }
 
 message ResolveRouteResponse {

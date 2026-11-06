@@ -14,6 +14,11 @@ describe('parseStatus', () => {
     })
     expect(s.upstreams[0]).toEqual({
       name: 'openai',
+      implementation: 'openai',
+      strategy: 'ordered',
+      failover: false,
+      credentials: null,
+      eligible: ['oa-main'],
       path_prefix: '/openai',
       base_url: 'https://api.openai.com/',
       binding: 'hmac',
@@ -28,13 +33,55 @@ describe('parseStatus', () => {
   it('accepts a null upstream binding and a plugin without certificate fields', () => {
     const s = parseStatus(
       status({
-        upstreams: [{ name: 'openrouter', path_prefix: '/or', base_url: 'https://x/', binding: null, routes: [] }],
+        upstreams: [
+          {
+            name: 'openrouter',
+            implementation: 'openrouter',
+            strategy: 'ordered',
+            failover: false,
+            credentials: null,
+            eligible: [],
+            path_prefix: '/or',
+            base_url: 'https://x/',
+            binding: null,
+            routes: [],
+          },
+        ],
         plugin: { mode: 'none', endpoint: null, health: 'unknown', last_error: null, last_ok_at: null, dropped_events: 3 },
       }),
     )
     expect(s.upstreams[0].binding).toBeNull()
     expect(s.plugin.client_cert_expires_at).toBeUndefined()
     expect(s.plugin.dropped_events).toBe(3)
+  })
+
+  it('reads an instance with a credential filter', () => {
+    const base = status().upstreams[0]
+    const s = parseStatus(
+      status({
+        upstreams: [
+          { ...base, name: 'claude', implementation: 'anthropic', strategy: 'sticky', failover: true, credentials: { kind: 'oauth', tags: ['max'] }, eligible: [] },
+        ],
+      }),
+    )
+    expect(s.upstreams[0]).toMatchObject({
+      name: 'claude',
+      implementation: 'anthropic',
+      strategy: 'sticky',
+      failover: true,
+      credentials: { kind: 'oauth', tags: ['max'] },
+      eligible: [],
+    })
+  })
+
+  it.each([
+    ['an unknown strategy', { strategy: 'random' }],
+    ['an unknown implementation', { implementation: 'gemini' }],
+    ['an instance without eligible', { eligible: undefined }],
+    ['a filter with a non-string ref', { credentials: { refs: [1] } }],
+    ['a failover that is not a boolean', { failover: 'yes' }],
+  ])('rejects an upstream with %s', (_name, over) => {
+    expect(() => parseStatus(status({ upstreams: [{ ...status().upstreams[0], ...over }] }))).toThrow(ApiError)
   })
 
   it.each([

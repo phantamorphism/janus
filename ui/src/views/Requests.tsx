@@ -7,11 +7,9 @@ import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
   OUTCOMES,
-  UPSTREAMS,
   type OutcomeName,
   type RequestQuery,
   type RequestRecord,
-  type UpstreamKind,
 } from '@/api/types'
 import { Badge, StatusBadge } from '@/components/Badge'
 import { PageHeader } from '@/components/PageHeader'
@@ -21,12 +19,13 @@ import { Time } from '@/components/Time'
 import { formatDuration, localInputToIso, words } from '@/lib/format'
 import { matchesFilter, outcomeQualifier } from '@/lib/outcome'
 import { outcomeTone } from '@/lib/tone'
+import { useUpstreamNames } from '@/lib/upstream'
 import { useResource } from '@/lib/useResource'
 import { RequestDrawer } from './RequestDrawer'
 
 interface Draft {
   identity: string
-  upstream: UpstreamKind | ''
+  upstream: string
   outcome: OutcomeName | ''
   credential: string
   since: string
@@ -97,6 +96,7 @@ function tailText(s: TailState | null, paused: boolean, buffered: number): strin
 export function Requests() {
   const api = useApi()
   const [draft, setDraft] = useState<Draft>(emptyDraft)
+  const upstreams = useUpstreamNames(false)
   const [query, setQuery] = useState<RequestQuery>(() => toQuery(emptyDraft))
   const key = JSON.stringify(query)
   const first = useResource((signal) => api.requests(query, signal), `requests:${key}`)
@@ -332,10 +332,10 @@ export function Requests() {
           <select
             className="field"
             value={draft.upstream}
-            onChange={(e) => setDraft({ ...draft, upstream: e.target.value as UpstreamKind | '' })}
+            onChange={(e) => setDraft({ ...draft, upstream: e.target.value })}
           >
             <option value="">Any</option>
-            {UPSTREAMS.map((u) => (
+            {upstreams.map((u) => (
               <option key={u} value={u}>
                 {u}
               </option>
@@ -484,7 +484,14 @@ export function Requests() {
                           {r.method} {r.path}
                         </button>
                       </td>
-                      <td className="mono">{r.credential_ref ?? <span className="text-muted">—</span>}</td>
+                      <td className="mono">
+                        {r.credential_ref ?? <span className="text-muted">—</span>}
+                        {r.attempts.length > 0 && (
+                          <div className="font-sans text-xs text-muted">
+                            after {r.attempts.map((x) => x.credential_ref).join(', ')}
+                          </div>
+                        )}
+                      </td>
                       <td className="text-right">{r.status === null ? <span className="text-muted">—</span> : <StatusBadge code={r.status} />}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatDuration(r.duration_ms)}</td>
                     </tr>

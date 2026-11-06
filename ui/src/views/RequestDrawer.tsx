@@ -8,6 +8,7 @@ import { Time } from '@/components/Time'
 import { formatDuration, words } from '@/lib/format'
 import { outcomeQualifier } from '@/lib/outcome'
 import { outcomeTone } from '@/lib/tone'
+import { recordUpstream } from '@/lib/upstream'
 import { useResource } from '@/lib/useResource'
 
 function Field({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -44,7 +45,7 @@ export function RequestDrawer({ initial, onClose }: { initial: RequestRecord; on
           <Badge tone={outcomeTone(r.outcome)}>{words(r.outcome)}</Badge>
           {qualifier && <span className="ml-2">{qualifier}</span>}
         </Field>
-        <Field label="Upstream">{r.upstream ?? none}</Field>
+        <Field label="Upstream">{recordUpstream(r) ?? none}</Field>
         <Field label="Method and path" mono>
           {r.method} {r.path}
         </Field>
@@ -71,6 +72,19 @@ export function RequestDrawer({ initial, onClose }: { initial: RequestRecord; on
         <Field label="Credential" mono>
           {r.credential_ref ?? none}
         </Field>
+        {r.attempts.length > 0 && (
+          <Field label="Failed over from">
+            <ol aria-label="Failed over from" className="space-y-1">
+              {r.attempts.map((a, i) => (
+                <li key={i} className="flex flex-wrap items-center gap-2">
+                  <span className="mono">{a.credential_ref}</span>
+                  <StatusBadge code={a.status} />
+                  <span className="text-muted">{words(a.verdict)}</span>
+                </li>
+              ))}
+            </ol>
+          </Field>
+        )}
         <Field label="Upstream status">
           {r.status === null ? none : <StatusBadge code={r.status} />}
         </Field>
