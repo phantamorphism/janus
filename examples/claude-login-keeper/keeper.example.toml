@@ -1,0 +1,36 @@
+# claude-login-keeper configuration. Paths must be absolute.
+
+# The plugin socket; the daemon's [plugin] endpoint is "unix://" + this path.
+# Its directory, and every ancestor, must not be writable by group or others.
+socket = "/home/op/.janus-keeper/run/keeper.sock"
+# daemon_uid = 1000               # refuse gRPC peers running as another uid
+
+# The keeper's own directory: claude runs with HOME=<state_dir>/home and
+# CLAUDE_CONFIG_DIR=<state_dir>/claude, never the operator's ~/.claude.
+state_dir = "/home/op/.janus-keeper/state"
+
+# The claude executable; a bare name is looked up on PATH at startup.
+claude_bin = "claude"
+
+# The daemon's admin surface. Default: unix:<data dir>/admin.sock, where the
+# data dir is $JANUS_DATA_DIR, else $HOME/.janus. An http:// address needs
+# admin_token_file (default <data dir>/admin-token).
+# admin = "unix:/home/op/.janus/admin.sock"
+
+# The loopback page (GET /, POST /login/start|cancel|code). Loopback only.
+http_bind = "127.0.0.1:27711"
+
+validate_interval = "5m"   # admin API check of every managed credential
+refresh_ahead     = "15m"  # refresh an OAuth credential expiring this soon
+login_timeout     = "10m"  # how long one flow waits for the operator
+debounce          = "10s"  # a burst of problem reports starts one flow
+backoff_min       = "1m"   # wait after the first failed flow; doubles
+backoff_max       = "1h"
+
+# Deny requests to a listed instance while every managed credential for it
+# needs a login; the reason says how to authorize. false: always use_default.
+deny_when_unusable = true
+
+[[credential]]
+ref       = "claude-sub"   # a pool slot holding a Claude Code .credentials.json
+instances = ["claude"]     # instances this credential is the only source for

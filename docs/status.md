@@ -22,9 +22,9 @@ Built and running:
 - **`janus-core`** — the plugin contract (`janus.proto` and its generated client
   and server), the `JanusPlugin` trait for linked plugins, the identity
   extractors (`hmac`, `jwt`, `opaque`, `trusted_header`, plus `none` and custom
-  methods) and their bindings, the `peer::PeerUid` interceptor for socket
-  plugins, and the metering primitives with the in-memory and SQLite
-  `UsageStore`s and their conformance suite.
+  methods) and their bindings, the `peer::PeerUid` interceptor and the
+  `peer::serve_unix` server for socket plugins, and the metering primitives with
+  the in-memory and SQLite `UsageStore`s and their conformance suite.
 - **`janus-daemon`** — the data plane for the Anthropic, OpenAI (including
   ChatGPT-account OAuth credentials, served at the Codex backend) and OpenRouter
   upstreams, through the full

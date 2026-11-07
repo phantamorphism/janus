@@ -5,6 +5,7 @@ members = [
     "crates/janus-daemon",
     "crates/janus-cli",
     "examples/tenant-pinning-plugin",
+    "examples/claude-login-keeper",
 ]
 
 [workspace.package]

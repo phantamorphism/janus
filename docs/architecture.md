@@ -26,6 +26,7 @@ janus/
 │   │                    # plugin client. Linked into custom builds.
 │   └── janus-cli/       # admin client binary ("janus")
 ├── examples/
+│   ├── claude-login-keeper/    # example plugin: re-login + rotation of a Claude credential
 │   └── tenant-pinning-plugin/  # example policy plugin (unix socket)
 ├── proto/
 │   └── janus.proto      # the plugin contract

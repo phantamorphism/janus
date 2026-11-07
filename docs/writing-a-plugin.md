@@ -14,7 +14,10 @@ operator checks it. The design and its reasoning are in
 <ref target="docs/plugin-contract">the plugin contract</ref>. A complete, tested
 plugin that follows this guide is
 <ref target="examples/tenant-pinning-plugin/README">the tenant-pinning example
-plugin</ref>.
+plugin</ref>. A plugin that uses `Notify` to act on credential events, and the
+admin API to rotate material, is
+<ref target="examples/claude-login-keeper/README">the Claude login keeper</ref>
+(<ref target="docs/claude-login-keeper">reference</ref>).
 
 ## Choose an execution model {#model}
 
@@ -140,6 +143,12 @@ The daemon walks the socket path before it connects. The checks are in
 - To check the daemon's side of the connection, install
   `janus_core::peer::PeerUid` with the daemon's uid.
 
+A Rust plugin can call `janus_core::peer::serve_unix`, which does all of this:
+it creates the directory with mode `0750`, removes a stale socket, sets the
+socket mode `0660`, installs `PeerUid` when a uid is given, and stops as
+described in <ref target="#shutdown">stop cleanly</ref>. Both example plugins
+use it.
+
 Configure the daemon with the absolute path:
 
 ```toml
@@ -156,8 +165,9 @@ request fails closed as `plugin_unreachable`.
 The daemon's `Notify` stream does not close. Thus a graceful shutdown that waits
 for every connection to drain (tonic's `serve_with_incoming_shutdown`, for
 example) does not complete while the daemon runs. Give in-flight calls a fixed
-grace period after the shutdown signal and then exit. The example plugin uses 2
-seconds.
+grace period after the shutdown signal and then exit.
+`janus_core::peer::serve_unix` waits `janus_core::peer::SHUTDOWN_GRACE` (2
+seconds).
 
 ## Serve over mutual TLS {#network}
 

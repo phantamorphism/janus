@@ -23,6 +23,7 @@ tokio.workspace = true
 futures.workspace = true
 async-trait.workspace = true
 tonic.workspace = true
+tokio-stream.workspace = true
 tonic-prost.workspace = true
 prost.workspace = true
 http.workspace = true
@@ -53,6 +54,5 @@ rusqlite = { workspace = true, optional = true }
 tonic-prost-build.workspace = true
 
 [dev-dependencies]
-tokio-stream.workspace = true
 tempfile.workspace = true
 toml.workspace = true

@@ -25,7 +25,8 @@
 //!   metadata, upstream names and data-directory layout.
 //! - [`identity`], [`pool`], [`metering`], [`proxy`] — the implementations.
 //! - [`peer`] (unix only) — the tonic peer-uid interceptor a Rust plugin can
-//!   install on its unix socket (`docs/plugin-contract#channel-unix`).
+//!   install on its unix socket, and `serve_unix`, which binds that socket
+//!   and serves a plugin on it (`docs/plugin-contract#channel-unix`).
 
 pub mod contract;
 pub mod identity;

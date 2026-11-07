@@ -496,8 +496,9 @@ from the socket (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS). For Rust
 plugins `janus-core` ships `peer::PeerUid`, a `tonic` interceptor installed with
 `JanusPluginServer::with_interceptor(plugin, PeerUid::new(daemon_uid))`. It
 fails closed: a call with no peer credentials, or from any other uid, is refused
-with `PERMISSION_DENIED`. In any other language's gRPC stack the check is a few
-lines.
+with `PERMISSION_DENIED`. `peer::serve_unix` binds the socket with the modes
+above and installs `PeerUid` when it is given a uid. In any other language's
+gRPC stack the check is a few lines.
 
 ### Network {#channel-network}
 

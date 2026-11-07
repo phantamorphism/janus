@@ -37,7 +37,7 @@ transcript</ref>.
 |---|---|
 | `src/policy.rs` | The policy file and the routing decision. Has no I/O, so you can test it with unit tests. |
 | `src/service.rs` | `ResolveRoute` and `Notify`: the decision, then the budget, as the `JanusPlugin` service. |
-| `src/lib.rs` | `serve`: binds the socket with the modes that the daemon requires, then serves until shutdown. |
+| `src/lib.rs` | `serve`: binds the socket with the modes that the daemon requires, then serves until shutdown (`janus_core::peer::serve_unix`). |
 | `src/main.rs` | The command line. |
 | `tests/socket.rs` | Serves the plugin on a real socket and calls it with the gRPC client that is generated from `proto/janus.proto`. |
 | `policy.example.toml` | An annotated policy file. |

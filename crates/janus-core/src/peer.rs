@@ -20,10 +20,23 @@
 //! It fails closed: a request whose connection carries no peer credentials
 //! (a non-unix transport, or a platform where the kernel did not report
 //! them) is refused exactly like one from the wrong uid.
+//!
+//! [`serve_unix`] binds the socket with the modes the daemon requires and
+//! serves a plugin on it, with this check when a daemon uid is given.
 
+use std::future::Future;
+use std::os::unix::fs::{DirBuilderExt, FileTypeExt, PermissionsExt};
+use std::path::Path;
+use std::time::Duration;
+
+use tokio::net::UnixListener;
+use tokio::sync::oneshot;
+use tokio_stream::wrappers::UnixListenerStream;
 use tonic::service::Interceptor;
 use tonic::transport::server::UdsConnectInfo;
 use tonic::{Request, Status};
+
+use crate::contract::proto::janus_plugin_server::{JanusPlugin, JanusPluginServer};
 
 /// A tonic [`Interceptor`] that admits a request only if the unix-socket
 /// peer that sent it runs as `expected_uid`, and otherwise answers
@@ -73,6 +86,88 @@ impl Interceptor for PeerUid {
     }
 }
 
+/// An error from [`serve_unix`].
+pub type ServeError = Box<dyn std::error::Error + Send + Sync>;
+
+/// How long in-flight calls get to finish once [`serve_unix`]'s `shutdown`
+/// resolves.
+pub const SHUTDOWN_GRACE: Duration = Duration::from_secs(2);
+
+/// Bind `socket` and serve `plugin` on it until `shutdown` resolves (plus at
+/// most [`SHUTDOWN_GRACE`]), then remove the socket.
+///
+/// The daemon refuses a socket whose directory, or any ancestor, is writable
+/// by group or others (`docs/plugin-contract#channel-unix`). A missing socket
+/// directory is created mode `0750`; an existing one is left as it is, and
+/// `janus plugin check` reports whether it passes. The socket itself is
+/// `0660`, so the daemon's user reaches it through the directory's group. A
+/// socket left by a previous run is replaced; any other file at the path is
+/// an error.
+///
+/// With `daemon_uid`, every call is also checked with [`PeerUid`] and refused
+/// with `PERMISSION_DENIED` from any other user.
+pub async fn serve_unix<P: JanusPlugin>(
+    plugin: P,
+    socket: &Path,
+    daemon_uid: Option<u32>,
+    shutdown: impl Future<Output = ()> + Send,
+) -> Result<(), ServeError> {
+    let listener = bind(socket)?;
+    let peer = daemon_uid.map(PeerUid::new);
+    let check_peer = move |req: Request<()>| -> Result<Request<()>, Status> {
+        if let Some(peer) = &peer {
+            peer.check(&req)?;
+        }
+        Ok(req)
+    };
+    tracing::info!(event = "listening", socket = %socket.display(),
+        peer_uid = daemon_uid.map_or("any".to_owned(), |u| u.to_string()));
+    // A graceful shutdown waits for every connection to close, and the
+    // daemon never closes its Notify stream; bound the wait.
+    let (stopping, stopped) = oneshot::channel::<()>();
+    let signal = async move {
+        shutdown.await;
+        let _ = stopping.send(());
+    };
+    let server = tonic::transport::Server::builder()
+        .add_service(JanusPluginServer::with_interceptor(plugin, check_peer))
+        .serve_with_incoming_shutdown(UnixListenerStream::new(listener), signal);
+    let served = tokio::select! {
+        served = server => served,
+        _ = async {
+            match stopped.await {
+                Ok(()) => tokio::time::sleep(SHUTDOWN_GRACE).await,
+                // The server ended by itself; its own result wins.
+                Err(_) => std::future::pending().await,
+            }
+        } => Ok(()),
+    };
+    // Best-effort: the next start removes a stale socket anyway.
+    let _ = std::fs::remove_file(socket);
+    Ok(served?)
+}
+
+fn bind(socket: &Path) -> Result<UnixListener, ServeError> {
+    let dir = socket
+        .parent()
+        .ok_or("socket path has no parent directory")?;
+    if !dir.exists() {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o750)
+            .create(dir)?;
+    }
+    // A socket left by a previous run; never remove anything else.
+    match std::fs::symlink_metadata(socket) {
+        Ok(meta) if meta.file_type().is_socket() => std::fs::remove_file(socket)?,
+        Ok(_) => return Err(format!("{} exists and is not a socket", socket.display()).into()),
+        Err(_) => {}
+    }
+    let listener = UnixListener::bind(socket)?;
+    std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o660))?;
+    Ok(listener)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -87,7 +182,6 @@ mod tests {
 
     use super::*;
     use crate::contract::proto::janus_plugin_client::JanusPluginClient;
-    use crate::contract::proto::janus_plugin_server::{JanusPlugin, JanusPluginServer};
     use crate::contract::proto::{
         NotifyAck, NotifyEvent, ResolveRouteRequest, ResolveRouteResponse,
     };
